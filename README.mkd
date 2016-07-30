@@ -1,0 +1,7 @@
+virt-backup [WORK IN PROGRESS]
+==============================
+
+Backup your kvm guests (using the blockcommit feature) managed by libvirt. The
+main goal is to do a modest alternative to the Proxmox VE backup system
+(without their vma system), to automatically backup your disks (with optional
+compression) and easily restore one.

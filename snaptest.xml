@@ -1,0 +1,6 @@
+<domainsnapshot>
+    <description>Basic external snapshot</description>
+    <disks>
+        <disk name='vda' snapshot='external'/>
+    </disks>
+</domainsnapshot>
