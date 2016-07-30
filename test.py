@@ -5,6 +5,7 @@ import threading
 import os
 import sys
 import time
+from tqdm import tqdm
 
 
 # Domain id used to test the result
@@ -25,9 +26,34 @@ def virEventLoopNativeStart():
     eventLoopThread.start()
 
 
+def copy_file_progress(src, dst, buffersize=512*1024):
+    total_size = os.path.getsize(src)
+    if not os.path.exists(dst) and dst.endswith("/"):
+        os.mkdir(dst)
+    if os.path.isdir(dst):
+        dst = os.path.join(dst, os.basename(src))
+
+    # Load tqdm with size counter instead of files counter
+    with tqdm(total=total_size, unit='B', unit_scale=True, ncols=0) as pbar, \
+            open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+        while True:
+            buf = fsrc.read(buffersize)
+            if not buf:
+                break
+            fdst.write(buf)
+            pbar.update(len(buf))
+
+
+def backup_img(disk, target, compress=False):
+    print("start backup")
+    copy_file_progress(disk, target)
+    print("over")
+
+
 def pivot_callback(conn, dom, disk, event_id, status, *args):
     if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY:
         print(disk)
+        backup_img(disk, "/mnt/kvm/backups/{}.qcow2".format(dom.ID()))
         dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
         os.remove(disk)
         print("done")
