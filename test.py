@@ -10,10 +10,6 @@ import time
 # Domain id used to test the result
 GUEST_TEST_NAME = "ubuntu15.10"
 
-# This keeps track of what thread is running the event loop,
-# (if it is run in a background thread)
-eventLoopThread = None
-
 
 def virEventLoopNativeRun():
     while True:
@@ -21,7 +17,6 @@ def virEventLoopNativeRun():
 
 
 def virEventLoopNativeStart():
-    global eventLoopThread
     libvirt.virEventRegisterDefaultImpl()
     eventLoopThread = threading.Thread(
         target=virEventLoopNativeRun, name="libvirtEventLoop"
