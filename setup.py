@@ -30,8 +30,10 @@ setup(
     ],
 
     keywords="libvirt",
-    packages=["virt-backup", ],
-    install_requires=["libvirt", "tqdm"],
+    packages=["virt_backup", ],
+    install_requires=["libvirt-python", "tqdm"],
+    setup_requires=['pytest-runner', ],
+    tests_require=['pytest', 'pytest-cov', "pytest-mock", "pytest-xdist"],
     entry_points={
         'console_scripts': [
             'virt-backup = virt_backup.__main__:start_backup',
