@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import defusedxml
 import libvirt
 import os
 from virt_backup.tools import copy_file_progress
@@ -9,6 +10,24 @@ class DomBackup():
     """
     Libvirt domain backup
     """
+    def _parse_xml(self):
+        """
+        Parse the domain's definition
+        """
+        return defusedxml.lxml.fromstring(self.dom.XMLDesc())
+
+    def _get_disks(self):
+        """
+        Get disks from the domain xml
+        """
+        dom_xml = self._parse_xml()
+        for elem in dom_xml.xpath("devices/disk"):
+            try:
+                if elem.get("device", None) == "disk":
+                    yield elem.xpath("target")[0].get("dev")
+            except IndexError:
+                continue
+
     def backup_img(self, disk, target, compress=False):
         print("start backup")
         copy_file_progress(disk, target)
@@ -32,7 +51,7 @@ class DomBackup():
     def external_snapshot(self):
         snap_xml = self.gen_snapshot_xml()
         try:
-            self.domain.snapshotCreateXML(
+            self.dom.snapshotCreateXML(
                 snap_xml,
                 (
                     libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY +
@@ -43,17 +62,17 @@ class DomBackup():
         except:
             print("Backup already exists, pass…")
 
-    def start(self, conn):
+    def start(self):
         event_register_args = (
             None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB, self.pivot_callback,
             None
         )
         try:
-            conn.domainEventRegisterAny(*event_register_args)
+            self.conn.domainEventRegisterAny(*event_register_args)
             self.external_snapshot()
             for disk in self.disks:
                 self.backup_img(disk, self.target_dir)
-                self.domain.blockCommit(
+                self.dom.blockCommit(
                     disk, None, None, 0,
                     (
                         libvirt.VIR_DOMAIN_BLOCK_COMMIT_ACTIVE +
@@ -62,9 +81,10 @@ class DomBackup():
                 )
         finally:
             #: TODO: block this step with an event
-            conn.domainEventDeregisterAny(*event_register_args)
+            self.conn.domainEventDeregisterAny(*event_register_args)
 
-    def __init__(self, domain, target_dir=None, disks=None):
-        self.domain = domain
+    def __init__(self, dom, target_dir=None, disks=None, conn=None):
+        self.dom = dom
+        self.conn = self.dom._conn if conn is None else conn
         self.target_dir = target_dir
-        self.disks = [] if disks is None else disks
+        self.disks = self._get_disks() if disks is None else disks

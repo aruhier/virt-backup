@@ -1,0 +1,31 @@
+<domain type='kvm' id='1'>
+  <name>test</name>
+  <uuid>59710e20-e403-45f1-959b-b64b53e2d213</uuid>
+  <title>test domain</title>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-2.6'>hvm</type>
+  </os>
+  <devices>
+    <emulator>/usr/sbin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/test-disk-1.qcow2'/>
+      <backingStore/>
+      <target dev='vda' bus='virtio'/>
+      <shareable/>
+      <boot order='1'/>
+      <alias name='virtio-disk0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x08' function='0x0'/>
+    </disk>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/test-disk-2.qcow2'/>
+      <backingStore/>
+      <target dev='vdb' bus='virtio'/>
+      <shareable/>
+      <alias name='virtio-disk1'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x09' function='0x0'/>
+    </disk>
+  </devices>
+</domain>
+
