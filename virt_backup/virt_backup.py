@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 import datetime
-import defusedxml
+import defusedxml.lxml
 import libvirt
-import lxml
+import lxml.etree
 import os
+import threading
 from virt_backup.tools import copy_file_progress
 
 
@@ -23,21 +24,27 @@ class DomBackup():
         Get disks from the domain xml
         """
         dom_xml = self._parse_xml()
+        disks = {}
         for elem in dom_xml.xpath("devices/disk"):
             try:
                 if elem.get("device", None) == "disk":
-                    yield elem.xpath("target")[0].get("dev")
+                    dev = elem.xpath("target")[0].get("dev")
+                    src = elem.xpath("source")[0].get("file")
+                    disks[dev] = src
             except IndexError:
                 continue
+        return disks
 
     def backup_img(self, disk, target, compress=False):
         copy_file_progress(disk, target)
+        print("backup ok")
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
         domain_matches = dom.ID() == self.dom.ID()
         if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
             dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
             os.remove(disk)
+            self._wait_for_pivot.set()
 
     def gen_snapshot_xml(self):
         """
@@ -52,47 +59,49 @@ class DomBackup():
 
         disks_el = lxml.etree.Element("disks")
         root_el.append(disks_el)
-        for d in self.disks:
+        for d in sorted(self.disks.keys()):
             disk_el = lxml.etree.Element("disk")
             disk_el.attrib["name"] = d
             disk_el.attrib["snapshot"] = "external"
             disks_el.append(disk_el)
 
-        return lxml.etree.tostring(xml_tree, pretty_print=True)
+        return lxml.etree.tostring(xml_tree, pretty_print=True).decode()
 
     def external_snapshot(self):
         snap_xml = self.gen_snapshot_xml()
-        try:
-            self.dom.snapshotCreateXML(
-                snap_xml,
-                (
-                    libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY +
-                    libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC +
-                    libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
-                )
+        # try:
+        self.dom.snapshotCreateXML(
+            snap_xml,
+            (
+                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY +
+                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC +
+                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
             )
-        except:
-            print("Backup already exists, pass…")
+        )
+        # except:
+        #   print("Backup already exists, pass…")
 
     def start(self):
-        event_register_args = (
-            None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB, self.pivot_callback,
-            None
-        )
+        self._wait_for_pivot.clear()
         try:
-            self.conn.domainEventRegisterAny(*event_register_args)
+            callback_id = self.conn.domainEventRegisterAny(
+                None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
+                self.pivot_callback, None
+            )
             self.external_snapshot()
+            # TODO: handle backingStore cases
             # TODO: maybe we should tar everything + put the xml into it?
-            for disk in self.disks:
+            for disk, src in self.disks.items():
                 # TODO: actually get the correct format of the current disk
                 # TODO: allow a user to set the format
-                target_img = os.join(
-                    self.target, "{}-{}-{}.qcow2".format(
+                target_img = os.path.join(
+                    self.target_dir, "{}-{}-{}.qcow2".format(
                         self.dom.name(), disk,
                         datetime.datetime.now().strftime("%Y%m%d-%H%M")
                     )
                 )
-                self.backup_img(disk, target_img)
+                # XXX: disk is the disk name, where it should be the path here
+                self.backup_img(src, target_img)
                 self.dom.blockCommit(
                     disk, None, None, 0,
                     (
@@ -100,12 +109,15 @@ class DomBackup():
                         libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
                     )
                 )
+                # TODO: setup a timeout here
+                self._wait_for_pivot.wait()
         finally:
             #: TODO: block this step with an event
-            self.conn.domainEventDeregisterAny(*event_register_args)
+            self.conn.domainEventDeregisterAny(callback_id)
 
     def __init__(self, dom, target_dir=None, disks=None, conn=None):
         self.dom = dom
         self.conn = self.dom._conn if conn is None else conn
         self.target_dir = target_dir
         self.disks = self._get_disks() if disks is None else disks
+        self._wait_for_pivot = threading.Event()

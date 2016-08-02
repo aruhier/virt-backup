@@ -16,7 +16,7 @@ class MockDomain():
         """
         Return the definition of a testing domain
         """
-        with open(os.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
+        with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
             dom_xml = "".join(dom_xmlfile.readlines())
         return dom_xml
 
@@ -31,9 +31,12 @@ def fixture_build_mock_domain(mocker):
 
 def test_get_disks(fixture_build_mock_domain):
     dombkup = DomBackup(dom=fixture_build_mock_domain)
-    expected_disks = ("vda", "vdb")
+    expected_disks = {
+        "vda": "/var/lib/libvirt/images/test-disk-1.qcow2",
+        "vdb": "/var/lib/libvirt/images/test-disk-2.qcow2",
+    }
 
-    dombkup._get_disks == expected_disks
+    assert dombkup._get_disks() == expected_disks
 
 
 def test_get_snapshot_xml(fixture_build_mock_domain):
@@ -42,9 +45,9 @@ def test_get_snapshot_xml(fixture_build_mock_domain):
         "<domainsnapshot>\n"
         "  <description>Pre-backup external snapshot</description>\n"
         "  <disks>\n"
-        "    <disk name=vda snapshot=external/>\n"
-        "    <disk name=vdb snapshot=external/>\n"
+        "    <disk name=\"vda\" snapshot=\"external\"/>\n"
+        "    <disk name=\"vdb\" snapshot=\"external\"/>\n"
         "  </disks>\n"
-        "</domainsnapshot>"
+        "</domainsnapshot>\n"
     )
-    dombkup.gen_snapshot_xml == expected_xml
+    assert dombkup.gen_snapshot_xml() == expected_xml

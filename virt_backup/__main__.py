@@ -5,7 +5,7 @@ import sys
 import time
 import threading
 
-from .virt_backup import pivot_callback
+from .virt_backup import DomBackup
 
 
 # Domain id used to test the result
@@ -39,8 +39,8 @@ def start_backup():
         print('Failed to find the main domain')
         sys.exit(1)
 
-    print("Domain 0: id %d running %s" % (dom0.ID(), dom0.OSType()))
-    print(dom0.info())
+    dbkup = DomBackup(dom0, target_dir="/mnt/kvm/backups", conn=conn)
+    dbkup.start()
 
     conn.setKeepAlive(5, 3)
     while True:
