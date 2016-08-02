@@ -69,7 +69,6 @@ class DomBackup():
 
     def external_snapshot(self):
         snap_xml = self.gen_snapshot_xml()
-        # try:
         self.dom.snapshotCreateXML(
             snap_xml,
             (
@@ -78,8 +77,6 @@ class DomBackup():
                 libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
             )
         )
-        # except:
-        #   print("Backup already exists, pass…")
 
     def start(self):
         self._wait_for_pivot.clear()
