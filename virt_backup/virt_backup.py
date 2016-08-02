@@ -2,6 +2,7 @@
 
 import defusedxml
 import libvirt
+import lxml
 import os
 from virt_backup.tools import copy_file_progress
 
@@ -46,7 +47,22 @@ class DomBackup():
         """
         Generate a xml defining the snapshot
         """
-        #: TODO
+        root_el = lxml.etree.Element("domainsnapshot")
+        xml_tree = root_el.getroottree()
+
+        descr_el = lxml.etree.Element("description")
+        root_el.append(descr_el)
+        descr_el.text = "Pre-backup external snapshot"
+
+        disks_el = lxml.etree.Element("disks")
+        root_el.append(disks_el)
+        for d in self.disks:
+            disk_el = lxml.etree.Element("disk")
+            disk_el.attrib["name"] = d
+            disk_el.attrib["snapshot"] = "external"
+            disks_el.append(disk_el)
+
+        return lxml.etree.tostring(xml_tree, pretty_print=True)
 
     def external_snapshot(self):
         snap_xml = self.gen_snapshot_xml()

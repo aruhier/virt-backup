@@ -34,3 +34,17 @@ def test_get_disks(fixture_build_mock_domain):
     expected_disks = ("vda", "vdb")
 
     dombkup._get_disks == expected_disks
+
+
+def test_get_snapshot_xml(fixture_build_mock_domain):
+    dombkup = DomBackup(dom=fixture_build_mock_domain)
+    expected_xml = (
+        "<domainsnapshot>\n"
+        "  <description>Pre-backup external snapshot</description>\n"
+        "  <disks>\n"
+        "    <disk name=vda snapshot=external/>\n"
+        "    <disk name=vdb snapshot=external/>\n"
+        "  </disks>\n"
+        "</domainsnapshot>"
+    )
+    dombkup.gen_snapshot_xml == expected_xml
