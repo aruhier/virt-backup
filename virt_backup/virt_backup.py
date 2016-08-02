@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import datetime
 import defusedxml
 import libvirt
 import lxml
@@ -30,18 +31,13 @@ class DomBackup():
                 continue
 
     def backup_img(self, disk, target, compress=False):
-        print("start backup")
         copy_file_progress(disk, target)
-        print("backup over")
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
         domain_matches = dom.ID() == self.dom.ID()
         if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
-            print(disk)
-            self.backup_img(disk, "/mnt/kvm/backups/{}.qcow2".format(dom.ID()))
             dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
             os.remove(disk)
-            print("done")
 
     def gen_snapshot_xml(self):
         """
@@ -86,8 +82,17 @@ class DomBackup():
         try:
             self.conn.domainEventRegisterAny(*event_register_args)
             self.external_snapshot()
+            # TODO: maybe we should tar everything + put the xml into it?
             for disk in self.disks:
-                self.backup_img(disk, self.target_dir)
+                # TODO: actually get the correct format of the current disk
+                # TODO: allow a user to set the format
+                target_img = os.join(
+                    self.target, "{}-{}-{}.qcow2".format(
+                        self.dom.name(), disk,
+                        datetime.datetime.now().strftime("%Y%m%d-%H%M")
+                    )
+                )
+                self.backup_img(disk, target_img)
                 self.dom.blockCommit(
                     disk, None, None, 0,
                     (
