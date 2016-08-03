@@ -36,7 +36,7 @@ class DomBackup():
         return disks
 
     def backup_img(self, disk, target, compress=False):
-        copy_file_progress(disk, target)
+        copy_file_progress(disk, target, buffersize=10*1024*1024)
         print("backup ok")
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
