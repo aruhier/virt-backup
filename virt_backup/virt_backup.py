@@ -3,10 +3,14 @@
 import datetime
 import defusedxml.lxml
 import libvirt
+import logging
 import lxml.etree
 import os
 import threading
 from virt_backup.tools import copy_file_progress
+
+
+logger = logging.getLogger("virt_backup")
 
 
 class DomBackup():
@@ -38,10 +42,24 @@ class DomBackup():
         return disks
 
     def backup_img(self, disk, target, compress=False):
+        """
+        Backup a disk image
+
+        :param disk: path of the image to backup
+        :param target: dir or filename to copy into/as
+        :param compress: (not used yet) use a compression method?
+        """
+        logger.debug("Copy {} as {}".format(disk, target))
         copy_file_progress(disk, target, buffersize=10*1024*1024)
-        print("backup ok")
+        logger.debug("{} successfully copied as {}".format(disk, target))
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
+        """
+        Pivot the snapshot
+
+        If the received domain matches with the one associated to this backup,
+        abort the blockjob and pivot it.
+        """
         domain_matches = dom.ID() == self.dom.ID()
         if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
             dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
@@ -70,6 +88,9 @@ class DomBackup():
         return lxml.etree.tostring(xml_tree, pretty_print=True).decode()
 
     def external_snapshot(self):
+        """
+        Create an external snapshot in order to freeze the base image
+        """
         snap_xml = self.gen_snapshot_xml()
         self.dom.snapshotCreateXML(
             snap_xml,
@@ -81,7 +102,11 @@ class DomBackup():
         )
 
     def start(self):
+        """
+        Start the entire backup process for all disks in self.disks
+        """
         self._wait_for_pivot.clear()
+        print("Backup started for domain {}".format(self.dom.name()))
         try:
             callback_id = self.conn.domainEventRegisterAny(
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
@@ -92,6 +117,9 @@ class DomBackup():
             # TODO: maybe we should tar everything + put the xml into it?
             for disk, prop in self.disks.items():
                 # TODO: allow a user to set the format
+                logger.info(
+                    "Backup disk {} of domain {}".format(disk, self.dom.name())
+                )
                 target_img = os.path.join(
                     self.target_dir, "{}-{}-{}.{}".format(
                         self.dom.name(), disk,
@@ -100,6 +128,10 @@ class DomBackup():
                     )
                 )
                 self.backup_img(prop["src"], target_img)
+
+                logger.info(
+                    "Starts to blockcommit {} to pivot snapshot".format(disk)
+                )
                 self.dom.blockCommit(
                     disk, None, None, 0,
                     (
@@ -110,8 +142,8 @@ class DomBackup():
                 # TODO: setup a timeout here
                 self._wait_for_pivot.wait()
         finally:
-            #: TODO: block this step with an event
             self.conn.domainEventDeregisterAny(callback_id)
+        print("Backup finished for domain {}".format(self.dom.name()))
 
     def __init__(self, dom, target_dir=None, disks=None, conn=None):
         self.dom = dom

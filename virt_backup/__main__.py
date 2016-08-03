@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
 import libvirt
+import logging
 import sys
 import time
 import threading
 
 from .virt_backup import DomBackup
+
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 # Domain id used to test the result
