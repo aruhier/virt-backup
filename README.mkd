@@ -6,6 +6,8 @@ main goal is to do a modest alternative to the Proxmox VE backup system
 (without their vma system), to automatically backup your disks (with optional
 compression) and easily restore one.
 
+**For the moment, the mainfile is really specific to my testing setup.**
+
 
 License
 -------
