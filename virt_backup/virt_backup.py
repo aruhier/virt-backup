@@ -30,7 +30,9 @@ class DomBackup():
                 if elem.get("device", None) == "disk":
                     dev = elem.xpath("target")[0].get("dev")
                     src = elem.xpath("source")[0].get("file")
-                    disks[dev] = src
+                    disk_type = elem.xpath("driver")[0].get("type")
+
+                    disks[dev] = {"src": src, "type": disk_type}
             except IndexError:
                 continue
         return disks
@@ -88,16 +90,16 @@ class DomBackup():
             self.external_snapshot()
             # TODO: handle backingStore cases
             # TODO: maybe we should tar everything + put the xml into it?
-            for disk, src in self.disks.items():
-                # TODO: actually get the correct format of the current disk
+            for disk, prop in self.disks.items():
                 # TODO: allow a user to set the format
                 target_img = os.path.join(
-                    self.target_dir, "{}-{}-{}.qcow2".format(
+                    self.target_dir, "{}-{}-{}.{}".format(
                         self.dom.name(), disk,
-                        datetime.datetime.now().strftime("%Y%m%d-%H%M")
+                        datetime.datetime.now().strftime("%Y%m%d-%H%M"),
+                        prop["type"]
                     )
                 )
-                self.backup_img(src, target_img)
+                self.backup_img(prop["src"], target_img)
                 self.dom.blockCommit(
                     disk, None, None, 0,
                     (

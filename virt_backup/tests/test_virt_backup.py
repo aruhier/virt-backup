@@ -32,8 +32,14 @@ def fixture_build_mock_domain(mocker):
 def test_get_disks(fixture_build_mock_domain):
     dombkup = DomBackup(dom=fixture_build_mock_domain)
     expected_disks = {
-        "vda": "/var/lib/libvirt/images/test-disk-1.qcow2",
-        "vdb": "/var/lib/libvirt/images/test-disk-2.qcow2",
+        "vda": {
+            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+            "type": "qcow2",
+        },
+        "vdb": {
+            "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
+            "type": "qcow2",
+        }
     }
 
     assert dombkup._get_disks() == expected_disks
