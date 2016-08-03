@@ -97,7 +97,6 @@ class DomBackup():
                         datetime.datetime.now().strftime("%Y%m%d-%H%M")
                     )
                 )
-                # XXX: disk is the disk name, where it should be the path here
                 self.backup_img(src, target_img)
                 self.dom.blockCommit(
                     disk, None, None, 0,
