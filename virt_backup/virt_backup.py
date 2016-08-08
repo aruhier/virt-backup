@@ -13,6 +13,63 @@ from virt_backup.tools import copy_file_progress
 logger = logging.getLogger("virt_backup")
 
 
+class BackupGroup():
+    """
+    Group of libvirt domain backups
+    """
+    def search(self, dom):
+        """
+        Search for a domain
+
+        :param dom: domain to search the associated DomBackup object.
+                    libvirt.virDomain object
+        :returns: a generator of DomBackup matching
+        """
+        for backup in self.backups:
+            if backup.dom == dom:
+                yield backup
+
+    def add_backup(self, dom, disks=()):
+        """
+        Add a domain and disks to backup in this group
+
+        If a backup already exists for the domain, will add the disks to the
+        first backup found
+
+        :param dom: dom to backup
+        :param disks: disks to backup and attached to dom
+        """
+        try:
+            # if a backup of `dom` already exists, add the disks to the first
+            # backup found
+            existing_bak = next(self.search(dom))
+            existing_bak.add_disks(*disks)
+        except StopIteration:
+            # spawn a new DomBackup instance otherwise
+            self.backups.append(
+                DomBackup(dom=dom, disks=disks, target_dir=self.target_dir)
+            )
+
+    def __init__(self, domlst=None, target=None):
+        """
+        :param domlst: domain and disks to backup. If specified, has to be a
+                       dict, where key would be the domain to backup, and value
+                       an iterable containing the disks name to backup. Value
+                       could be None
+        """
+        #: list of DomBackup
+        self.backups = list()
+        if domlst:
+            for dom, disks in domlst:
+                self.add_backup(dom, disks)
+
+        # TODO: move target in a property, so changing it would change the
+        # target of each backups attached
+
+        #: directory where backups will be saved
+        self.target = target
+
+
 class DomBackup():
     """
     Libvirt domain backup
@@ -45,9 +102,32 @@ class DomBackup():
                     disks[dev] = {"src": src, "type": disk_type}
             except IndexError:
                 continue
-        # TODO: throw an exception if a disk was is the filter but in fact not
+        # TODO: raise an exception if a disk was is the filter but in fact not
         #       found in the domain
         return disks
+
+    def add_disks(self, *dev_disks):
+        """
+        Add disk by dev name
+
+        .. warning::
+
+            Adding a disk during a backup is not recommended, as the current
+            disks list could be inaccurate. It will pull the informations
+            about the current disks attached to the domain, but the backup
+            process creates temporary external snapshots, changing the current
+            disks attached. This should not be an issue when the backingStore
+            property will be correctly handled, but for now it is.
+
+        :param dev_disk: dev name of the new disk to backup
+        """
+        if len(dev_disks) == 0:
+            raise Exception("At least one disk name is needed")
+        dom_all_disks = self._get_disks()
+        for dev in dev_disks:
+            if dev in self.disks:
+                continue
+            self.disks[dev] = dom_all_disks[dev]
 
     def backup_img(self, disk, target, compress=False):
         """
