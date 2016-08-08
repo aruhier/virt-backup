@@ -23,9 +23,13 @@ class DomBackup():
         """
         return defusedxml.lxml.fromstring(self.dom.XMLDesc())
 
-    def _get_disks(self):
+    def _get_disks(self, *filter_dev):
         """
         Get disks from the domain xml
+
+        :param filter_dev: return only disks for which the dev name matches
+                           with one in filter_dev. If no parameter, will return
+                           every disks.
         """
         dom_xml = self._parse_xml()
         disks = {}
@@ -33,12 +37,16 @@ class DomBackup():
             try:
                 if elem.get("device", None) == "disk":
                     dev = elem.xpath("target")[0].get("dev")
+                    if len(filter_dev) and dev not in filter_dev:
+                        continue
                     src = elem.xpath("source")[0].get("file")
                     disk_type = elem.xpath("driver")[0].get("type")
 
                     disks[dev] = {"src": src, "type": disk_type}
             except IndexError:
                 continue
+        # TODO: throw an exception if a disk was is the filter but in fact not
+        #       found in the domain
         return disks
 
     def backup_img(self, disk, target, compress=False):
@@ -144,8 +152,14 @@ class DomBackup():
             self.conn.domainEventDeregisterAny(callback_id)
         print("Backup finished for domain {}".format(self.dom.name()))
 
-    def __init__(self, dom, target_dir=None, disks=None, conn=None,
-                 timeout=None):
+    def __init__(self, dom, target_dir=None, dev_disks=None, conn=None,
+                 timeout=None, _disks=None):
+        """
+        :param dev_disks: list of disks dev names to backup. Disks will be
+                          searched in the domain to pull more informations, and
+                          an exception will be thrown if one of them is not
+                          found
+        """
         #: domain to backup. Has to be a libvirt.virDomain object
         self.dom = dom
 
@@ -153,7 +167,9 @@ class DomBackup():
         self.target_dir = target_dir
 
         #: disks to backups. If None, will backup every vm disks
-        self.disks = self._get_disks() if disks is None else disks
+        if dev_disks:
+            _disks = self._get_disks(dev_disks)
+        self.disks = self._get_disks() if _disks is None else _disks
 
         #: libvirt connection to use. If not sent, will use the connection used
         #  for self.domain
