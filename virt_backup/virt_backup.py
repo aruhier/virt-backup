@@ -139,15 +139,29 @@ class DomBackup():
                         libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
                     )
                 )
-                # TODO: setup a timeout here
-                self._wait_for_pivot.wait()
+                self._wait_for_pivot.wait(timeout=self.timeout)
         finally:
             self.conn.domainEventDeregisterAny(callback_id)
         print("Backup finished for domain {}".format(self.dom.name()))
 
-    def __init__(self, dom, target_dir=None, disks=None, conn=None):
+    def __init__(self, dom, target_dir=None, disks=None, conn=None,
+                 timeout=None):
+        #: domain to backup. Has to be a libvirt.virDomain object
         self.dom = dom
-        self.conn = self.dom._conn if conn is None else conn
+
+        #: directory where backups will be saved
         self.target_dir = target_dir
+
+        #: disks to backups. If None, will backup every vm disks
         self.disks = self._get_disks() if disks is None else disks
+
+        #: libvirt connection to use. If not sent, will use the connection used
+        #  for self.domain
+        self.conn = self.dom._conn if conn is None else conn
+
+        #: timeout when waiting for the block pivot to end. Infinite wait if
+        #  timeout is None
+        self.timeout = timeout
+
+        #: used to trigger when block pivot ends
         self._wait_for_pivot = threading.Event()
