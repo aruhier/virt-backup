@@ -50,7 +50,7 @@ class BackupGroup():
                 DomBackup(dom=dom, disks=disks, target_dir=self.target_dir)
             )
 
-    def __init__(self, domlst=None, target=None):
+    def __init__(self, domlst=None, target_dir=None):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -67,7 +67,7 @@ class BackupGroup():
         # target of each backups attached
 
         #: directory where backups will be saved
-        self.target = target
+        self.target_dir = target_dir
 
 
 class DomBackup():
