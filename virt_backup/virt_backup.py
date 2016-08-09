@@ -47,7 +47,7 @@ class BackupGroup():
         except StopIteration:
             # spawn a new DomBackup instance otherwise
             self.backups.append(
-                DomBackup(dom=dom, disks=disks, target_dir=self.target_dir)
+                DomBackup(dom=dom, dev_disks=disks, target_dir=self.target_dir)
             )
 
     def __init__(self, domlst=None, target_dir=None):
@@ -59,15 +59,20 @@ class BackupGroup():
         """
         #: list of DomBackup
         self.backups = list()
-        if domlst:
-            for dom, disks in domlst:
-                self.add_backup(dom, disks)
 
         # TODO: move target in a property, so changing it would change the
         # target of each backups attached
 
         #: directory where backups will be saved
         self.target_dir = target_dir
+
+        if domlst:
+            for bak_item in domlst:
+                try:
+                    dom, disks = bak_item
+                except TypeError:
+                    dom, disks = (bak_item, ())
+                self.add_backup(dom, disks)
 
 
 class DomBackup():
@@ -119,11 +124,12 @@ class DomBackup():
             disks attached. This should not be an issue when the backingStore
             property will be correctly handled, but for now it is.
 
-        :param dev_disk: dev name of the new disk to backup
+        :param dev_disk: dev name of the new disk to backup. If not indicated,
+                         will add all disks.
         """
-        if len(dev_disks) == 0:
-            raise Exception("At least one disk name is needed")
         dom_all_disks = self._get_disks()
+        if len(dev_disks) == 0:
+            self.disks = dom_all_disks
         for dev in dev_disks:
             if dev in self.disks:
                 continue
