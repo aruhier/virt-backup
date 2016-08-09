@@ -17,6 +17,18 @@ class BackupGroup():
     """
     Group of libvirt domain backups
     """
+    @property
+    def target_dir(self):
+        return self._target_dir
+
+    @target_dir.setter
+    def target_dir(self, val):
+        """
+        Change the target dir for all attached backups
+        """
+        for b in self.backups:
+            b.target = val
+
     def search(self, dom):
         """
         Search for a domain
@@ -60,11 +72,8 @@ class BackupGroup():
         #: list of DomBackup
         self.backups = list()
 
-        # TODO: move target in a property, so changing it would change the
-        # target of each backups attached
-
         #: directory where backups will be saved
-        self.target_dir = target_dir
+        self._target_dir = target_dir
 
         if domlst:
             for bak_item in domlst:
