@@ -161,3 +161,11 @@ def test_backup_group_search_not_found(fixture_build_mock_domain):
 
     with pytest.raises(StopIteration):
         next(backup_group.search(dom))
+
+
+def test_backup_group_start(fixture_build_mock_domain, mocker):
+    backup_group = BackupGroup(domlst=(fixture_build_mock_domain, ))
+    backup_group.backups[0].start = mocker.stub()
+
+    backup_group.start()
+    assert backup_group.backups[0].start.called

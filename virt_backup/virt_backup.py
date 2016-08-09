@@ -62,6 +62,13 @@ class BackupGroup():
                 DomBackup(dom=dom, dev_disks=disks, target_dir=self.target_dir)
             )
 
+    def start(self):
+        """
+        Start to backup all DomBackup objects attached
+        """
+        for b in self.backups:
+            b.start()
+
     def __init__(self, domlst=None, target_dir=None):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
