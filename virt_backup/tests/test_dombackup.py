@@ -1,9 +1,9 @@
 
 import datetime
 import pytest
+import tarfile
 
 from virt_backup.virt_backup import DomBackup
-from helper.datetime import MockDatetime
 
 
 def test_get_disks(fixture_build_mock_domain):
@@ -104,3 +104,33 @@ def test_disk_backup_name_format(fixture_build_mock_domain):
 
     expected_name = "20160815-171013_1_test_vda"
     assert dombkup._disk_backup_name_format(snapdate, "vda") == expected_name
+
+
+def test_get_new_tar(fixture_build_mock_domain, tmpdir, compression="tar"):
+    dombkup = DomBackup(dom=fixture_build_mock_domain, compression=compression)
+    snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+
+    target_dir = tmpdir.mkdir("get_new_tar")
+
+    if compression == "tar":
+        extension = "tar"
+    else:
+        extension = "tar.{}".format(compression)
+    tar_path = target_dir.join(
+        "{}.{}".format(dombkup._main_backup_name_format(snapdate), extension)
+    )
+    with dombkup.get_new_tar(str(target_dir), snapshot_date=snapdate):
+        assert tar_path.check()
+
+
+def test_get_new_tar_xz(fixture_build_mock_domain, tmpdir):
+    return test_get_new_tar(
+        fixture_build_mock_domain, tmpdir, compression="xz"
+    )
+
+
+def test_get_new_tar_unvalid_compression(fixture_build_mock_domain, tmpdir):
+    with pytest.raises(tarfile.CompressionError):
+        return test_get_new_tar(
+            fixture_build_mock_domain, tmpdir, compression="test"
+        )
