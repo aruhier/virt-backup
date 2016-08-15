@@ -36,6 +36,7 @@ def start_backup():
     if conn is None:
         print('Failed to open connection to the hypervisor')
         sys.exit(1)
+    conn.setKeepAlive(5, 3)
 
     try:
         dom0 = conn.lookupByName(GUEST_TEST_NAME)
@@ -45,10 +46,6 @@ def start_backup():
 
     dbkup = DomBackup(dom0, target_dir="/mnt/kvm/backups", conn=conn)
     dbkup.start()
-
-    conn.setKeepAlive(5, 3)
-    while True:
-        time.sleep(1)
 
 
 if __name__ == "__main__":
