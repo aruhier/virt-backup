@@ -11,7 +11,7 @@ DEFAULT_BUFFERSIZE = 512*1024
 def copy_file_progress(src, dst, buffersize=DEFAULT_BUFFERSIZE):
     total_size = os.path.getsize(src)
     if not os.path.exists(dst) and dst.endswith("/"):
-        os.mkdir(dst)
+        os.makedirs(dst)
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.basename(src))
 

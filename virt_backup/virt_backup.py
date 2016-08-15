@@ -6,6 +6,7 @@ import libvirt
 import logging
 import lxml.etree
 import os
+import tarfile
 import threading
 from tqdm import tqdm
 from virt_backup.tools import copy_file_progress, get_progress_bar_tar
@@ -174,15 +175,22 @@ class DomBackup():
                 continue
             self.disks[dev] = dom_all_disks[dev]
 
-    def backup_img(self, disk, target):
+    def backup_img(self, disk, target, target_filename=None):
         """
         Backup a disk image
 
         :param disk: path of the image to backup
         :param target: dir or filename to copy into/as
+        :param target_filename: destination file will have this name, or keep
+                                the original one. target has to be a dir
+                                (if not exists, will be created)
         """
-        logger.debug("Copy {} as {}".format(disk, target))
-        if self.compress is None:
+        if self.compression is None:
+            if target_filename is not None:
+                if not os.path.isdir(target):
+                    os.makedirs(target)
+                target = os.path.join(target, target_filename)
+            logger.debug("Copy {} as {}".format(disk, target))
             copy_file_progress(disk, target, buffersize=10*1024*1024)
         else:
             # target is a tarfile.TarFile
@@ -191,10 +199,38 @@ class DomBackup():
                 "total": total_size, "unit": "B", "unit_scale": True,
                 "ncols": 0
             }
+            logger.debug("Copy {}…".format(disk))
             with tqdm(**tqdm_kwargs) as pbar:
                 target.fileobject = get_progress_bar_tar(pbar)
-                target.add(disk)
-        logger.debug("{} successfully copied as {}".format(disk, target))
+                target.add(disk, arcname=target_filename)
+        logger.debug("{} successfully copied".format(disk))
+
+    def get_new_tar(self, target, snapshot_date):
+        """
+        Get a new tar for this backup
+
+        self._main_backup_name_format will be used to generate a new tar name
+
+        :param target: directory path that will contain our tar. If not exists,
+                       will be created.
+        """
+        if self.compression not in (None, "tar"):
+            mode = "x:{}".format(self.compression)
+            extension = "tar.{}".format(self.compression)
+        else:
+            mode = "x"
+            extension = "tar"
+
+        if not os.path.isdir(target):
+            os.path.makedirs(target)
+
+        complete_path = os.path.join(
+            target,
+            "{}.{}".format(
+                self._main_backup_name_format(snapshot_date), extension
+            )
+        )
+        return tarfile.open(complete_path, mode)
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
         """
@@ -248,6 +284,7 @@ class DomBackup():
         """
         Start the entire backup process for all disks in self.disks
         """
+        backup_target = None
         self._wait_for_pivot.clear()
         print("Backup started for domain {}".format(self.dom.name()))
         try:
@@ -257,22 +294,22 @@ class DomBackup():
             )
             self.external_snapshot()
             snapshot_date = datetime.datetime.now()
+            backup_target = (
+                self.target_dir if self.compression is None
+                else self.get_new_tar(self.target_dir, snapshot_date)
+            )
 
             # TODO: handle backingStore cases
-            # TODO: maybe we should tar everything + put the xml into it?
+            # TODO: add a json containing our backup metadata
             for disk, prop in self.disks.items():
-                # TODO: allow a user to set the format
                 logger.info(
                     "Backup disk {} of domain {}".format(disk, self.dom.name())
                 )
-                target_img = os.path.join(
-                    self.target_dir,
-                    "{}.{}".format(
-                        self._disk_backup_name_format(snapshot_date, disk),
-                        prop["type"]
-                    )
+                target_img = "{}.{}".format(
+                    self._disk_backup_name_format(snapshot_date, disk),
+                    prop["type"]
                 )
-                self.backup_img(prop["src"], target_img)
+                self.backup_img(prop["src"], backup_target, target_img)
 
                 logger.info(
                     "Starts to blockcommit {} to pivot snapshot".format(disk)
@@ -287,6 +324,9 @@ class DomBackup():
                 self._wait_for_pivot.wait(timeout=self.timeout)
         finally:
             self.conn.domainEventDeregisterAny(callback_id)
+            if isinstance(backup_target, tarfile.TarFile):
+                backup_target.close()
+            # TODO: remove our broken backup if it failed
         print("Backup finished for domain {}".format(self.dom.name()))
 
     def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
