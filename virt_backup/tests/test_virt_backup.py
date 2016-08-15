@@ -134,7 +134,8 @@ def test_main_backup_name_format(fixture_build_mock_domain):
     MockDatetime.fixed_date = snapdate
     datetime.datetime = MockDatetime
 
-    assert dombkup._main_backup_name_format(snapdate) == "20160815-1710_1_test"
+    expected_name = "20160815-171013_1_test"
+    assert dombkup._main_backup_name_format(snapdate) == expected_name
 
 
 def test_disk_backup_name_format(fixture_build_mock_domain):
@@ -143,8 +144,8 @@ def test_disk_backup_name_format(fixture_build_mock_domain):
     MockDatetime.fixed_date = snapdate
     datetime.datetime = MockDatetime
 
-    expected_format = "20160815-1710_1_test_vda"
-    assert dombkup._disk_backup_name_format(snapdate, "vda") == expected_format
+    expected_name = "20160815-171013_1_test_vda"
+    assert dombkup._disk_backup_name_format(snapdate, "vda") == expected_name
 
 
 def test_backup_group():

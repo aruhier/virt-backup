@@ -137,7 +137,7 @@ class DomBackup():
 
         :param snapdate: date when external snapshots have been created
         """
-        str_snapdate = snapdate.strftime("%Y%m%d-%H%M")
+        str_snapdate = snapdate.strftime("%Y%m%d-%H%M%S")
         return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
     def _disk_backup_name_format(self, snapdate, disk_name, *args, **kwargs):
