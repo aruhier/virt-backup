@@ -1,4 +1,5 @@
 
+import datetime
 import os
 import pytest
 
@@ -20,8 +21,22 @@ class MockDomain():
             dom_xml = "".join(dom_xmlfile.readlines())
         return dom_xml
 
+    def ID(self):
+        return 1
+
+    def name(self):
+        return "test"
+
     def __init__(self, _conn, *args, **kwargs):
         self._conn = _conn
+
+
+class MockDatetime(datetime.datetime):
+    fixed_date = None
+
+    @classmethod
+    def now(cls):
+        return cls.fixed_date
 
 
 @pytest.fixture
@@ -111,6 +126,25 @@ def test_get_snapshot_xml(fixture_build_mock_domain):
         "</domainsnapshot>\n"
     )
     assert dombkup.gen_snapshot_xml() == expected_xml
+
+
+def test_main_backup_name_format(fixture_build_mock_domain):
+    dombkup = DomBackup(dom=fixture_build_mock_domain)
+    snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+    MockDatetime.fixed_date = snapdate
+    datetime.datetime = MockDatetime
+
+    assert dombkup._main_backup_name_format(snapdate) == "20160815-1710_1_test"
+
+
+def test_disk_backup_name_format(fixture_build_mock_domain):
+    dombkup = DomBackup(dom=fixture_build_mock_domain)
+    snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+    MockDatetime.fixed_date = snapdate
+    datetime.datetime = MockDatetime
+
+    expected_format = "20160815-1710_1_test_vda"
+    assert dombkup._disk_backup_name_format(snapdate, "vda") == expected_format
 
 
 def test_backup_group():

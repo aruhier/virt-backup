@@ -128,6 +128,28 @@ class DomBackup():
         #       found in the domain
         return disks
 
+    def _main_backup_name_format(self, snapdate, *args, **kwargs):
+        """
+        Main backup name format
+
+        Extracted in its own function so it can be easily override
+
+        :param snapdate: date when external snapshots have been created
+        """
+        str_snapdate = snapdate.strftime("%Y%m%d-%H%M")
+        return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
+
+    def _disk_backup_name_format(self, snapdate, disk_name, *args, **kwargs):
+        """
+        Backup name format for each disk when no compression/compacting is set
+
+        :param snapdate: date when external snapshots have been created
+        :param disk_name: disk name currently being backup
+        """
+        return (
+            "{}_{}".format(self._main_backup_name_format(snapdate), disk_name)
+        )
+
     def add_disks(self, *dev_disks):
         """
         Add disk by dev name
@@ -234,7 +256,7 @@ class DomBackup():
                 self.pivot_callback, None
             )
             self.external_snapshot()
-            snapshot_date = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+            snapshot_date = datetime.datetime.now()
 
             # TODO: handle backingStore cases
             # TODO: maybe we should tar everything + put the xml into it?
@@ -244,8 +266,10 @@ class DomBackup():
                     "Backup disk {} of domain {}".format(disk, self.dom.name())
                 )
                 target_img = os.path.join(
-                    self.target_dir, "{}-{}-{}.{}".format(
-                        self.dom.name(), disk, snapshot_date, prop["type"]
+                    self.target_dir,
+                    "{}.{}".format(
+                        self._disk_backup_name_format(snapshot_date, disk),
+                        prop["type"]
                     )
                 )
                 self.backup_img(prop["src"], target_img)
