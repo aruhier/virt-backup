@@ -234,6 +234,8 @@ class DomBackup():
                 self.pivot_callback, None
             )
             self.external_snapshot()
+            snapshot_date = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+
             # TODO: handle backingStore cases
             # TODO: maybe we should tar everything + put the xml into it?
             for disk, prop in self.disks.items():
@@ -243,9 +245,7 @@ class DomBackup():
                 )
                 target_img = os.path.join(
                     self.target_dir, "{}-{}-{}.{}".format(
-                        self.dom.name(), disk,
-                        datetime.datetime.now().strftime("%Y%m%d-%H%M"),
-                        prop["type"]
+                        self.dom.name(), disk, snapshot_date, prop["type"]
                     )
                 )
                 self.backup_img(prop["src"], target_img)
