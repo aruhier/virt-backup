@@ -93,8 +93,6 @@ def test_get_snapshot_xml(fixture_build_mock_domain):
 def test_main_backup_name_format(fixture_build_mock_domain):
     dombkup = DomBackup(dom=fixture_build_mock_domain)
     snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
-    MockDatetime.fixed_date = snapdate
-    datetime.datetime = MockDatetime
 
     expected_name = "20160815-171013_1_test"
     assert dombkup._main_backup_name_format(snapdate) == expected_name
@@ -103,8 +101,6 @@ def test_main_backup_name_format(fixture_build_mock_domain):
 def test_disk_backup_name_format(fixture_build_mock_domain):
     dombkup = DomBackup(dom=fixture_build_mock_domain)
     snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
-    MockDatetime.fixed_date = snapdate
-    datetime.datetime = MockDatetime
 
     expected_name = "20160815-171013_1_test_vda"
     assert dombkup._disk_backup_name_format(snapdate, "vda") == expected_name
