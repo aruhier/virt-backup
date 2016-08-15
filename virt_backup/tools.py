@@ -1,22 +1,39 @@
 #!/usr/bin/env python3
 
 import os
+import tarfile
 from tqdm import tqdm
 
 
-def copy_file_progress(src, dst, buffersize=512*1024):
+DEFAULT_BUFFERSIZE = 512*1024
+
+
+def copy_file_progress(src, dst, buffersize=DEFAULT_BUFFERSIZE):
     total_size = os.path.getsize(src)
     if not os.path.exists(dst) and dst.endswith("/"):
         os.mkdir(dst)
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.basename(src))
 
+    with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+        copy_stream_progress(fsrc, fdst, total_size, buffersize)
+
+
+def copy_stream_progress(stsrc, stdst, total_size,
+                         buffersize=DEFAULT_BUFFERSIZE):
     # Load tqdm with size counter instead of files counter
-    with tqdm(total=total_size, unit='B', unit_scale=True, ncols=0) as pbar, \
-            open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+    with tqdm(total=total_size, unit="B", unit_scale=True, ncols=0) as pbar:
         while True:
-            buf = fsrc.read(buffersize)
+            buf = stsrc.read(buffersize)
             if not buf:
                 break
-            fdst.write(buf)
+            stdst.write(buf)
             pbar.update(len(buf))
+
+
+def get_progress_bar_tar(progress_bar):
+    class FileProgressFileObject(tarfile.ExFileObject):
+        def read(self, size, *args):
+            progress_bar.update(size)
+            return tarfile.ExFileObject.read(self, size, *args)
+    return FileProgressFileObject

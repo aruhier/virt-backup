@@ -7,7 +7,8 @@ import logging
 import lxml.etree
 import os
 import threading
-from virt_backup.tools import copy_file_progress
+from tqdm import tqdm
+from virt_backup.tools import copy_file_progress, get_progress_bar_tar
 
 
 logger = logging.getLogger("virt_backup")
@@ -151,16 +152,26 @@ class DomBackup():
                 continue
             self.disks[dev] = dom_all_disks[dev]
 
-    def backup_img(self, disk, target, compress=False):
+    def backup_img(self, disk, target):
         """
         Backup a disk image
 
         :param disk: path of the image to backup
         :param target: dir or filename to copy into/as
-        :param compress: (not used yet) use a compression method?
         """
         logger.debug("Copy {} as {}".format(disk, target))
-        copy_file_progress(disk, target, buffersize=10*1024*1024)
+        if self.compress is None:
+            copy_file_progress(disk, target, buffersize=10*1024*1024)
+        else:
+            # target is a tarfile.TarFile
+            total_size = os.path.getsize(disk)
+            tqdm_kwargs = {
+                "total": total_size, "unit": "B", "unit_scale": True,
+                "ncols": 0
+            }
+            with tqdm(**tqdm_kwargs) as pbar:
+                target.fileobject = get_progress_bar_tar(pbar)
+                target.add(disk)
         logger.debug("{} successfully copied as {}".format(disk, target))
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
@@ -254,8 +265,8 @@ class DomBackup():
             self.conn.domainEventDeregisterAny(callback_id)
         print("Backup finished for domain {}".format(self.dom.name()))
 
-    def __init__(self, dom, target_dir=None, dev_disks=None, conn=None,
-                 timeout=None, _disks=None):
+    def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
+                 compression_lvl=None, conn=None, timeout=None, _disks=None):
         """
         :param dev_disks: list of disks dev names to backup. Disks will be
                           searched in the domain to pull more informations, and
@@ -272,6 +283,17 @@ class DomBackup():
         if dev_disks:
             _disks = self._get_disks(dev_disks)
         self.disks = self._get_disks() if _disks is None else _disks
+
+        #: string indicating how to compress the backups:
+        #    * None: no compression, backups will be only copied
+        #    * "tar": backups will not be compressed, but packaged in a tar
+        #    * "gz"/"bz2"/"xz": backups will be compressed in a tar +
+        #        compression selected. For more informations, read the
+        #        documentation about the mode argument of tarfile.open
+        self.compression = compression
+
+        #: If compression, indicates the lvl to use
+        self.compression_lvl = compression_lvl
 
         #: libvirt connection to use. If not sent, will use the connection used
         #  for self.domain
