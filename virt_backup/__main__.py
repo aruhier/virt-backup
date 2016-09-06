@@ -3,7 +3,6 @@
 import libvirt
 import logging
 import sys
-import time
 import threading
 
 from .virt_backup import DomBackup
