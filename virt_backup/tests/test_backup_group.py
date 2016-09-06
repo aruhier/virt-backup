@@ -3,6 +3,8 @@ import pytest
 
 from virt_backup.virt_backup import BackupGroup
 
+from helper.virt_backup import MockDomain
+
 
 def test_backup_group():
     backup_group = BackupGroup()
@@ -60,3 +62,33 @@ def test_backup_group_start(fixture_build_mock_domain, mocker):
 
     backup_group.start()
     assert backup_group.backups[0].start.called
+
+
+def test_backup_group_propagate_attr(fixture_build_mock_domain):
+    backup_group = BackupGroup(
+        domlst=(fixture_build_mock_domain, ), compression="xz"
+    )
+    assert backup_group.backups[0].compression == "xz"
+
+    backup_group.default_bak_param["target_dir"] = "/test"
+    assert backup_group.backups[0].target_dir is None
+    backup_group.propagate_default_backup_attr()
+    assert backup_group.backups[0].target_dir == "/test"
+
+
+def test_backup_group_propagate_attr_multiple_domains(mocker):
+    backup_group = BackupGroup(
+        domlst=(
+            MockDomain(_conn=mocker.stub()), MockDomain(_conn=mocker.stub())
+        ), compression="xz"
+    )
+    for b in backup_group.backups:
+        assert b.compression == "xz"
+
+    backup_group.default_bak_param["target_dir"] = "/test"
+    for b in backup_group.backups:
+        assert b.target_dir is None
+
+    backup_group.propagate_default_backup_attr()
+    for b in backup_group.backups:
+        assert b.target_dir is "/test"

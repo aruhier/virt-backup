@@ -15,22 +15,28 @@ from virt_backup.tools import copy_file_progress, get_progress_bar_tar
 logger = logging.getLogger("virt_backup")
 
 
+def groups_from_dict(groups_dict, conn):
+    """
+    Construct and yield BackupGroups from a dict (typically as stored in
+    config)
+
+    :param groups_dict: dict of groups properties (take a look at the
+                        config syntax for more info)
+    :param conn: connection with libvirt
+    """
+    def build(name, properties):
+        hosts = properties.pop("hosts")
+        # TODO: compute the domlst to be actualy generate a domain lists
+        return BackupGroup(name, **properties)
+
+    for group_name, group_properties in groups_dict.items():
+        yield build(group_name, group_properties)
+
+
 class BackupGroup():
     """
     Group of libvirt domain backups
     """
-    @property
-    def target_dir(self):
-        return self._target_dir
-
-    @target_dir.setter
-    def target_dir(self, val):
-        """
-        Change the target dir for all attached backups
-        """
-        for b in self.backups:
-            b.target = val
-
     def search(self, dom):
         """
         Search for a domain
@@ -60,9 +66,17 @@ class BackupGroup():
             existing_bak.add_disks(*disks)
         except StopIteration:
             # spawn a new DomBackup instance otherwise
-            self.backups.append(
-                DomBackup(dom=dom, dev_disks=disks, target_dir=self.target_dir)
-            )
+            self.backups.append(DomBackup(
+                dom=dom, dev_disks=disks, **self.default_bak_param
+            ))
+
+    def propagate_default_backup_attr(self):
+        """
+        Propagate default backup attributes to all attached backups
+        """
+        for backup in self.backups:
+            for attr, val in self.default_bak_param.items():
+                setattr(backup, attr, val)
 
     def start(self):
         """
@@ -71,7 +85,7 @@ class BackupGroup():
         for b in self.backups:
             b.start()
 
-    def __init__(self, domlst=None, target_dir=None):
+    def __init__(self, domlst=None, name=None, **default_bak_param):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -81,8 +95,9 @@ class BackupGroup():
         #: list of DomBackup
         self.backups = list()
 
-        #: directory where backups will be saved
-        self._target_dir = target_dir
+        #: default attributes for new created domain backups. Keys and values
+        #  correspond to what a DomBackup object expect as attributes
+        self.default_bak_param = default_bak_param
 
         if domlst:
             for bak_item in domlst:
