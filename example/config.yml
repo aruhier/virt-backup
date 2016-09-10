@@ -18,11 +18,11 @@ groups:
 
     hosts:
       - host: domainname
-        disk:
+        disks:
           - vda
           - vdb
       - domainname2
-      - "*"
+      - r:".*"
       - "!domainname3"
       - "!g:stable"
       - r:"^dom.*"

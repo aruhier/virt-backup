@@ -15,6 +15,79 @@ from virt_backup.tools import copy_file_progress, get_progress_bar_tar
 logger = logging.getLogger("virt_backup")
 
 
+def match_domains_regex(pattern, conn):
+    """
+    Return all domains matching with the regex
+
+    :param pattern: regex to match on for domain names
+    :param conn: connection with libvirt
+    """
+
+
+def parse_host_pattern(pattern, conn):
+    """
+    Parse the host pattern as written in the config
+
+    :param pattern: pattern to match on one or several domain names
+    :param conn: connection with libvirt
+    """
+    # if the pattern starts with !, exclude the matching domains
+    exclude = not pattern.startswith("!")
+    if exclude:
+        # clean pattern to remove the '!' char
+        pattern = pattern[1:]
+
+    if pattern.startswith("r:"):
+        pattern = pattern[2:]
+        domains = match_domains_regex(pattern, conn)
+    elif pattern.startswith("g:"):
+        # TODO: option to include another group into this one. It would
+        # need to include all domains of this group.
+        pattern = pattern[2:]
+        # domains =
+    else:
+        # will raise libvirt.libvirtError if the domain is not found
+        conn.lookupByName(pattern)
+        domains = pattern
+
+    return {"domains": domains, "exclude": exclude}
+
+
+def match_domains_from_config(host, conn):
+    """
+    Return matching domains with the host definition
+
+    Will be mainly used by config,
+
+    :param host: domain name or custom regex to match on multiple domains
+    :param conn: connection with libvirt
+    :returns {"domains": (domain_name, ), "exclude": bool}: exclude will
+        indicate if the domains need to be explicitly excluded of the backup
+        group or not (for example, if a user wants to exclude all domains
+        starting by a certain pattern). Domains will not be libvirt.virDomain
+        objects, but just domain names (easier to manage the include/exclude
+        feature)
+    """
+    if isinstance(host, str):
+        pattern = host
+    else:
+        try:
+            pattern = host["host"]
+        except KeyError as e:
+            logger.error(
+                "Configuration error, missing host for lines: \n"
+                "{}".format(host)
+            )
+            raise e
+    matches = parse_host_pattern(pattern, conn)
+    if not isinstance(host, dict):
+        return matches
+
+    if host.get("disks", None):
+        matches["disks"] = host["disks"]
+    return matches
+
+
 def groups_from_dict(groups_dict, conn):
     """
     Construct and yield BackupGroups from a dict (typically as stored in
