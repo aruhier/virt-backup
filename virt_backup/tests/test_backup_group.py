@@ -1,7 +1,10 @@
 
 import pytest
 
-from virt_backup.virt_backup import BackupGroup
+from virt_backup.virt_backup import (
+    BackupGroup, search_domains_regex, parse_host_pattern,
+    match_domains_from_config
+)
 
 from helper.virt_backup import MockDomain
 
@@ -92,3 +95,96 @@ def test_backup_group_propagate_attr_multiple_domains(mocker):
     backup_group.propagate_default_backup_attr()
     for b in backup_group.backups:
         assert b.target_dir is "/test"
+
+
+def test_search_domains_regex(fixture_build_mock_libvirtconn):
+    conn = fixture_build_mock_libvirtconn
+    domain_names = ("dom1", "dom2", "dom3", "test")
+    conn._domains = [
+        MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names
+    ]
+
+    matches = list(sorted(search_domains_regex("^dom\d$", conn)))
+    expected = list(sorted(domain_names))
+    expected.remove("test")
+
+    assert matches == expected
+
+
+def test_search_domains_regex_not_found(
+        fixture_build_mock_libvirtconn, fixture_build_mock_domain):
+    """
+    Search a non existing domain
+    """
+    conn = fixture_build_mock_libvirtconn
+    conn._domains = [fixture_build_mock_domain]
+
+    matches = list(search_domains_regex("^dom$", conn))
+    assert matches == []
+
+
+def test_parse_host_pattern_regex(fixture_build_mock_libvirtconn_filled):
+    conn = fixture_build_mock_libvirtconn_filled
+    matches = parse_host_pattern("r:^matching.?$", conn)
+    domains = tuple(sorted(matches["domains"]))
+    exclude = matches["exclude"]
+
+    assert domains == ("matching", "matching2")
+    assert exclude is False
+
+
+def test_parse_host_pattern_direct_name(fixture_build_mock_libvirtconn_filled):
+    """
+    Test parse_host_pattern directly with a domain name
+    """
+    conn = fixture_build_mock_libvirtconn_filled
+    matches = parse_host_pattern("matching", conn)
+    domains = tuple(sorted(matches["domains"]))
+    exclude = matches["exclude"]
+
+    assert domains == ("matching",)
+    assert exclude is False
+
+
+def test_match_domains_from_config(fixture_build_mock_libvirtconn_filled):
+    conn = fixture_build_mock_libvirtconn_filled
+    host_config = {"host": "matching", "disks": ["vda", "vdb"]}
+
+    matches = match_domains_from_config(host_config, conn)
+    domains = tuple(sorted(matches["domains"]))
+    exclude, disks = matches["exclude"], tuple(sorted(matches["disks"]))
+
+    assert domains == ("matching",)
+    assert exclude is False
+    assert disks == ("vda", "vdb")
+
+
+def test_match_domains_from_config_unexisting(
+        fixture_build_mock_libvirtconn_filled):
+    """
+    Test match_domains_from_config with a non existing domain
+    """
+    conn = fixture_build_mock_libvirtconn_filled
+    host_config = {"host": "nonexisting", "disks": ["vda", "vdb"]}
+
+    matches = match_domains_from_config(host_config, conn)
+    domains = tuple(sorted(matches["domains"]))
+    exclude = matches["exclude"]
+
+    assert domains == tuple()
+    assert exclude is False
+
+
+def test_match_domains_from_config_str(fixture_build_mock_libvirtconn_filled):
+    """
+    Test match_domains_from_config with a str pattern
+    """
+    conn = fixture_build_mock_libvirtconn_filled
+    host_config = "r:matching\d?"
+
+    matches = match_domains_from_config(host_config, conn)
+    domains = tuple(sorted(matches["domains"]))
+    exclude = matches["exclude"]
+
+    assert domains == ("matching", "matching2")
+    assert exclude is False

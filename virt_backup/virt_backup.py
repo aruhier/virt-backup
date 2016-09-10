@@ -6,6 +6,7 @@ import libvirt
 import logging
 import lxml.etree
 import os
+import re
 import tarfile
 import threading
 from tqdm import tqdm
@@ -15,13 +16,18 @@ from virt_backup.tools import copy_file_progress, get_progress_bar_tar
 logger = logging.getLogger("virt_backup")
 
 
-def match_domains_regex(pattern, conn):
+def search_domains_regex(pattern, conn):
     """
-    Return all domains matching with the regex
+    Yield all domains matching with a regex
 
-    :param pattern: regex to match on for domain names
+    :param pattern: regex to match on all domain names listed by libvirt
     :param conn: connection with libvirt
     """
+    c_pattern = re.compile(pattern)
+    for domain in conn.listAllDomains():
+        domain_name = domain.name()
+        if c_pattern.match(domain_name):
+            yield domain_name
 
 
 def parse_host_pattern(pattern, conn):
@@ -32,23 +38,27 @@ def parse_host_pattern(pattern, conn):
     :param conn: connection with libvirt
     """
     # if the pattern starts with !, exclude the matching domains
-    exclude = not pattern.startswith("!")
+    exclude = pattern.startswith("!")
     if exclude:
         # clean pattern to remove the '!' char
         pattern = pattern[1:]
 
     if pattern.startswith("r:"):
         pattern = pattern[2:]
-        domains = match_domains_regex(pattern, conn)
+        domains = search_domains_regex(pattern, conn)
     elif pattern.startswith("g:"):
         # TODO: option to include another group into this one. It would
         # need to include all domains of this group.
         pattern = pattern[2:]
         # domains =
     else:
-        # will raise libvirt.libvirtError if the domain is not found
-        conn.lookupByName(pattern)
-        domains = pattern
+        try:
+            # will raise libvirt.libvirtError if the domain is not found
+            conn.lookupByName(pattern)
+            domains = (pattern,)
+        except libvirt.libvirtError as e:
+            logger.error(e)
+            domains = tuple()
 
     return {"domains": domains, "exclude": exclude}
 
@@ -80,11 +90,13 @@ def match_domains_from_config(host, conn):
             )
             raise e
     matches = parse_host_pattern(pattern, conn)
-    if not isinstance(host, dict):
+    # not useful to continue if no domain matches or if the host variable
+    # doesn't bring any property for our domain (like which disks to backup)
+    if not isinstance(host, dict) or not matches["domains"]:
         return matches
 
     if host.get("disks", None):
-        matches["disks"] = host["disks"]
+        matches["disks"] = sorted(host["disks"])
     return matches
 
 
