@@ -257,7 +257,6 @@ def test_groups_from_dict_multiple_groups(
 
     groups = tuple(groups_from_dict(groups_config, conn))
     assert len(groups) == 2
-    test0, test1 = groups
+    group0, group1 = groups
 
-    assert test0.name == "test0"
-    assert test1.name == "test1"
+    assert sorted((group0.name, group1.name)) == ["test0", "test1"]
