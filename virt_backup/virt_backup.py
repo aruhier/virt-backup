@@ -111,8 +111,32 @@ def groups_from_dict(groups_dict, conn):
     """
     def build(name, properties):
         hosts = properties.pop("hosts")
-        # TODO: compute the domlst to be actualy generate a domain lists
-        return BackupGroup(name, **properties)
+        include, exclude = [], []
+        for host in hosts:
+            matches = match_domains_from_config(host, conn)
+            if not matches.get("domains", None):
+                continue
+            if matches["exclude"]:
+                exclude += list(matches["domains"])
+            else:
+                matches.pop("exclude")
+                include.append(matches)
+
+        logger.debug("Include domains: {}".format(include))
+        logger.debug("Exclude domains: {}".format(exclude))
+
+        # replace some properties by the correct ones
+        if properties.get("target", None):
+            properties["target_dir"] = properties.pop("target")
+
+        backup_group = BackupGroup(name=name, **properties)
+        for i in include:
+            for domain_name in i["domains"]:
+                if domain_name not in exclude:
+                    domain = conn.lookupByName(domain_name)
+                    backup_group.add_backup(domain, matches.get("disks", ()))
+
+        return backup_group
 
     for group_name, group_properties in groups_dict.items():
         yield build(group_name, group_properties)
@@ -170,7 +194,7 @@ class BackupGroup():
         for b in self.backups:
             b.start()
 
-    def __init__(self, domlst=None, name=None, **default_bak_param):
+    def __init__(self, name="unnamed", domlst=None, **default_bak_param):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -179,6 +203,9 @@ class BackupGroup():
         """
         #: list of DomBackup
         self.backups = list()
+
+        #: group name, "unnamed" by default
+        self.name = name
 
         #: default attributes for new created domain backups. Keys and values
         #  correspond to what a DomBackup object expect as attributes

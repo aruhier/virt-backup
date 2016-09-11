@@ -3,7 +3,7 @@ import pytest
 
 from virt_backup.virt_backup import (
     BackupGroup, search_domains_regex, parse_host_pattern,
-    match_domains_from_config
+    match_domains_from_config, groups_from_dict
 )
 
 from helper.virt_backup import MockDomain
@@ -130,7 +130,7 @@ def test_parse_host_pattern_regex(fixture_build_mock_libvirtconn_filled):
     exclude = matches["exclude"]
 
     assert domains == ("matching", "matching2")
-    assert exclude is False
+    assert not exclude
 
 
 def test_parse_host_pattern_direct_name(fixture_build_mock_libvirtconn_filled):
@@ -143,7 +143,20 @@ def test_parse_host_pattern_direct_name(fixture_build_mock_libvirtconn_filled):
     exclude = matches["exclude"]
 
     assert domains == ("matching",)
-    assert exclude is False
+    assert not exclude
+
+
+def test_parse_host_pattern_exclude(fixture_build_mock_libvirtconn_filled):
+    """
+    Test parse_host_pattern with a pattern excluding a domain
+    """
+    conn = fixture_build_mock_libvirtconn_filled
+    matches = parse_host_pattern("!matching", conn)
+    domains = tuple(sorted(matches["domains"]))
+    exclude = matches["exclude"]
+
+    assert domains == ("matching",)
+    assert exclude
 
 
 def test_match_domains_from_config(fixture_build_mock_libvirtconn_filled):
@@ -155,7 +168,7 @@ def test_match_domains_from_config(fixture_build_mock_libvirtconn_filled):
     exclude, disks = matches["exclude"], tuple(sorted(matches["disks"]))
 
     assert domains == ("matching",)
-    assert exclude is False
+    assert not exclude
     assert disks == ("vda", "vdb")
 
 
@@ -172,7 +185,7 @@ def test_match_domains_from_config_unexisting(
     exclude = matches["exclude"]
 
     assert domains == tuple()
-    assert exclude is False
+    assert not exclude
 
 
 def test_match_domains_from_config_str(fixture_build_mock_libvirtconn_filled):
@@ -187,4 +200,64 @@ def test_match_domains_from_config_str(fixture_build_mock_libvirtconn_filled):
     exclude = matches["exclude"]
 
     assert domains == ("matching", "matching2")
-    assert exclude is False
+    assert not exclude
+
+
+def test_groups_from_dict(fixture_build_mock_libvirtconn_filled):
+    """
+    Test groups_from_dict with only one group
+    """
+    conn = fixture_build_mock_libvirtconn_filled
+    groups_config = {
+        "test": {
+            "target": "/mnt/test",
+            "compression": "tar",
+            "hosts": [
+                {"host": "r:^matching\d?$", "disks": ["vda", "vdb"]},
+                "!matching2", "nonexisting"
+            ],
+        },
+    }
+
+    groups = tuple(groups_from_dict(groups_config, conn))
+    assert len(groups) == 1
+    test_group = groups[0]
+
+    target, compression = (
+        test_group.default_bak_param[k] for k in ("target_dir", "compression")
+    )
+    assert target == "/mnt/test"
+    assert compression == "tar"
+
+    dombackups = test_group.backups
+    assert len(dombackups) == 1
+
+    matching_backup = dombackups[0]
+    assert matching_backup.dom.name() == "matching"
+    assert tuple(sorted(matching_backup.disks.keys())) == ("vda", "vdb")
+
+
+def test_groups_from_dict_multiple_groups(
+        fixture_build_mock_libvirtconn_filled):
+    """
+    Test match_domains_from_config with a str pattern
+    """
+    conn = fixture_build_mock_libvirtconn_filled
+    groups_config = {
+        "test0": {
+            "target": "/mnt/test0",
+            "compression": "tar",
+            "hosts": ["matching2", ],
+        },
+        "test1": {
+            "target": "/mnt/test1",
+            "hosts": ["matching", "a"],
+        },
+    }
+
+    groups = tuple(groups_from_dict(groups_config, conn))
+    assert len(groups) == 2
+    test0, test1 = groups
+
+    assert test0.name == "test0"
+    assert test1.name == "test1"
