@@ -1,5 +1,5 @@
-virt-backup [WORK IN PROGRESS]
-==============================
+virt-backup [WORK IN PROGRESS] [![Build Status](https://travis-ci.org/Anthony25/virt-backup.svg?branch=master)](https://travis-ci.org/Anthony25/virt-backup)
+============================================================================================================================================================
 
 Backup your kvm guests (using the blockcommit feature) managed by libvirt. The
 main goal is to do a modest alternative to the Proxmox VE backup system
