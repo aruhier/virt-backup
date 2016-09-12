@@ -1,5 +1,20 @@
 language: python
+
+matrix:
+  include:
+    - python: 3.4
+      env: TOXENV=py34
+    - python: 3.5-dev
+      env: TOXENV=py35
+
+sudo: yes
+
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y python3-libvirt
+
 install:
-  - pip install tox
+  - pip install -U tox
+
 script:
   - tox
