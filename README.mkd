@@ -1,5 +1,7 @@
-virt-backup [WORK IN PROGRESS] [![Build Status](https://travis-ci.org/Anthony25/virt-backup.svg?branch=master)](https://travis-ci.org/Anthony25/virt-backup)
-============================================================================================================================================================
+virt-backup [WORK IN PROGRESS]
+===============================
+
+[![Build Status](https://travis-ci.org/Anthony25/virt-backup.svg?branch=master)](https://travis-ci.org/Anthony25/virt-backup)  [![Coverage Status](https://coveralls.io/repos/github/Anthony25/virt-backup/badge.svg?branch=master)](https://coveralls.io/github/Anthony25/virt-backup?branch=master)
 
 Backup your kvm guests (using the blockcommit feature) managed by libvirt. The
 main goal is to do a modest alternative to the Proxmox VE backup system
