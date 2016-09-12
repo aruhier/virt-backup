@@ -7,11 +7,12 @@ matrix:
     - python: 3.5-dev
       env: TOXENV=py35
 
-sudo: yes
+sudo: required
+dist: trusty
 
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y python3-libvirt
+  - sudo apt-get install -y libvirt-dev
 
 install:
   - pip install -U tox
