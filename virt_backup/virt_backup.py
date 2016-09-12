@@ -342,10 +342,10 @@ class DomBackup():
                        will be created.
         """
         if self.compression not in (None, "tar"):
-            mode = "x:{}".format(self.compression)
+            mode = "w:{}".format(self.compression)
             extension = "tar.{}".format(self.compression)
         else:
-            mode = "x"
+            mode = "w"
             extension = "tar"
 
         if not os.path.isdir(target):
@@ -357,6 +357,8 @@ class DomBackup():
                 self._main_backup_name_format(snapshot_date), extension
             )
         )
+        if os.path.exists(complete_path):
+            raise FileExistsError
         return tarfile.open(complete_path, mode)
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
