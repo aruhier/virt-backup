@@ -6,6 +6,7 @@ import sys
 import threading
 
 from .virt_backup import DomBackup
+from .config import get_config, Config
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -31,6 +32,13 @@ def virEventLoopNativeStart():
 
 def start_backup():
     virEventLoopNativeStart()
+
+    config = Config(defaults={"debug": False, })
+    try:
+        config.from_dict(get_config())
+    except FileNotFoundError:
+        sys.exit(1)
+
     conn = libvirt.open(None)
     if conn is None:
         print('Failed to open connection to the hypervisor')

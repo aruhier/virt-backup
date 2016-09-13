@@ -31,7 +31,9 @@ setup(
 
     keywords="libvirt",
     packages=["virt_backup", ],
-    install_requires=["defusedxml", "libvirt-python", "lxml", "tqdm"],
+    install_requires=[
+        "appdirs", "defusedxml", "libvirt-python", "lxml", "tqdm"
+    ],
     setup_requires=['pytest-runner', ],
     tests_require=['pytest', 'pytest-cov', "pytest-mock", "pytest-xdist"],
     entry_points={
