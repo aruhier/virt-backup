@@ -194,7 +194,8 @@ class BackupGroup():
         for b in self.backups:
             b.start()
 
-    def __init__(self, name="unnamed", domlst=None, **default_bak_param):
+    def __init__(self, name="unnamed", domlst=None, autostart=True,
+                 **default_bak_param):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -206,6 +207,9 @@ class BackupGroup():
 
         #: group name, "unnamed" by default
         self.name = name
+
+        #: does this group have to be autostarted from the main function or not
+        self.autostart = autostart
 
         #: default attributes for new created domain backups. Keys and values
         #  correspond to what a DomBackup object expect as attributes

@@ -44,7 +44,8 @@ def start_backups():
     if config.get("groups", None):
         groups = groups_from_dict(config["groups"], conn)
         for g in groups:
-            g.start()
+            if g.autostart:
+                g.start()
 
 
 if __name__ == "__main__":
