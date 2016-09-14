@@ -64,7 +64,7 @@ class Config(dict):
         self.refresh_global_logger_lvl()
 
     def refresh_global_logger_lvl(self):
-        if self["debug"]:
+        if self.get("debug", None):
             logging.getLogger("virt_backup").setLevel(logging.DEBUG)
 
     def from_dict(self, conf_dict):
