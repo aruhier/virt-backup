@@ -2,7 +2,6 @@
 
 import appdirs
 import errno
-import glob
 import logging
 import os
 import yaml
