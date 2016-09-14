@@ -11,7 +11,7 @@ CUR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 def test_get_config():
     config.CONFIG_DIRS = (
-        os.path.join(CUR_PATH, "testconfig"), *config.CONFIG_DIRS
+        (os.path.join(CUR_PATH, "testconfig"), ) + config.CONFIG_DIRS
     )
     conf = config.get_config()
     with open(os.path.join(config.CONFIG_DIRS[0], "config.yml"), "r") as f:
