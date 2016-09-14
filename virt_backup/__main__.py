@@ -5,15 +5,11 @@ import logging
 import sys
 import threading
 
-from .virt_backup import DomBackup
+from .virt_backup import groups_from_dict
 from .config import get_config, Config
 
 
 logging.basicConfig(level=logging.DEBUG)
-
-
-# Domain id used to test the result
-GUEST_TEST_NAME = "ubuntu15.10"
 
 
 def virEventLoopNativeRun():
@@ -30,7 +26,7 @@ def virEventLoopNativeStart():
     eventLoopThread.start()
 
 
-def start_backup():
+def start_backups():
     virEventLoopNativeStart()
 
     config = Config(defaults={"debug": False, })
@@ -45,15 +41,11 @@ def start_backup():
         sys.exit(1)
     conn.setKeepAlive(5, 3)
 
-    try:
-        dom0 = conn.lookupByName(GUEST_TEST_NAME)
-    except:
-        print('Failed to find the main domain')
-        sys.exit(1)
-
-    dbkup = DomBackup(dom0, target_dir="/mnt/kvm/backups", conn=conn)
-    dbkup.start()
+    if config.get("groups", None):
+        groups = groups_from_dict(config["groups"], conn)
+        for g in groups:
+            g.start()
 
 
 if __name__ == "__main__":
-    start_backup()
+    start_backups()

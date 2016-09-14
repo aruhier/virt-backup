@@ -7,4 +7,4 @@ Libvirt Backup
 from virt_backup import __main__
 
 if __name__ == "__main__":
-    __main__.start_backup()
+    __main__.start_backups()

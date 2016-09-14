@@ -129,7 +129,7 @@ def groups_from_dict(groups_dict, conn):
         if properties.get("target", None):
             properties["target_dir"] = properties.pop("target")
 
-        backup_group = BackupGroup(name=name, **properties)
+        backup_group = BackupGroup(name=name, conn=conn, **properties)
         for i in include:
             for domain_name in i["domains"]:
                 if domain_name not in exclude:
