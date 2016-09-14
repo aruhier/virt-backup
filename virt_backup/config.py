@@ -27,7 +27,7 @@ def get_config(custom_path=None):
     :returns: loaded config in yaml, as a dict object
     """
     if custom_path:
-        config_path = glob.glob(custom_path)
+        config_path = custom_path
     else:
         for d in CONFIG_DIRS:
             config_path = os.path.join(d, CONFIG_FILENAME)
