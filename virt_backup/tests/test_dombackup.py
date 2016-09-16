@@ -1,5 +1,6 @@
 
 import datetime
+import json
 import pytest
 import tarfile
 
@@ -134,3 +135,36 @@ def test_get_new_tar_unvalid_compression(fixture_build_mock_domain, tmpdir):
         return test_get_new_tar(
             fixture_build_mock_domain, tmpdir, compression="test"
         )
+
+
+def test_get_definition(fixture_build_mock_domain):
+    dombkup = DomBackup(
+        dom=fixture_build_mock_domain, dev_disks=("vda", ), compression="xz",
+        compression_lvl=4
+    )
+
+    expected_def = {
+        "disks": ("vda", ), "compression": "xz", "compression_lvl": 4,
+        "domain_id": fixture_build_mock_domain.ID(),
+        "domain_name": fixture_build_mock_domain.name(),
+        "domain_xml": fixture_build_mock_domain.XMLDesc()
+    }
+    assert dombkup.get_definition() == expected_def
+
+
+def test_dump_json_definition(fixture_build_mock_domain, tmpdir):
+    target_dir = tmpdir.mkdir("json_dump")
+    dombkup = DomBackup(
+        dom=fixture_build_mock_domain, dev_disks=("vda", ), compression="xz",
+        compression_lvl=4, target_dir=str(target_dir),
+    )
+
+    definition = dombkup.get_definition()
+    datenow = datetime.datetime.now()
+    definition["date"] = datenow.timestamp()
+    # converts disks to list as json doesn't know tuples
+    definition["disks"] = list(definition["disks"])
+
+    dombkup._dump_json_definition(definition)
+    assert len(target_dir.listdir()) == 1
+    assert json.loads(target_dir.listdir()[0].read()) == definition

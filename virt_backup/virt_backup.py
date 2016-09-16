@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import datetime
+import arrow
 import defusedxml.lxml
+import json
 import libvirt
 import logging
 import lxml.etree
@@ -256,7 +257,7 @@ class DomBackup():
                     disks[dev] = {"src": src, "type": disk_type}
             except IndexError:
                 continue
-        # TODO: raise an exception if a disk was is the filter but in fact not
+        # TODO: raise an exception if a disk was part of the filter but not
         #       found in the domain
         return disks
 
@@ -282,6 +283,21 @@ class DomBackup():
             "{}_{}".format(self._main_backup_name_format(snapdate), disk_name)
         )
 
+    def _dump_json_definition(self, definition):
+        """
+        Dump the backup definition as json
+
+        Definition will describe our backup, with the date, backuped
+        disks names and other informations
+        """
+        backup_date = arrow.get(definition["date"]).to("local")
+        definition_path = os.path.join(
+            self.target_dir,
+            "{}.{}".format(self._main_backup_name_format(backup_date), "json")
+        )
+        with open(definition_path, "w") as json_definition:
+            json.dump(definition, json_definition, indent=4)
+
     def add_disks(self, *dev_disks):
         """
         Add disk by dev name
@@ -306,6 +322,18 @@ class DomBackup():
                 continue
             self.disks[dev] = dom_all_disks[dev]
 
+    def get_definition(self):
+        """
+        Get a json defining this backup
+        """
+        return {
+            "disks": tuple(self.disks.keys()),
+            "compression": self.compression,
+            "compression_lvl": self.compression_lvl,
+            "domain_id": self.dom.ID(), "domain_name": self.dom.name(),
+            "domain_xml": self.dom.XMLDesc()
+        }
+
     def backup_img(self, disk, target, target_filename=None):
         """
         Backup a disk image
@@ -315,15 +343,9 @@ class DomBackup():
         :param target_filename: destination file will have this name, or keep
                                 the original one. target has to be a dir
                                 (if not exists, will be created)
+        :returns backup_path: complete path of our backup
         """
-        if self.compression is None:
-            if target_filename is not None:
-                if not os.path.isdir(target):
-                    os.makedirs(target)
-                target = os.path.join(target, target_filename)
-            logger.debug("Copy {} as {}".format(disk, target))
-            copy_file_progress(disk, target, buffersize=10*1024*1024)
-        else:
+        if self.compression:
             # target is a tarfile.TarFile
             total_size = os.path.getsize(disk)
             tqdm_kwargs = {
@@ -334,7 +356,23 @@ class DomBackup():
             with tqdm(**tqdm_kwargs) as pbar:
                 target.fileobject = get_progress_bar_tar(pbar)
                 target.add(disk, arcname=target_filename)
+            if self.compression == "xz":
+                backup_path = target.fileobj._fp.name
+            else:
+                backup_path = target.fileobj.name
+        else:
+            # target is a directory if target_filename is set, or an existing
+            # directory or a destination file
+            if target_filename is not None:
+                if not os.path.isdir(target):
+                    os.makedirs(target)
+            target = os.path.join(target, target_filename or disk)
+            logger.debug("Copy {} as {}".format(disk, target))
+            copy_file_progress(disk, target, buffersize=10*1024*1024)
+            backup_path = target
+
         logger.debug("{} successfully copied".format(disk))
+        return os.path.abspath(backup_path)
 
     def get_new_tar(self, target, snapshot_date):
         """
@@ -420,20 +458,21 @@ class DomBackup():
         backup_target = None
         self._wait_for_pivot.clear()
         print("Backup started for domain {}".format(self.dom.name()))
+        definition = self.get_definition()
         try:
             callback_id = self.conn.domainEventRegisterAny(
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
                 self.pivot_callback, None
             )
             self.external_snapshot()
-            snapshot_date = datetime.datetime.now()
+            snapshot_date = arrow.now()
+            definition["date"] = snapshot_date.timestamp
             backup_target = (
                 self.target_dir if self.compression is None
                 else self.get_new_tar(self.target_dir, snapshot_date)
             )
 
             # TODO: handle backingStore cases
-            # TODO: add a json containing our backup metadata
             for disk, prop in self.disks.items():
                 logger.info(
                     "Backup disk {} of domain {}".format(disk, self.dom.name())
@@ -442,7 +481,15 @@ class DomBackup():
                     self._disk_backup_name_format(snapshot_date, disk),
                     prop["type"]
                 )
-                self.backup_img(prop["src"], backup_target, target_img)
+                backup_path = self.backup_img(
+                    prop["src"], backup_target, target_img
+                )
+                if self.compression and not definition.get("files", None):
+                    # all disks will be compacted in the same tar, so already
+                    # store it in definition if it was not set before
+                    definition["files"] = backup_path
+                else:
+                    definition["files"][disk] = backup_path
 
                 logger.info(
                     "Starts to blockcommit {} to pivot snapshot".format(disk)
@@ -455,6 +502,7 @@ class DomBackup():
                     )
                 )
                 self._wait_for_pivot.wait(timeout=self.timeout)
+            self._dump_json_definition(definition)
         finally:
             self.conn.domainEventDeregisterAny(callback_id)
             if isinstance(backup_target, tarfile.TarFile):

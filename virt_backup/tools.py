@@ -17,6 +17,7 @@ def copy_file_progress(src, dst, buffersize=DEFAULT_BUFFERSIZE):
 
     with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
         copy_stream_progress(fsrc, fdst, total_size, buffersize)
+    return dst
 
 
 def copy_stream_progress(stsrc, stdst, total_size,
