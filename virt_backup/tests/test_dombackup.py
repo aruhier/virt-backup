@@ -35,6 +35,18 @@ def test_get_disks_with_filter(fixture_build_mock_domain):
     assert dombkup._get_disks("vda") == expected_disks
 
 
+def test_init_with_disk(fixture_build_mock_domain):
+    dombkup = DomBackup(dom=fixture_build_mock_domain, dev_disks=("vda", ))
+
+    expected_disks = {
+        "vda": {
+            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+            "type": "qcow2",
+        },
+    }
+    assert dombkup.disks == expected_disks
+
+
 def test_add_disks(fixture_build_mock_domain):
     """
     Create a DomBackup with only one disk (vda) and test to add vdb

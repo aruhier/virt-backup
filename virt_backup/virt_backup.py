@@ -526,7 +526,7 @@ class DomBackup():
 
         #: disks to backups. If None, will backup every vm disks
         if dev_disks:
-            _disks = self._get_disks(dev_disks)
+            _disks = self._get_disks(*dev_disks)
         self.disks = self._get_disks() if _disks is None else _disks
 
         #: string indicating how to compress the backups:
