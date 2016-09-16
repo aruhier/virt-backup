@@ -451,6 +451,53 @@ class DomBackup():
             )
         )
 
+    def _backup_disk(self, disk, disk_properties, backup_target, definition):
+        """
+        Backup a disk and complete the definition by adding this disk
+
+        :param disk: diskname to backup
+        :param disk_properties: dictionary discribing our disk (typically
+                                contained in self.disks[disk])
+        :param backup_target: target path of our backup
+        :param definition: dictionary representing the domain backup
+        """
+        snapshot_date = arrow.get(definition["date"]).to("local")
+        logger.info(
+            "Backup disk {} of domain {}".format(disk, self.dom.name())
+        )
+        target_img = "{}.{}".format(
+            self._disk_backup_name_format(snapshot_date, disk),
+            disk_properties["type"]
+        )
+        backup_path = self.backup_img(
+            disk_properties["src"], backup_target, target_img
+        )
+        if self.compression and not definition.get("files", None):
+            # all disks will be compacted in the same tar, so already
+            # store it in definition if it was not set before
+            definition["files"] = backup_path
+        else:
+            definition["files"][disk] = backup_path
+
+    def _blockcommit_disk_and_wait(self, disk):
+        """
+        Block commit and wait for the pivot to be triggered
+
+        Will allow to merge the external snapshot previously created with the
+        disk main image
+
+        :param disk: diskname to blockcommit
+        """
+        logger.info("Starts to blockcommit {} to pivot snapshot".format(disk))
+        self.dom.blockCommit(
+            disk, None, None, 0,
+            (
+                libvirt.VIR_DOMAIN_BLOCK_COMMIT_ACTIVE +
+                libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
+            )
+        )
+        self._wait_for_pivot.wait(timeout=self.timeout)
+
     def start(self):
         """
         Start the entire backup process for all disks in self.disks
@@ -465,43 +512,20 @@ class DomBackup():
                 self.pivot_callback, None
             )
             self.external_snapshot()
+
+            # all of our disks are frozen, so the backup date is right now
             snapshot_date = arrow.now()
             definition["date"] = snapshot_date.timestamp
+
             backup_target = (
                 self.target_dir if self.compression is None
                 else self.get_new_tar(self.target_dir, snapshot_date)
             )
-
             # TODO: handle backingStore cases
             for disk, prop in self.disks.items():
-                logger.info(
-                    "Backup disk {} of domain {}".format(disk, self.dom.name())
-                )
-                target_img = "{}.{}".format(
-                    self._disk_backup_name_format(snapshot_date, disk),
-                    prop["type"]
-                )
-                backup_path = self.backup_img(
-                    prop["src"], backup_target, target_img
-                )
-                if self.compression and not definition.get("files", None):
-                    # all disks will be compacted in the same tar, so already
-                    # store it in definition if it was not set before
-                    definition["files"] = backup_path
-                else:
-                    definition["files"][disk] = backup_path
+                self._backup_disk(disk, prop, backup_target, definition)
+                self._blockcommit_disk_and_wait(disk)
 
-                logger.info(
-                    "Starts to blockcommit {} to pivot snapshot".format(disk)
-                )
-                self.dom.blockCommit(
-                    disk, None, None, 0,
-                    (
-                        libvirt.VIR_DOMAIN_BLOCK_COMMIT_ACTIVE +
-                        libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
-                    )
-                )
-                self._wait_for_pivot.wait(timeout=self.timeout)
             self._dump_json_definition(definition)
         finally:
             self.conn.domainEventDeregisterAny(callback_id)
