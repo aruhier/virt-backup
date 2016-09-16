@@ -4,7 +4,9 @@ import json
 import pytest
 import tarfile
 
-from virt_backup.virt_backup import DomBackup
+from virt_backup.domain import DomBackup, search_domains_regex
+
+from helper.virt_backup import MockDomain
 
 
 def test_get_disks(fixture_build_mock_domain):
@@ -180,3 +182,29 @@ def test_dump_json_definition(fixture_build_mock_domain, tmpdir):
     dombkup._dump_json_definition(definition)
     assert len(target_dir.listdir()) == 1
     assert json.loads(target_dir.listdir()[0].read()) == definition
+
+
+def test_search_domains_regex(fixture_build_mock_libvirtconn):
+    conn = fixture_build_mock_libvirtconn
+    domain_names = ("dom1", "dom2", "dom3", "test")
+    conn._domains = [
+        MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names
+    ]
+
+    matches = list(sorted(search_domains_regex("^dom\d$", conn)))
+    expected = list(sorted(domain_names))
+    expected.remove("test")
+
+    assert matches == expected
+
+
+def test_search_domains_regex_not_found(
+        fixture_build_mock_libvirtconn, fixture_build_mock_domain):
+    """
+    Search a non existing domain
+    """
+    conn = fixture_build_mock_libvirtconn
+    conn._domains = [fixture_build_mock_domain]
+
+    matches = list(search_domains_regex("^dom$", conn))
+    assert matches == []

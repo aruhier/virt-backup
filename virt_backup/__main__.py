@@ -5,7 +5,7 @@ import logging
 import sys
 import threading
 
-from .virt_backup import groups_from_dict
+from .group import groups_from_dict
 from .config import get_config, Config
 
 
