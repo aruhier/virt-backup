@@ -62,9 +62,9 @@ class MockConn():
 def build_completed_backups(backup_dir):
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
     backup_properties = (
-        (arrow.get("2016-07-08 18:30:02"), None),
-        (arrow.get("2014-05-01 00:30:00"), "tar"),
-        (arrow.get("2016-12-08 14:28:13"), "xz"),
+        (arrow.get("2016-07-08 18:30:02").to("local"), None),
+        (arrow.get("2014-05-01 00:30:00").to("local"), "tar"),
+        (arrow.get("2016-12-08 14:28:13").to("local"), "xz"),
     )
     conn = MockConn()
     for domain_id, domain_name in enumerate(domain_names):
@@ -79,6 +79,7 @@ def build_completed_backups(backup_dir):
             dbackup.compression = compression
             definition = dbackup.get_definition()
             definition["date"] = bakdate.timestamp
+            definition["files"] = {}
             if compression:
                 tar = dbackup.get_new_tar(domain_bdir, bakdate)
                 if compression == "xz":
@@ -94,11 +95,11 @@ def build_completed_backups(backup_dir):
 
                 img_complete_path = os.path.join(domain_bdir, img_name)
                 with open(img_complete_path, "w"):
-                    continue
+                    pass
                 if compression:
                     # add img to the tar file and remove it
                     tar.add(img_complete_path)
-                    os.path.remove(img_complete_path)
+                    os.remove(img_complete_path)
             dbackup._dump_json_definition(definition)
 
-    return (bp[0] for bp in backup_properties)
+    return (domain_names, (bp[0] for bp in backup_properties))

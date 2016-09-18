@@ -2,6 +2,7 @@
 
 import arrow
 import defusedxml.lxml
+import glob
 import json
 import libvirt
 import logging
@@ -30,6 +31,31 @@ def search_domains_regex(pattern, conn):
         domain_name = domain.name()
         if c_pattern.match(domain_name):
             yield domain_name
+
+
+def list_backups_by_domain(backup_dir):
+    """
+    Group all avaible backups by domain, in a dict
+
+    Backups have to respect the structure: backup_dir/domain_name/*backups*
+
+    :returns: {domain_name: [(definition_path, definition_dict), …], …}
+    :rtype: dict
+    """
+    backups = {}
+    for json_file in glob.glob(os.path.join(backup_dir, "*/*.json")):
+        logger.debug("{} detected".format(json_file))
+        with open(json_file, "r") as definition_file:
+            try:
+                definition = json.load(definition_file)
+            except Exception as e:
+                logger.debug("Error for file {}: {}".format(json_file, e))
+                continue
+        domain_name = definition["domain_name"]
+        if domain_name not in backups:
+            backups[domain_name] = []
+        backups[domain_name].append((json_file, definition))
+    return backups
 
 
 class DomBackup():

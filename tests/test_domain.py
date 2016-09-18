@@ -1,10 +1,13 @@
 
 import datetime
 import json
+import os
 import pytest
 import tarfile
 
-from virt_backup.domain import DomBackup, search_domains_regex
+from virt_backup.domain import (
+    DomBackup, search_domains_regex, list_backups_by_domain
+)
 
 from helper.virt_backup import MockDomain
 
@@ -208,3 +211,33 @@ def test_search_domains_regex_not_found(
 
     matches = list(search_domains_regex("^dom$", conn))
     assert matches == []
+
+
+def test_list_backups_by_domain(fixture_build_backup_directory):
+    """
+    Search a non existing domain
+    """
+    backup_dir = str(fixture_build_backup_directory["backup_dir"])
+    backup_dates = tuple(fixture_build_backup_directory["backup_dates"])
+    domain_names = fixture_build_backup_directory["domain_names"]
+
+    backups = list_backups_by_domain(str(backup_dir))
+    assert sorted(backups.keys()) == sorted(domain_names)
+
+    def expected_backups(domain_id, domain_name):
+        for backup_date in backup_dates:
+            str_backup_date = backup_date.strftime("%Y%m%d-%H%M%S")
+            json_filename = "{}_{}_{}.json".format(
+                str_backup_date, domain_id, domain_name
+            )
+            json_path = os.path.join(backup_dir, domain_name, json_filename)
+
+            assert os.path.isfile(json_path)
+            with open(json_path, "r") as json_file:
+                yield (json_path, json.load(json_file))
+
+    for domain_id, domain_name in enumerate(domain_names):
+        assert (
+            sorted(expected_backups(domain_id, domain_name)) ==
+            sorted(backups[domain_name])
+        )

@@ -23,7 +23,10 @@ def fixture_build_mock_libvirtconn_filled(fixture_build_mock_libvirtconn):
     return conn
 
 
-@pytest.fixture(scope="session")
-def fixture_build_completed_backups(tmpdir):
-    backup_dates = build_completed_backups(tmpdir)
-    return {"backup_dates": backup_dates, "backup_dir": tmpdir}
+@pytest.fixture
+def fixture_build_backup_directory(tmpdir):
+    domain_names, backup_dates = build_completed_backups(str(tmpdir))
+    return {
+        "domain_names": domain_names, "backup_dates": backup_dates,
+        "backup_dir": tmpdir
+    }
