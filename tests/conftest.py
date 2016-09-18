@@ -1,6 +1,6 @@
 
 import pytest
-from helper.virt_backup import MockDomain, MockConn
+from helper.virt_backup import MockDomain, MockConn, build_completed_backups
 
 
 @pytest.fixture
@@ -21,3 +21,9 @@ def fixture_build_mock_libvirtconn_filled(fixture_build_mock_libvirtconn):
         MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names
     ]
     return conn
+
+
+@pytest.fixture(scope="session")
+def fixture_build_completed_backups(tmpdir):
+    backup_dates = build_completed_backups(tmpdir)
+    return {"backup_dates": backup_dates, "backup_dir": tmpdir}

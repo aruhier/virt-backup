@@ -1,8 +1,11 @@
 
+import arrow
 import defusedxml.lxml
 import libvirt
 import lxml
 import os
+
+from virt_backup.domain import DomBackup
 
 
 CUR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -54,3 +57,48 @@ class MockConn():
 
     def __init__(self, _domains=None, *args, **kwargs):
         self._domains = _domains or []
+
+
+def build_completed_backups(backup_dir):
+    domain_names = ("a", "b", "vm-10", "matching", "matching2")
+    backup_properties = (
+        (arrow.get("2016-07-08 18:30:02"), None),
+        (arrow.get("2014-05-01 00:30:00"), "tar"),
+        (arrow.get("2016-12-08 14:28:13"), "xz"),
+    )
+    conn = MockConn()
+    for domain_id, domain_name in enumerate(domain_names):
+        domain_bdir = os.path.join(backup_dir, domain_name)
+        os.mkdir(domain_bdir)
+        domain = MockDomain(conn, name=domain_name, id=domain_id)
+        dbackup = DomBackup(
+            domain, domain_bdir, dev_disks=("vda", "vdb")
+        )
+
+        for bakdate, compression in backup_properties:
+            dbackup.compression = compression
+            definition = dbackup.get_definition()
+            definition["date"] = bakdate.timestamp
+            if compression:
+                tar = dbackup.get_new_tar(domain_bdir, bakdate)
+                if compression == "xz":
+                    definition["tar"] = tar.fileobj._fp.name
+                else:
+                    definition["tar"] = tar.fileobj.name
+            for disk in dbackup.disks:
+                # create empty files as our backup images
+                img_name = "{}.qcow2".format(
+                    dbackup._disk_backup_name_format(bakdate, disk),
+                )
+                definition["files"][disk] = img_name
+
+                img_complete_path = os.path.join(domain_bdir, img_name)
+                with open(img_complete_path, "w"):
+                    continue
+                if compression:
+                    # add img to the tar file and remove it
+                    tar.add(img_complete_path)
+                    os.path.remove(img_complete_path)
+            dbackup._dump_json_definition(definition)
+
+    return (bp[0] for bp in backup_properties)
