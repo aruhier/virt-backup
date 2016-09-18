@@ -1,5 +1,7 @@
 
+import defusedxml.lxml
 import libvirt
+import lxml
 import os
 
 
@@ -15,18 +17,26 @@ class MockDomain():
         Return the definition of a testing domain
         """
         with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
-            dom_xml = "".join(dom_xmlfile.readlines())
-        return dom_xml
+            dom_xml_str = dom_xmlfile.read()
+        dom_xml = defusedxml.lxml.fromstring(dom_xml_str)
+        dom_xml.set("id", str(self._id))
+        elem_name = dom_xml.xpath("name")[0]
+        if not elem_name:
+            elem_name = dom_xml.makeelement("name")
+            dom_xml.insert(0, elem_name)
+        elem_name.text = self._name
+        return lxml.etree.tostring(dom_xml, pretty_print=True).decode()
 
     def ID(self):
-        return 1
+        return self._id
 
     def name(self):
         return self._name
 
-    def __init__(self, _conn, name="test", *args, **kwargs):
+    def __init__(self, _conn, name="test", id=1, *args, **kwargs):
         self._conn = _conn
         self._name = name
+        self._id = id
 
 
 class MockConn():
