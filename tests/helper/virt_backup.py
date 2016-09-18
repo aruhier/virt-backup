@@ -101,5 +101,8 @@ def build_completed_backups(backup_dir):
                     tar.add(img_complete_path)
                     os.remove(img_complete_path)
             dbackup._dump_json_definition(definition)
+        # create a bad json file
+        with open(os.path.join(domain_bdir, "badfile.json"), "w"):
+            pass
 
     return (domain_names, (bp[0] for bp in backup_properties))
