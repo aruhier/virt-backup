@@ -58,15 +58,12 @@ def list_backups_by_domain(backup_dir):
     return backups
 
 
-class DomBackup():
-    """
-    Libvirt domain backup
-    """
+class _BaseDomBackup():
     def _parse_xml(self):
         """
         Parse the domain's definition
         """
-        return defusedxml.lxml.fromstring(self.dom.XMLDesc())
+        raise NotImplementedError
 
     def _get_disks(self, *filter_dev):
         """
@@ -93,6 +90,17 @@ class DomBackup():
         # TODO: raise an exception if a disk was part of the filter but not
         #       found in the domain
         return disks
+
+
+class DomBackup(_BaseDomBackup):
+    """
+    Libvirt domain backup
+    """
+    def _parse_xml(self):
+        """
+        Parse the domain's definition
+        """
+        return defusedxml.lxml.fromstring(self.dom.XMLDesc())
 
     def _main_backup_name_format(self, snapdate, *args, **kwargs):
         """
@@ -167,6 +175,35 @@ class DomBackup():
             "domain_xml": self.dom.XMLDesc()
         }
 
+    def get_new_tar(self, target, snapshot_date):
+        """
+        Get a new tar for this backup
+
+        self._main_backup_name_format will be used to generate a new tar name
+
+        :param target: directory path that will contain our tar. If not exists,
+                       will be created.
+        """
+        if self.compression not in (None, "tar"):
+            mode = "w:{}".format(self.compression)
+            extension = "tar.{}".format(self.compression)
+        else:
+            mode = "w"
+            extension = "tar"
+
+        if not os.path.isdir(target):
+            os.path.makedirs(target)
+
+        complete_path = os.path.join(
+            target,
+            "{}.{}".format(
+                self._main_backup_name_format(snapshot_date), extension
+            )
+        )
+        if os.path.exists(complete_path):
+            raise FileExistsError
+        return tarfile.open(complete_path, mode)
+
     def backup_img(self, disk, target, target_filename=None):
         """
         Backup a disk image
@@ -206,35 +243,6 @@ class DomBackup():
 
         logger.debug("{} successfully copied".format(disk))
         return os.path.abspath(backup_path)
-
-    def get_new_tar(self, target, snapshot_date):
-        """
-        Get a new tar for this backup
-
-        self._main_backup_name_format will be used to generate a new tar name
-
-        :param target: directory path that will contain our tar. If not exists,
-                       will be created.
-        """
-        if self.compression not in (None, "tar"):
-            mode = "w:{}".format(self.compression)
-            extension = "tar.{}".format(self.compression)
-        else:
-            mode = "w"
-            extension = "tar"
-
-        if not os.path.isdir(target):
-            os.path.makedirs(target)
-
-        complete_path = os.path.join(
-            target,
-            "{}.{}".format(
-                self._main_backup_name_format(snapshot_date), extension
-            )
-        )
-        if os.path.exists(complete_path):
-            raise FileExistsError
-        return tarfile.open(complete_path, mode)
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
         """
@@ -407,3 +415,19 @@ class DomBackup():
 
         #: used to trigger when block pivot ends
         self._wait_for_pivot = threading.Event()
+
+
+def get_complete_backup_from_def(definition):
+    pass
+
+
+class DomCompleteBackup(_BaseDomBackup):
+    def __init__(self, dom_xml=None, disks=None, tar=None):
+        #: domain XML as it was during the backup
+        self.dom_xml = dom_xml
+
+        #: if disks were compressed or contained into a tar file
+        self.tar = tar
+
+        #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
+        self.disks = disks
