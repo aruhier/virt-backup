@@ -209,7 +209,6 @@ class DomBackup(_BaseDomBackup):
         Get a json defining this backup
         """
         return {
-            "disks": tuple(self.disks.keys()),
             "compression": self.compression,
             "compression_lvl": self.compression_lvl,
             "domain_id": self.dom.ID(), "domain_name": self.dom.name(),
@@ -419,7 +418,12 @@ class DomBackup(_BaseDomBackup):
 
 
 def get_complete_backup_from_def(definition):
-    pass
+    backup = DomCompleteBackup(
+        dom_xml=definition.get("domain_xml", None),
+        disks=definition.get("disks", None),
+        tar=definition.get("tar", None)
+    )
+    return backup
 
 
 class DomCompleteBackup(_BaseDomBackup):

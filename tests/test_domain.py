@@ -6,10 +6,25 @@ import pytest
 import tarfile
 
 from virt_backup.domain import (
-    DomBackup, search_domains_regex, list_backups_by_domain
+    DomBackup, search_domains_regex, list_backups_by_domain,
+    get_complete_backup_from_def
 )
 
 from helper.virt_backup import MockDomain
+
+
+@pytest.fixture
+def fixture_build_bak_definition_with_compression(fixture_build_mock_domain):
+    dombkup = DomBackup(
+        dom=fixture_build_mock_domain, dev_disks=("vda", ), compression="xz",
+        compression_lvl=4,
+    )
+
+    definition = dombkup.get_definition()
+    datenow = datetime.datetime.now()
+    definition["date"] = datenow.timestamp()
+
+    return definition
 
 
 def test_get_self_domain_disks(fixture_build_mock_domain):
@@ -161,7 +176,7 @@ def test_get_definition(fixture_build_mock_domain):
     )
 
     expected_def = {
-        "disks": ("vda", ), "compression": "xz", "compression_lvl": 4,
+        "compression": "xz", "compression_lvl": 4,
         "domain_id": fixture_build_mock_domain.ID(),
         "domain_name": fixture_build_mock_domain.name(),
         "domain_xml": fixture_build_mock_domain.XMLDesc()
@@ -179,8 +194,6 @@ def test_dump_json_definition(fixture_build_mock_domain, tmpdir):
     definition = dombkup.get_definition()
     datenow = datetime.datetime.now()
     definition["date"] = datenow.timestamp()
-    # converts disks to list as json doesn't know tuples
-    definition["disks"] = list(definition["disks"])
 
     dombkup._dump_json_definition(definition)
     assert len(target_dir.listdir()) == 1
@@ -241,3 +254,11 @@ def test_list_backups_by_domain(fixture_build_backup_directory):
             sorted(expected_backups(domain_id, domain_name)) ==
             sorted(backups[domain_name])
         )
+
+
+def test_get_complete_backup_from_def(
+        fixture_build_bak_definition_with_compression):
+    definition = fixture_build_bak_definition_with_compression
+    complete_backup = get_complete_backup_from_def(definition)
+
+    assert complete_backup.dom_xml == definition["domain_xml"]
