@@ -314,11 +314,11 @@ class DomBackup(_BaseDomBackup):
             disk_properties["src"], backup_target, target_img
         )
         if self.compression:
-            if not definition.get("files", None):
+            if not definition.get("tar", None):
                 # all disks will be compacted in the same tar, so already
                 # store it in definition if it was not set before
                 definition["tar"] = os.path.basename(backup_path)
-        definition["files"][disk] = target_img
+        definition["disks"][disk] = target_img
 
     def _blockcommit_disk_and_wait(self, disk):
         """
