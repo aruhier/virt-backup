@@ -12,7 +12,7 @@ from virt_backup.domain import (
 from helper.virt_backup import MockDomain
 
 
-def test_get_disks(fixture_build_mock_domain):
+def test_get_self_domain_disks(fixture_build_mock_domain):
     dombkup = DomBackup(dom=fixture_build_mock_domain)
     expected_disks = {
         "vda": {
@@ -25,7 +25,7 @@ def test_get_disks(fixture_build_mock_domain):
         }
     }
 
-    assert dombkup._get_disks() == expected_disks
+    assert dombkup._get_self_domain_disks() == expected_disks
 
 
 def test_get_disks_with_filter(fixture_build_mock_domain):
@@ -37,7 +37,7 @@ def test_get_disks_with_filter(fixture_build_mock_domain):
         },
     }
 
-    assert dombkup._get_disks("vda") == expected_disks
+    assert dombkup._get_self_domain_disks("vda") == expected_disks
 
 
 def test_init_with_disk(fixture_build_mock_domain):
@@ -94,7 +94,7 @@ def test_add_not_existing_disk(fixture_build_mock_domain):
         dombkup.add_disks("vdc")
 
 
-def test_get_snapshot_xml(fixture_build_mock_domain):
+def test_get_libvirt_snapshot_xml(fixture_build_mock_domain):
     dombkup = DomBackup(dom=fixture_build_mock_domain)
     expected_xml = (
         "<domainsnapshot>\n"
@@ -105,7 +105,7 @@ def test_get_snapshot_xml(fixture_build_mock_domain):
         "  </disks>\n"
         "</domainsnapshot>\n"
     )
-    assert dombkup.gen_snapshot_xml() == expected_xml
+    assert dombkup.gen_libvirt_snapshot_xml() == expected_xml
 
 
 def test_main_backup_name_format(fixture_build_mock_domain):
