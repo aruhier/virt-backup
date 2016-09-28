@@ -15,61 +15,62 @@ def test_backup_group():
     assert len(backup_group.backups) == 0
 
 
-def test_backup_group_with_domain(fixture_build_mock_domain):
-    dom = fixture_build_mock_domain
+def test_backup_group_with_domain(build_mock_domain):
+    dom = build_mock_domain
     backup_group = BackupGroup(domlst=((dom, None),))
 
     assert len(backup_group.backups) == 1
     assert backup_group.backups[0].dom == dom
 
 
-def test_backup_group_add_backup(fixture_build_mock_domain):
+def test_backup_group_add_backup(build_mock_domain):
     backup_group = BackupGroup()
-    dom = fixture_build_mock_domain
+    dom = build_mock_domain
 
     backup_group.add_backup(dom)
+
     assert len(backup_group.backups) == 1
     assert backup_group.backups[0].dom == dom
 
 
-def test_backup_group_dedup_backup_domain(fixture_build_mock_domain):
+def test_backup_group_dedup_backup_domain(build_mock_domain):
     """
     Test to add 2 times the same backup and check that it's not duplicated
     """
-    dom = fixture_build_mock_domain
+    dom = build_mock_domain
     backup_group = BackupGroup(domlst=(dom, ))
 
     backup_group.add_backup(dom)
     assert len(backup_group.backups) == 1
 
 
-def test_backup_group_search(fixture_build_mock_domain):
-    dom = fixture_build_mock_domain
+def test_backup_group_search(build_mock_domain):
+    dom = build_mock_domain
     backup_group = BackupGroup(domlst=(dom, ))
 
     dombak = next(backup_group.search(dom))
     assert dombak == backup_group.backups[0]
 
 
-def test_backup_group_search_not_found(fixture_build_mock_domain):
-    dom = fixture_build_mock_domain
+def test_backup_group_search_not_found(build_mock_domain):
+    dom = build_mock_domain
     backup_group = BackupGroup()
 
     with pytest.raises(StopIteration):
         next(backup_group.search(dom))
 
 
-def test_backup_group_start(fixture_build_mock_domain, mocker):
-    backup_group = BackupGroup(domlst=(fixture_build_mock_domain, ))
+def test_backup_group_start(build_mock_domain, mocker):
+    backup_group = BackupGroup(domlst=(build_mock_domain, ))
     backup_group.backups[0].start = mocker.stub()
 
     backup_group.start()
     assert backup_group.backups[0].start.called
 
 
-def test_backup_group_propagate_attr(fixture_build_mock_domain):
+def test_backup_group_propagate_attr(build_mock_domain):
     backup_group = BackupGroup(
-        domlst=(fixture_build_mock_domain, ), compression="xz"
+        domlst=(build_mock_domain, ), compression="xz"
     )
     assert backup_group.backups[0].compression == "xz"
 
@@ -97,8 +98,8 @@ def test_backup_group_propagate_attr_multiple_domains(mocker):
         assert b.target_dir is "/test"
 
 
-def test_parse_host_pattern_regex(fixture_build_mock_libvirtconn_filled):
-    conn = fixture_build_mock_libvirtconn_filled
+def test_parse_host_pattern_regex(build_mock_libvirtconn_filled):
+    conn = build_mock_libvirtconn_filled
     matches = parse_host_pattern("r:^matching.?$", conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
@@ -107,11 +108,11 @@ def test_parse_host_pattern_regex(fixture_build_mock_libvirtconn_filled):
     assert not exclude
 
 
-def test_parse_host_pattern_direct_name(fixture_build_mock_libvirtconn_filled):
+def test_parse_host_pattern_direct_name(build_mock_libvirtconn_filled):
     """
     Test parse_host_pattern directly with a domain name
     """
-    conn = fixture_build_mock_libvirtconn_filled
+    conn = build_mock_libvirtconn_filled
     matches = parse_host_pattern("matching", conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
@@ -120,11 +121,11 @@ def test_parse_host_pattern_direct_name(fixture_build_mock_libvirtconn_filled):
     assert not exclude
 
 
-def test_parse_host_pattern_exclude(fixture_build_mock_libvirtconn_filled):
+def test_parse_host_pattern_exclude(build_mock_libvirtconn_filled):
     """
     Test parse_host_pattern with a pattern excluding a domain
     """
-    conn = fixture_build_mock_libvirtconn_filled
+    conn = build_mock_libvirtconn_filled
     matches = parse_host_pattern("!matching", conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
@@ -133,8 +134,8 @@ def test_parse_host_pattern_exclude(fixture_build_mock_libvirtconn_filled):
     assert exclude
 
 
-def test_match_domains_from_config(fixture_build_mock_libvirtconn_filled):
-    conn = fixture_build_mock_libvirtconn_filled
+def test_match_domains_from_config(build_mock_libvirtconn_filled):
+    conn = build_mock_libvirtconn_filled
     host_config = {"host": "matching", "disks": ["vda", "vdb"]}
 
     matches = match_domains_from_config(host_config, conn)
@@ -146,12 +147,11 @@ def test_match_domains_from_config(fixture_build_mock_libvirtconn_filled):
     assert disks == ("vda", "vdb")
 
 
-def test_match_domains_from_config_unexisting(
-        fixture_build_mock_libvirtconn_filled):
+def test_match_domains_from_config_unexisting(build_mock_libvirtconn_filled):
     """
     Test match_domains_from_config with a non existing domain
     """
-    conn = fixture_build_mock_libvirtconn_filled
+    conn = build_mock_libvirtconn_filled
     host_config = {"host": "nonexisting", "disks": ["vda", "vdb"]}
 
     matches = match_domains_from_config(host_config, conn)
@@ -162,11 +162,11 @@ def test_match_domains_from_config_unexisting(
     assert not exclude
 
 
-def test_match_domains_from_config_str(fixture_build_mock_libvirtconn_filled):
+def test_match_domains_from_config_str(build_mock_libvirtconn_filled):
     """
     Test match_domains_from_config with a str pattern
     """
-    conn = fixture_build_mock_libvirtconn_filled
+    conn = build_mock_libvirtconn_filled
     host_config = "r:matching\d?"
 
     matches = match_domains_from_config(host_config, conn)
@@ -177,11 +177,11 @@ def test_match_domains_from_config_str(fixture_build_mock_libvirtconn_filled):
     assert not exclude
 
 
-def test_groups_from_dict(fixture_build_mock_libvirtconn_filled):
+def test_groups_from_dict(build_mock_libvirtconn_filled):
     """
     Test groups_from_dict with only one group
     """
-    conn = fixture_build_mock_libvirtconn_filled
+    conn = build_mock_libvirtconn_filled
     groups_config = {
         "test": {
             "target": "/mnt/test",
@@ -212,11 +212,11 @@ def test_groups_from_dict(fixture_build_mock_libvirtconn_filled):
 
 
 def test_groups_from_dict_multiple_groups(
-        fixture_build_mock_libvirtconn_filled):
+        build_mock_libvirtconn_filled):
     """
     Test match_domains_from_config with a str pattern
     """
-    conn = fixture_build_mock_libvirtconn_filled
+    conn = build_mock_libvirtconn_filled
     groups_config = {
         "test0": {
             "target": "/mnt/test0",

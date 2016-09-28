@@ -14,12 +14,21 @@ from helper.virt_backup import MockDomain
 
 
 @pytest.fixture
-def fixture_build_bak_definition_with_compression(fixture_build_mock_domain):
-    dombkup = DomBackup(
-        dom=fixture_build_mock_domain, dev_disks=("vda", ), compression="xz",
+def get_uncompressed_dombackup(build_mock_domain):
+    return DomBackup(
+        dom=build_mock_domain, dev_disks=("vda", ), compression="None",
+    )
+
+
+@pytest.fixture
+def get_compressed_dombackup(build_mock_domain):
+    return DomBackup(
+        dom=build_mock_domain, dev_disks=("vda", ), compression="xz",
         compression_lvl=4,
     )
 
+
+def get_and_tweak_def_from_dombackup(dombkup):
     definition = dombkup.get_definition()
     datenow = datetime.datetime.now()
     definition["date"] = datenow.timestamp()
@@ -27,181 +36,196 @@ def fixture_build_bak_definition_with_compression(fixture_build_mock_domain):
     return definition
 
 
-def test_get_self_domain_disks(fixture_build_mock_domain):
-    dombkup = DomBackup(dom=fixture_build_mock_domain)
-    expected_disks = {
-        "vda": {
-            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
-            "type": "qcow2",
-        },
-        "vdb": {
-            "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
-            "type": "qcow2",
+@pytest.fixture
+def build_bak_definition(get_uncompressed_dombackup):
+    dombkup = get_uncompressed_dombackup
+
+    return get_and_tweak_def_from_dombackup(dombkup)
+
+
+@pytest.fixture
+def build_bak_definition_with_compression(get_compressed_dombackup):
+    dombkup = get_compressed_dombackup
+
+    return get_and_tweak_def_from_dombackup(dombkup)
+
+
+@pytest.fixture
+def get_uncompressed_complete_backup(build_bak_definition):
+    definition = build_bak_definition
+
+    return get_complete_backup_from_def(definition)
+
+
+class TestDomBackup():
+    def test_get_self_domain_disks(self, build_mock_domain):
+        dombkup = DomBackup(dom=build_mock_domain)
+        expected_disks = {
+            "vda": {
+                "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+                "type": "qcow2",
+            },
+            "vdb": {
+                "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
+                "type": "qcow2",
+            }
         }
-    }
 
-    assert dombkup._get_self_domain_disks() == expected_disks
+        assert dombkup._get_self_domain_disks() == expected_disks
 
-
-def test_get_disks_with_filter(fixture_build_mock_domain):
-    dombkup = DomBackup(dom=fixture_build_mock_domain)
-    expected_disks = {
-        "vda": {
-            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
-            "type": "qcow2",
-        },
-    }
-
-    assert dombkup._get_self_domain_disks("vda") == expected_disks
-
-
-def test_init_with_disk(fixture_build_mock_domain):
-    dombkup = DomBackup(dom=fixture_build_mock_domain, dev_disks=("vda", ))
-
-    expected_disks = {
-        "vda": {
-            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
-            "type": "qcow2",
-        },
-    }
-    assert dombkup.disks == expected_disks
-
-
-def test_add_disks(fixture_build_mock_domain):
-    """
-    Create a DomBackup with only one disk (vda) and test to add vdb
-    """
-    disks = {
-        "vda": {
-            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
-            "type": "qcow2",
-        },
-    }
-    dombkup = DomBackup(dom=fixture_build_mock_domain, _disks=disks)
-    expected_disks = {
-        "vda": {
-            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
-            "type": "qcow2",
-        },
-    }
-    assert dombkup.disks == expected_disks
-
-    dombkup.add_disks("vdb")
-    expected_disks = {
-        "vda": {
-            "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
-            "type": "qcow2",
-        },
-        "vdb": {
-            "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
-            "type": "qcow2",
+    def test_get_disks_with_filter(self, build_mock_domain):
+        dombkup = DomBackup(dom=build_mock_domain)
+        expected_disks = {
+            "vda": {
+                "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+                "type": "qcow2",
+            },
         }
-    }
-    assert dombkup.disks == expected_disks
 
+        assert dombkup._get_self_domain_disks("vda") == expected_disks
 
-def test_add_not_existing_disk(fixture_build_mock_domain):
-    """
-    Create a DomBackup and test to add vdc
-    """
-    dombkup = DomBackup(dom=fixture_build_mock_domain)
-    with pytest.raises(KeyError):
-        dombkup.add_disks("vdc")
+    def test_init_with_disk(self, build_mock_domain):
+        dombkup = DomBackup(dom=build_mock_domain, dev_disks=("vda", ))
 
+        expected_disks = {
+            "vda": {
+                "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+                "type": "qcow2",
+            },
+        }
+        assert dombkup.disks == expected_disks
 
-def test_get_libvirt_snapshot_xml(fixture_build_mock_domain):
-    dombkup = DomBackup(dom=fixture_build_mock_domain)
-    expected_xml = (
-        "<domainsnapshot>\n"
-        "  <description>Pre-backup external snapshot</description>\n"
-        "  <disks>\n"
-        "    <disk name=\"vda\" snapshot=\"external\"/>\n"
-        "    <disk name=\"vdb\" snapshot=\"external\"/>\n"
-        "  </disks>\n"
-        "</domainsnapshot>\n"
-    )
-    assert dombkup.gen_libvirt_snapshot_xml() == expected_xml
+    def test_add_disks(self, build_mock_domain):
+        """
+        Create a DomBackup with only one disk (vda) and test to add vdb
+        """
+        disks = {
+            "vda": {
+                "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+                "type": "qcow2",
+            },
+        }
+        dombkup = DomBackup(dom=build_mock_domain, _disks=disks)
+        expected_disks = {
+            "vda": {
+                "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+                "type": "qcow2",
+            },
+        }
+        assert dombkup.disks == expected_disks
 
+        dombkup.add_disks("vdb")
+        expected_disks = {
+            "vda": {
+                "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
+                "type": "qcow2",
+            },
+            "vdb": {
+                "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
+                "type": "qcow2",
+            }
+        }
+        assert dombkup.disks == expected_disks
 
-def test_main_backup_name_format(fixture_build_mock_domain):
-    dombkup = DomBackup(dom=fixture_build_mock_domain)
-    snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+    def test_add_not_existing_disk(self, build_mock_domain):
+        """
+        Create a DomBackup and test to add vdc
+        """
+        dombkup = DomBackup(dom=build_mock_domain)
+        with pytest.raises(KeyError):
+            dombkup.add_disks("vdc")
 
-    expected_name = "20160815-171013_1_test"
-    assert dombkup._main_backup_name_format(snapdate) == expected_name
+    def test_get_libvirt_snapshot_xml(self, build_mock_domain):
+        dombkup = DomBackup(dom=build_mock_domain)
+        expected_xml = (
+            "<domainsnapshot>\n"
+            "  <description>Pre-backup external snapshot</description>\n"
+            "  <disks>\n"
+            "    <disk name=\"vda\" snapshot=\"external\"/>\n"
+            "    <disk name=\"vdb\" snapshot=\"external\"/>\n"
+            "  </disks>\n"
+            "</domainsnapshot>\n"
+        )
+        assert dombkup.gen_libvirt_snapshot_xml() == expected_xml
 
+    def test_main_backup_name_format(self, build_mock_domain):
+        dombkup = DomBackup(dom=build_mock_domain)
+        snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
 
-def test_disk_backup_name_format(fixture_build_mock_domain):
-    dombkup = DomBackup(dom=fixture_build_mock_domain)
-    snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+        expected_name = "20160815-171013_1_test"
+        assert dombkup._main_backup_name_format(snapdate) == expected_name
 
-    expected_name = "20160815-171013_1_test_vda"
-    assert dombkup._disk_backup_name_format(snapdate, "vda") == expected_name
+    def test_disk_backup_name_format(self, build_mock_domain):
+        dombkup = DomBackup(dom=build_mock_domain)
+        snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
 
+        backup_name = dombkup._disk_backup_name_format(snapdate, "vda")
+        expected_name = "20160815-171013_1_test_vda"
+        assert backup_name == expected_name
 
-def test_get_new_tar(fixture_build_mock_domain, tmpdir, compression="tar"):
-    dombkup = DomBackup(dom=fixture_build_mock_domain, compression=compression)
-    snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+    def test_get_new_tar(self, build_mock_domain, tmpdir, compression="tar"):
+        dombkup = DomBackup(
+            dom=build_mock_domain, compression=compression
+        )
+        snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
 
-    target_dir = tmpdir.mkdir("get_new_tar")
+        target_dir = tmpdir.mkdir("get_new_tar")
 
-    if compression == "tar":
-        extension = "tar"
-    else:
-        extension = "tar.{}".format(compression)
-    tar_path = target_dir.join(
-        "{}.{}".format(dombkup._main_backup_name_format(snapdate), extension)
-    )
-    with dombkup.get_new_tar(str(target_dir), snapshot_date=snapdate):
-        assert tar_path.check()
+        if compression == "tar":
+            extension = "tar"
+        else:
+            extension = "tar.{}".format(compression)
+        tar_path = target_dir.join(
+            "{}.{}".format(
+                dombkup._main_backup_name_format(snapdate), extension
+            )
+        )
+        with dombkup.get_new_tar(str(target_dir), snapshot_date=snapdate):
+            assert tar_path.check()
 
-
-def test_get_new_tar_xz(fixture_build_mock_domain, tmpdir):
-    return test_get_new_tar(
-        fixture_build_mock_domain, tmpdir, compression="xz"
-    )
-
-
-def test_get_new_tar_unvalid_compression(fixture_build_mock_domain, tmpdir):
-    with pytest.raises(tarfile.CompressionError):
-        return test_get_new_tar(
-            fixture_build_mock_domain, tmpdir, compression="test"
+    def test_get_new_tar_xz(self, build_mock_domain, tmpdir):
+        return self.test_get_new_tar(
+            build_mock_domain, tmpdir, compression="xz"
         )
 
+    def test_get_new_tar_unvalid_compression(self, build_mock_domain, tmpdir):
+        with pytest.raises(tarfile.CompressionError):
+            return self.test_get_new_tar(
+                build_mock_domain, tmpdir, compression="test"
+            )
 
-def test_get_definition(fixture_build_mock_domain):
-    dombkup = DomBackup(
-        dom=fixture_build_mock_domain, dev_disks=("vda", ), compression="xz",
-        compression_lvl=4
-    )
+    def test_get_definition(self, build_mock_domain):
+        dombkup = DomBackup(
+            dom=build_mock_domain, dev_disks=("vda", ),
+            compression="xz", compression_lvl=4
+        )
 
-    expected_def = {
-        "compression": "xz", "compression_lvl": 4,
-        "domain_id": fixture_build_mock_domain.ID(),
-        "domain_name": fixture_build_mock_domain.name(),
-        "domain_xml": fixture_build_mock_domain.XMLDesc()
-    }
-    assert dombkup.get_definition() == expected_def
+        expected_def = {
+            "compression": "xz", "compression_lvl": 4,
+            "domain_id": build_mock_domain.ID(),
+            "domain_name": build_mock_domain.name(),
+            "domain_xml": build_mock_domain.XMLDesc()
+        }
+        assert dombkup.get_definition() == expected_def
+
+    def test_dump_json_definition(self, build_mock_domain, tmpdir):
+        target_dir = tmpdir.mkdir("json_dump")
+        dombkup = DomBackup(
+            dom=build_mock_domain, dev_disks=("vda", ),
+            compression="xz", compression_lvl=4, target_dir=str(target_dir),
+        )
+
+        definition = dombkup.get_definition()
+        datenow = datetime.datetime.now()
+        definition["date"] = datenow.timestamp()
+
+        dombkup._dump_json_definition(definition)
+        assert len(target_dir.listdir()) == 1
+        assert json.loads(target_dir.listdir()[0].read()) == definition
 
 
-def test_dump_json_definition(fixture_build_mock_domain, tmpdir):
-    target_dir = tmpdir.mkdir("json_dump")
-    dombkup = DomBackup(
-        dom=fixture_build_mock_domain, dev_disks=("vda", ), compression="xz",
-        compression_lvl=4, target_dir=str(target_dir),
-    )
-
-    definition = dombkup.get_definition()
-    datenow = datetime.datetime.now()
-    definition["date"] = datenow.timestamp()
-
-    dombkup._dump_json_definition(definition)
-    assert len(target_dir.listdir()) == 1
-    assert json.loads(target_dir.listdir()[0].read()) == definition
-
-
-def test_search_domains_regex(fixture_build_mock_libvirtconn):
-    conn = fixture_build_mock_libvirtconn
+def test_search_domains_regex(build_mock_libvirtconn):
+    conn = build_mock_libvirtconn
     domain_names = ("dom1", "dom2", "dom3", "test")
     conn._domains = [
         MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names
@@ -215,24 +239,24 @@ def test_search_domains_regex(fixture_build_mock_libvirtconn):
 
 
 def test_search_domains_regex_not_found(
-        fixture_build_mock_libvirtconn, fixture_build_mock_domain):
+        build_mock_libvirtconn, build_mock_domain):
     """
     Search a non existing domain
     """
-    conn = fixture_build_mock_libvirtconn
-    conn._domains = [fixture_build_mock_domain]
+    conn = build_mock_libvirtconn
+    conn._domains = [build_mock_domain]
 
     matches = list(search_domains_regex("^dom$", conn))
     assert matches == []
 
 
-def test_list_backups_by_domain(fixture_build_backup_directory):
+def test_list_backups_by_domain(build_backup_directory):
     """
     Search a non existing domain
     """
-    backup_dir = str(fixture_build_backup_directory["backup_dir"])
-    backup_dates = tuple(fixture_build_backup_directory["backup_dates"])
-    domain_names = fixture_build_backup_directory["domain_names"]
+    backup_dir = str(build_backup_directory["backup_dir"])
+    backup_dates = tuple(build_backup_directory["backup_dates"])
+    domain_names = build_backup_directory["domain_names"]
 
     backups = list_backups_by_domain(str(backup_dir))
     assert sorted(backups.keys()) == sorted(domain_names)
@@ -256,9 +280,8 @@ def test_list_backups_by_domain(fixture_build_backup_directory):
         )
 
 
-def test_get_complete_backup_from_def(
-        fixture_build_bak_definition_with_compression):
-    definition = fixture_build_bak_definition_with_compression
+def test_get_complete_backup_from_def(build_bak_definition_with_compression):
+    definition = build_bak_definition_with_compression
     complete_backup = get_complete_backup_from_def(definition)
 
     assert complete_backup.dom_xml == definition["domain_xml"]

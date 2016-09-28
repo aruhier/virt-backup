@@ -12,7 +12,7 @@ TESTCONF_PATH = os.path.join(CUR_PATH, "testconfig", "config.yml")
 
 
 @pytest.fixture
-def fixture_get_config():
+def get_testing_config():
     return get_config(custom_path=TESTCONF_PATH)
 
 
@@ -27,9 +27,9 @@ def test_get_config():
     assert conf == expected_conf
 
 
-def test_get_config_custom_path(fixture_get_config):
-    # fixture_get_config already uses a custom path, so uses it
-    conf = fixture_get_config
+def test_get_config_custom_path(get_testing_config):
+    # get_config already uses a custom path, so uses it
+    conf = get_testing_config
     with open(TESTCONF_PATH, "r") as f:
         expected_conf = yaml.safe_load(f)
 
@@ -53,23 +53,23 @@ def test_config_with_default_config():
     assert conf["debug"]
 
 
-def test_config_from_dict(fixture_get_config):
+def test_config_from_dict(get_testing_config):
     conf = Config()
-    conf.from_dict(fixture_get_config)
+    conf.from_dict(get_testing_config)
 
-    assert sorted(conf.items()) == sorted(fixture_get_config.items())
+    assert sorted(conf.items()) == sorted(get_testing_config.items())
 
 
-def test_config_from_yaml(fixture_get_config):
+def test_config_from_yaml(get_testing_config):
     conf = Config()
     conf.from_yaml(TESTCONF_PATH)
 
-    assert sorted(conf.items()) == sorted(fixture_get_config.items())
+    assert sorted(conf.items()) == sorted(get_testing_config.items())
 
 
-def test_config_from_str(fixture_get_config):
+def test_config_from_str(get_testing_config):
     conf = Config()
     with open(TESTCONF_PATH, "r") as conf_file:
         conf.from_str(conf_file.read())
 
-    assert sorted(conf.items()) == sorted(fixture_get_config.items())
+    assert sorted(conf.items()) == sorted(get_testing_config.items())
