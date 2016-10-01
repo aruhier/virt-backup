@@ -59,6 +59,41 @@ class MockConn():
         self._domains = _domains or []
 
 
+def build_complete_backup_files_from_domainbackup(dbackup, date):
+    """
+    :returns definition: updated definition from backuped files
+    """
+    definition = dbackup.get_definition()
+    definition["date"] = date.timestamp
+    definition["disks"] = {}
+
+    backup_dir = dbackup.target_dir
+
+    if dbackup.compression:
+        tar = dbackup.get_new_tar(backup_dir, date)
+        if dbackup.compression == "xz":
+            definition["tar"] = tar.fileobj._fp.name
+        else:
+            definition["tar"] = tar.fileobj.name
+    for disk in dbackup.disks:
+        # create empty files as our backup images
+        img_name = "{}.qcow2".format(
+            dbackup._disk_backup_name_format(date, disk),
+        )
+        definition["disks"][disk] = img_name
+
+        img_complete_path = os.path.join(backup_dir, img_name)
+        with open(img_complete_path, "w"):
+            pass
+        if dbackup.compression:
+            # add img to the tar file and remove it
+            tar.add(img_complete_path, arcname=img_name)
+            os.remove(img_complete_path)
+    if dbackup.compression:
+        tar.close()
+    return definition
+
+
 def build_completed_backups(backup_dir):
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
     backup_properties = (
@@ -77,29 +112,9 @@ def build_completed_backups(backup_dir):
 
         for bakdate, compression in backup_properties:
             dbackup.compression = compression
-            definition = dbackup.get_definition()
-            definition["date"] = bakdate.timestamp
-            definition["files"] = {}
-            if compression:
-                tar = dbackup.get_new_tar(domain_bdir, bakdate)
-                if compression == "xz":
-                    definition["tar"] = tar.fileobj._fp.name
-                else:
-                    definition["tar"] = tar.fileobj.name
-            for disk in dbackup.disks:
-                # create empty files as our backup images
-                img_name = "{}.qcow2".format(
-                    dbackup._disk_backup_name_format(bakdate, disk),
-                )
-                definition["files"][disk] = img_name
-
-                img_complete_path = os.path.join(domain_bdir, img_name)
-                with open(img_complete_path, "w"):
-                    pass
-                if compression:
-                    # add img to the tar file and remove it
-                    tar.add(img_complete_path)
-                    os.remove(img_complete_path)
+            definition = build_complete_backup_files_from_domainbackup(
+                dbackup, bakdate
+            )
             dbackup._dump_json_definition(definition)
         # create a bad json file
         with open(os.path.join(domain_bdir, "badfile.json"), "w"):

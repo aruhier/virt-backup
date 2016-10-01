@@ -417,17 +417,59 @@ class DomBackup(_BaseDomBackup):
         self._wait_for_pivot = threading.Event()
 
 
-def get_complete_backup_from_def(definition):
+def build_dom_complete_backup_from_def(definition, backup_dir):
     backup = DomCompleteBackup(
+        backup_dir=backup_dir,
         dom_xml=definition.get("domain_xml", None),
         disks=definition.get("disks", None),
-        tar=definition.get("tar", None)
+        tar=definition.get("tar", None),
     )
     return backup
 
 
 class DomCompleteBackup(_BaseDomBackup):
-    def __init__(self, dom_xml=None, disks=None, tar=None):
+    def get_size_of_disk(self, disk):
+        if self.tar is None:
+            return os.path.getsize(self.get_complete_path_of(self.disks[disk]))
+        else:
+            tar_path = self.get_complete_path_of(self.tar)
+            with tarfile.open(tar_path, "r:*") as tar_f:
+                disk_tarinfo = tar_f.getmember(self.disks[disk])
+                return disk_tarinfo.size
+
+    def restore_disk_to(self, disk, target):
+        """
+        :param disk: disk name
+        :param target: destination path for the restoration
+        """
+        if self.tar is None:
+            logger.debug("Restore {} in {}".format(disk, target))
+            disk_image_path = self.get_complete_path_of(self.disks[disk])
+            copy_file_progress(
+                disk_image_path, target, buffersize=10*1024*1024
+            )
+        else:
+            # TODO: handle the case where target is the complete img
+            # destination path. For the moment, it is a directory where our img
+            # will be extracted
+            tar_path = self.get_complete_path_of(self.tar)
+            with tarfile.open(tar_path, "r:*") as tar_f:
+                tqdm_kwargs = {
+                    "total": self.get_size_of_disk(disk),
+                    "unit": "B", "unit_scale": True,
+                    "ncols": 0
+                }
+                with tqdm(**tqdm_kwargs) as pbar:
+                    tar_f.fileobject = get_progress_bar_tar(pbar)
+                    tar_f.extract(self.disks[disk], target)
+
+    def get_complete_path_of(self, filename):
+        return os.path.join(self.backup_dir, filename)
+
+    def __init__(self, backup_dir, dom_xml=None, disks=None, tar=None):
+        #: backup directory path
+        self.backup_dir = backup_dir
+
         #: domain XML as it was during the backup
         self.dom_xml = dom_xml
 

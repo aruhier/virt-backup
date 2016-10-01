@@ -1,5 +1,7 @@
 
+import arrow
 import datetime
+import filecmp
 import json
 import os
 import pytest
@@ -7,16 +9,18 @@ import tarfile
 
 from virt_backup.domain import (
     DomBackup, search_domains_regex, list_backups_by_domain,
-    get_complete_backup_from_def
+    build_dom_complete_backup_from_def
 )
 
-from helper.virt_backup import MockDomain
+from helper.virt_backup import (
+    MockDomain, build_complete_backup_files_from_domainbackup
+)
 
 
 @pytest.fixture
 def get_uncompressed_dombackup(build_mock_domain):
     return DomBackup(
-        dom=build_mock_domain, dev_disks=("vda", ), compression="None",
+        dom=build_mock_domain, dev_disks=("vda", ), compression=None,
     )
 
 
@@ -28,10 +32,11 @@ def get_compressed_dombackup(build_mock_domain):
     )
 
 
-def get_and_tweak_def_from_dombackup(dombkup):
+def get_and_tweak_def_from_dombackup(dombkup, date=None):
     definition = dombkup.get_definition()
-    datenow = datetime.datetime.now()
-    definition["date"] = datenow.timestamp()
+    if date is None:
+        date = datetime.datetime.now()
+    definition["date"] = date.timestamp()
 
     return definition
 
@@ -50,11 +55,28 @@ def build_bak_definition_with_compression(get_compressed_dombackup):
     return get_and_tweak_def_from_dombackup(dombkup)
 
 
-@pytest.fixture
-def get_uncompressed_complete_backup(build_bak_definition):
-    definition = build_bak_definition
+def transform_dombackup_to_dom_complete_backup(dombkup):
+    definition = build_complete_backup_files_from_domainbackup(
+        dombkup, arrow.now()
+    )
 
-    return get_complete_backup_from_def(definition)
+    return build_dom_complete_backup_from_def(definition, dombkup.target_dir)
+
+
+@pytest.fixture
+def get_uncompressed_complete_backup(get_uncompressed_dombackup, tmpdir):
+    dombkup = get_uncompressed_dombackup
+    dombkup.target_dir = str(tmpdir)
+
+    return transform_dombackup_to_dom_complete_backup(dombkup)
+
+
+@pytest.fixture
+def get_compressed_complete_backup(get_compressed_dombackup, tmpdir):
+    dombkup = get_compressed_dombackup
+    dombkup.target_dir = str(tmpdir)
+
+    return transform_dombackup_to_dom_complete_backup(dombkup)
 
 
 class TestDomBackup():
@@ -282,6 +304,55 @@ def test_list_backups_by_domain(build_backup_directory):
 
 def test_get_complete_backup_from_def(build_bak_definition_with_compression):
     definition = build_bak_definition_with_compression
-    complete_backup = get_complete_backup_from_def(definition)
+    complete_backup = build_dom_complete_backup_from_def(
+        definition, backup_dir="./"
+    )
 
     assert complete_backup.dom_xml == definition["domain_xml"]
+
+
+class TestDomCompleteBackup():
+    def test_restore_disk_to(self, get_uncompressed_complete_backup, tmpdir):
+        """
+        Test with a not compressed backup
+        """
+        backup = get_uncompressed_complete_backup
+        src_img = backup.get_complete_path_of(backup.disks["vda"])
+        dst_img = os.path.join(str(tmpdir), "vda.img")
+
+        backup.restore_disk_to("vda", dst_img)
+
+        assert filecmp.cmp(src_img, dst_img)
+
+    def test_restore_compressed_disk_to(
+            self, get_compressed_complete_backup, tmpdir):
+        """
+        Test with a compressed backup
+        """
+        backup = get_compressed_complete_backup
+        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+
+        # extract our img from tar to be able to compare it
+        src_tar = backup.get_complete_path_of(backup.tar)
+        with tarfile.open(src_tar, "r:*") as tar_f:
+            tar_f.extract(backup.disks["vda"], backup.backup_dir)
+        src_img = backup.get_complete_path_of(backup.disks["vda"])
+
+        backup.restore_disk_to("vda", str(tmpdir))
+
+        assert filecmp.cmp(src_img, dst_img, shallow=False)
+
+    def test_get_complete_backup_from_def(
+            self, get_uncompressed_complete_backup):
+        backup = get_uncompressed_complete_backup
+
+        complete_path_of_vda = backup.get_complete_path_of(backup.disks["vda"])
+        expected_path = os.path.join(backup.backup_dir, backup.disks["vda"])
+
+        assert complete_path_of_vda == expected_path
+
+    def test_get_size_of_disk(self, get_uncompressed_complete_backup, tmpdir):
+        backup = get_uncompressed_complete_backup
+        disk_img = backup.get_complete_path_of(backup.disks["vda"])
+
+        assert backup.get_size_of_disk("vda") == os.path.getsize(disk_img)
