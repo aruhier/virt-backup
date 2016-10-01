@@ -36,7 +36,7 @@ setup(
         "PyYAML"
     ],
     setup_requires=['pytest-runner', ],
-    tests_require=['pytest', 'pytest-cov', "pytest-mock", "pytest-xdist"],
+    tests_require=['pytest', 'pytest-cov', "pytest-mock"],
     entry_points={
         'console_scripts': [
             'virt-backup = virt_backup.__main__:start_backup',
