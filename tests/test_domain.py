@@ -324,6 +324,16 @@ class TestDomCompleteBackup():
 
         assert filecmp.cmp(src_img, dst_img)
 
+    def test_restore_disk_to_dir(self, get_uncompressed_complete_backup,
+                                 tmpdir):
+        backup = get_uncompressed_complete_backup
+        src_img = backup.get_complete_path_of(backup.disks["vda"])
+        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+
+        backup.restore_disk_to("vda", str(tmpdir))
+
+        assert filecmp.cmp(src_img, dst_img)
+
     def test_restore_compressed_disk_to(
             self, get_compressed_complete_backup, tmpdir):
         """
@@ -332,15 +342,30 @@ class TestDomCompleteBackup():
         backup = get_compressed_complete_backup
         dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
 
-        # extract our img from tar to be able to compare it
-        src_tar = backup.get_complete_path_of(backup.tar)
-        with tarfile.open(src_tar, "r:*") as tar_f:
-            tar_f.extract(backup.disks["vda"], backup.backup_dir)
-        src_img = backup.get_complete_path_of(backup.disks["vda"])
-
-        backup.restore_disk_to("vda", str(tmpdir))
+        backup.restore_disk_to("vda", dst_img)
+        src_img = self.extract_disk_from_backup_tar(backup, "vda")
 
         assert filecmp.cmp(src_img, dst_img, shallow=False)
+
+    def test_restore_compressed_disk_to_dir(
+            self, get_compressed_complete_backup, tmpdir):
+        """
+        Test with a compressed backup
+        """
+        backup = get_compressed_complete_backup
+        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+
+        backup.restore_disk_to("vda", str(tmpdir))
+        src_img = self.extract_disk_from_backup_tar(backup, "vda")
+
+        assert filecmp.cmp(src_img, dst_img, shallow=False)
+
+    def extract_disk_from_backup_tar(self, backup, disk):
+        src_tar = backup.get_complete_path_of(backup.tar)
+        with tarfile.open(src_tar, "r:*") as tar_f:
+            tar_f.extract(backup.disks[disk], backup.backup_dir)
+
+        return backup.get_complete_path_of(backup.disks[disk])
 
     def test_get_complete_backup_from_def(
             self, get_uncompressed_complete_backup):

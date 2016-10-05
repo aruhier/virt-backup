@@ -13,7 +13,9 @@ import tarfile
 import threading
 from tqdm import tqdm
 
-from virt_backup.tools import copy_file_progress, get_progress_bar_tar
+from virt_backup.tools import (
+    copy_file_progress, copy_stream_to_file_progress, get_progress_bar_tar
+)
 
 
 logger = logging.getLogger("virt_backup")
@@ -443,25 +445,29 @@ class DomCompleteBackup(_BaseDomBackup):
         :param target: destination path for the restoration
         """
         if self.tar is None:
+            disk_img = self.disks[disk]
             logger.debug("Restore {} in {}".format(disk, target))
-            disk_image_path = self.get_complete_path_of(self.disks[disk])
-            copy_file_progress(
-                disk_image_path, target, buffersize=10*1024*1024
+            disk_img_path = self.get_complete_path_of(disk_img)
+            return copy_file_progress(
+                disk_img_path, target, buffersize=10*1024*1024
             )
         else:
-            # TODO: handle the case where target is the complete img
-            # destination path. For the moment, it is a directory where our img
-            # will be extracted
-            tar_path = self.get_complete_path_of(self.tar)
-            with tarfile.open(tar_path, "r:*") as tar_f:
-                tqdm_kwargs = {
-                    "total": self.get_size_of_disk(disk),
-                    "unit": "B", "unit_scale": True,
-                    "ncols": 0
-                }
-                with tqdm(**tqdm_kwargs) as pbar:
-                    tar_f.fileobject = get_progress_bar_tar(pbar)
-                    tar_f.extract(self.disks[disk], target)
+            return self._extract_disk_to(disk, target)
+
+    def _extract_disk_to(self, disk, target):
+        disk_img = self.disks[disk]
+        tar_path = self.get_complete_path_of(self.tar)
+        with tarfile.open(tar_path, "r:*") as tar_f:
+            disk_tarinfo = tar_f.getmember(disk_img)
+
+            if not os.path.exists(target) and target.endswith("/"):
+                os.makedirs(target)
+            if os.path.isdir(target):
+                target = os.path.join(target, disk_img)
+
+            copy_stream_to_file_progress(
+                tar_f.extractfile(disk_tarinfo), target, disk_tarinfo.size
+            )
 
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)

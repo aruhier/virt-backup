@@ -13,10 +13,17 @@ def copy_file_progress(src, dst, buffersize=DEFAULT_BUFFERSIZE):
     if not os.path.exists(dst) and dst.endswith("/"):
         os.makedirs(dst)
     if os.path.isdir(dst):
-        dst = os.path.join(dst, os.basename(src))
+        dst = os.path.join(dst, os.path.basename(src))
 
     with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
         copy_stream_progress(fsrc, fdst, total_size, buffersize)
+    return dst
+
+
+def copy_stream_to_file_progress(src, dst, total_size,
+                                 buffersize=DEFAULT_BUFFERSIZE):
+    with open(dst, "wb") as fdst:
+        copy_stream_progress(src, fdst, total_size, buffersize)
     return dst
 
 
