@@ -55,6 +55,10 @@ class MockConn():
                 return d
         raise libvirt.libvirtError("Domain not found")
 
+    def defineXML(self, xml):
+        # TODO: set the domain id and name as defined in the xml
+        return MockDomain(_conn=self)
+
     def __init__(self, _domains=None, *args, **kwargs):
         self._domains = _domains or []
 

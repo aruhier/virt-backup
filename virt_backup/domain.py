@@ -439,6 +439,25 @@ class DomCompleteBackup(_BaseDomBackup):
                 disk_tarinfo = tar_f.getmember(self.disks[disk])
                 return disk_tarinfo.size
 
+    def restore_domain(self, conn, id=None):
+        """
+        :param conn: libvirt connection to the hypervisor
+        :param id: new id for the restored domain
+        """
+        dom_xml = (
+            self._get_dom_xml_with_other_id(id) if id else self.dom_xml
+        )
+        return conn.defineXML(dom_xml)
+
+    def _get_dom_xml_with_other_id(self, id):
+        parsed_dxml = self._parse_dom_xml()
+        parsed_dxml.set("id", str(id))
+
+        return lxml.etree.tostring(parsed_dxml, pretty_print=True).decode()
+
+    def _parse_dom_xml(self):
+        return defusedxml.lxml.fromstring(self.dom_xml)
+
     def restore_disk_to(self, disk, target):
         """
         :param disk: disk name

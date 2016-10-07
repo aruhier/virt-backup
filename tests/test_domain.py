@@ -334,6 +334,26 @@ class TestDomCompleteBackup():
 
         assert filecmp.cmp(src_img, dst_img)
 
+    def test_restore_domain(
+            self, get_uncompressed_complete_backup, build_mock_libvirtconn,
+            monkeypatch):
+        conn = build_mock_libvirtconn
+        backup = get_uncompressed_complete_backup
+
+        backup.restore_domain(conn)
+
+    def test_restore_domain_to(
+            self, get_uncompressed_complete_backup, build_mock_libvirtconn,
+            monkeypatch):
+        """
+        Test to restore the domain to a specific id
+        """
+        conn = build_mock_libvirtconn
+        backup = get_uncompressed_complete_backup
+
+        # TODO: check if id of the new domain matches
+        backup.restore_domain(conn, id=13)
+
     def test_restore_compressed_disk_to(
             self, get_compressed_complete_backup, tmpdir):
         """
