@@ -69,6 +69,8 @@ def get_domain_disks_of(dom_xml, *filter_dev):
                        with one in filter_dev. If no parameter, will return
                        every disks.
     """
+    if isinstance(dom_xml, str):
+        dom_xml = defusedxml.lxml.fromstring(dom_xml)
     disks = {}
     for elem in dom_xml.xpath("devices/disk"):
         try:
@@ -462,6 +464,49 @@ class DomCompleteBackup(_BaseDomBackup):
 
     def _parse_dom_xml(self):
         return defusedxml.lxml.fromstring(self.dom_xml)
+
+    def restore_and_replace_disk_of(self, disk, domain, disk_to_replace):
+        """
+        Restore a disk by replacing an old disks
+
+        :param disk: disk name
+        :param domain: domain to target
+        :param disk_to_replace: which disk of `domain` to replace
+        """
+        # TODO: check that the domain is stopped
+        disk_target_path = (
+            get_domain_disks_of(domain.XMLDesc(), disk_to_replace)[disk]["src"]
+        )
+
+        # TODO: restore disk with a correct extension, and not by keeping the
+        #       old disk one
+        result = self.restore_disk_to(disk, disk_target_path)
+        self._copy_disk_driver_with_domain(disk, domain, disk_to_replace)
+        return result
+
+    def _copy_disk_driver_with_domain(self, disk, domain, domain_disk):
+        disk_xml = self._get_elemxml_of_domain_disk(
+            self._parse_dom_xml(), disk
+        )
+        domain_xml = defusedxml.lxml.fromstring(domain.XMLDesc())
+        domain_disk_xml = self._get_elemxml_of_domain_disk(
+            domain_xml, domain_disk
+        )
+
+        domain_disk_xml.replace(
+            domain_disk_xml.xpath("driver")[0],
+            disk_xml.xpath("driver")[0]
+        )
+
+    def _get_elemxml_of_domain_disk(self, dom_xml, disk):
+        for elem in dom_xml.xpath("devices/disk"):
+            try:
+                if elem.get("device", None) == "disk":
+                    dev = elem.xpath("target")[0].get("dev")
+                    if dev == disk:
+                        return elem
+            except IndexError:
+                continue
 
     def restore_disk_to(self, disk, target):
         """

@@ -19,16 +19,7 @@ class MockDomain():
         """
         Return the definition of a testing domain
         """
-        with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
-            dom_xml_str = dom_xmlfile.read()
-        dom_xml = defusedxml.lxml.fromstring(dom_xml_str)
-        dom_xml.set("id", str(self._id))
-        elem_name = dom_xml.xpath("name")[0]
-        if not elem_name:
-            elem_name = dom_xml.makeelement("name")
-            dom_xml.insert(0, elem_name)
-        elem_name.text = self._name
-        return lxml.etree.tostring(dom_xml, pretty_print=True).decode()
+        return lxml.etree.tostring(self.dom_xml, pretty_print=True).decode()
 
     def ID(self):
         return self._id
@@ -36,10 +27,41 @@ class MockDomain():
     def name(self):
         return self._name
 
+    def set_name(self, name):
+        elem_name = self.dom_xml.xpath("name")[0]
+        if elem_name is None:
+            elem_name = self.dom_xml.makeelement("name")
+            self.dom_xml.insert(0, elem_name)
+        elem_name.text = self._name
+
+    def set_id(self, id):
+        self.dom_xml.set("id", str(self._id))
+
+    def set_storage_basedir(self, basedir):
+        """
+        Change the basedir of all attached disks
+
+        :param basedir: new basedir
+        """
+        for elem in self.dom_xml.xpath("devices/disk"):
+            try:
+                if elem.get("device", None) == "disk":
+                    src = elem.xpath("source")[0]
+                    img = src.get("file")
+                    new_path = os.path.join(basedir, os.path.basename(img))
+                    src.set("file", new_path)
+            except IndexError:
+                continue
+
     def __init__(self, _conn, name="test", id=1, *args, **kwargs):
         self._conn = _conn
         self._name = name
         self._id = id
+
+        with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
+            self.dom_xml = defusedxml.lxml.fromstring(dom_xmlfile.read())
+        self.set_id(id)
+        self.set_name(name)
 
 
 class MockConn():
