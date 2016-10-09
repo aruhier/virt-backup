@@ -60,6 +60,33 @@ def list_backups_by_domain(backup_dir):
     return backups
 
 
+def get_domain_disks_of(dom_xml, *filter_dev):
+    """
+    Get disks from the domain xml
+
+    :param dom_xml: domain xml to extract the disks from
+    :param filter_dev: return only disks for which the dev name matches
+                       with one in filter_dev. If no parameter, will return
+                       every disks.
+    """
+    disks = {}
+    for elem in dom_xml.xpath("devices/disk"):
+        try:
+            if elem.get("device", None) == "disk":
+                dev = elem.xpath("target")[0].get("dev")
+                if len(filter_dev) and dev not in filter_dev:
+                    continue
+                src = elem.xpath("source")[0].get("file")
+                disk_type = elem.xpath("driver")[0].get("type")
+
+                disks[dev] = {"src": src, "type": disk_type}
+        except IndexError:
+            continue
+    # TODO: raise an exception if a disk was part of the filter but not
+    #       found in the domain
+    return disks
+
+
 class _BaseDomBackup():
     def _parse_dom_xml(self):
         """
@@ -68,30 +95,8 @@ class _BaseDomBackup():
         raise NotImplementedError
 
     def _get_self_domain_disks(self, *filter_dev):
-        """
-        Get disks from the domain xml
-
-        :param filter_dev: return only disks for which the dev name matches
-                           with one in filter_dev. If no parameter, will return
-                           every disks.
-        """
         dom_xml = self._parse_dom_xml()
-        disks = {}
-        for elem in dom_xml.xpath("devices/disk"):
-            try:
-                if elem.get("device", None) == "disk":
-                    dev = elem.xpath("target")[0].get("dev")
-                    if len(filter_dev) and dev not in filter_dev:
-                        continue
-                    src = elem.xpath("source")[0].get("file")
-                    disk_type = elem.xpath("driver")[0].get("type")
-
-                    disks[dev] = {"src": src, "type": disk_type}
-            except IndexError:
-                continue
-        # TODO: raise an exception if a disk was part of the filter but not
-        #       found in the domain
-        return disks
+        return get_domain_disks_of(dom_xml, *filter_dev)
 
 
 class DomBackup(_BaseDomBackup):
