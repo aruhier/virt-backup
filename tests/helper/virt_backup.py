@@ -27,6 +27,13 @@ class MockDomain():
     def name(self):
         return self._name
 
+    def state(self):
+        return self._state
+
+    def isActive(self):
+        state_id = self.state()[0]
+        return state_id >= 1 and state_id <= 3
+
     def set_name(self, name):
         elem_name = self.dom_xml.xpath("name")[0]
         if elem_name is None:
@@ -36,6 +43,9 @@ class MockDomain():
 
     def set_id(self, id):
         self.dom_xml.set("id", str(self._id))
+
+    def set_state(self, state_id, reason_id):
+        self._state = [state_id, reason_id]
 
     def set_storage_basedir(self, basedir):
         """
@@ -57,6 +67,7 @@ class MockDomain():
         self._conn = _conn
         self._name = name
         self._id = id
+        self._state = [1, 1]
 
         with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
             self.dom_xml = defusedxml.lxml.fromstring(dom_xmlfile.read())

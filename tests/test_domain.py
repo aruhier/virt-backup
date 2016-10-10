@@ -11,7 +11,7 @@ from virt_backup.domain import (
     DomBackup, search_domains_regex, list_backups_by_domain,
     build_dom_complete_backup_from_def, get_domain_disks_of
 )
-from virt_backup.exceptions import DiskNotFound
+from virt_backup.exceptions import DiskNotFoundError, DomainRunningError
 
 from helper.virt_backup import (
     MockDomain, build_complete_backup_files_from_domainbackup
@@ -89,7 +89,7 @@ def test_get_domain_disks_of(build_mock_domain):
 
 def test_get_domain_disks_of_disk_not_found(build_mock_domain):
     domain = build_mock_domain
-    with pytest.raises(DiskNotFound):
+    with pytest.raises(DiskNotFoundError):
         get_domain_disks_of(domain.XMLDesc(), "vda", "vdc")
 
 
@@ -327,9 +327,9 @@ def test_get_complete_backup_from_def(build_bak_definition_with_compression):
 
 class TestDomCompleteBackup():
     def test_restore_disk_in_domain(self, get_uncompressed_complete_backup,
-                                    build_mock_domain, tmpdir):
+                                    build_stopped_mock_domain, tmpdir):
         backup = get_uncompressed_complete_backup
-        domain = build_mock_domain
+        domain = build_stopped_mock_domain
 
         src_img = backup.get_complete_path_of(backup.disks["vda"])
         domain.set_storage_basedir(str(tmpdir))
@@ -342,6 +342,14 @@ class TestDomCompleteBackup():
             get_domain_disks_of(domain.XMLDesc())["vda"]["type"] ==
             get_domain_disks_of(backup.dom_xml)["vda"]["type"]
         )
+
+    def test_restore_disk_in_running_domain(
+            self, get_uncompressed_complete_backup, build_mock_domain):
+        backup = get_uncompressed_complete_backup
+        domain = build_mock_domain
+
+        with pytest.raises(DomainRunningError):
+            backup.restore_and_replace_disk_of("vda", domain, "vda")
 
     def test_restore_disk_to(self, get_uncompressed_complete_backup, tmpdir):
         """

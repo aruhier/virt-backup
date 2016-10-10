@@ -9,6 +9,12 @@ def build_mock_domain(mocker):
 
 
 @pytest.fixture
+def build_stopped_mock_domain(build_mock_domain):
+    build_mock_domain.set_state(4, 1)
+    return build_mock_domain
+
+
+@pytest.fixture
 def build_mock_libvirtconn():
     return MockConn()
 

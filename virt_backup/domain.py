@@ -16,7 +16,7 @@ from tqdm import tqdm
 from virt_backup.tools import (
     copy_file_progress, copy_stream_to_file_progress, get_progress_bar_tar
 )
-from virt_backup.exceptions import DiskNotFound
+from virt_backup.exceptions import DiskNotFoundError, DomainRunningError
 
 
 logger = logging.getLogger("virt_backup")
@@ -93,7 +93,7 @@ def get_domain_disks_of(dom_xml, *filter_dev):
 
     for disk in filter_dev:
         if disk not in disks:
-            raise DiskNotFound(disk)
+            raise DiskNotFoundError(disk)
 
     return disks
 
@@ -482,7 +482,7 @@ class DomCompleteBackup(_BaseDomBackup):
         :param domain: domain to target
         :param disk_to_replace: which disk of `domain` to replace
         """
-        # TODO: check that the domain is stopped
+        self._ensure_domain_not_running(domain)
         disk_target_path = (
             get_domain_disks_of(domain.XMLDesc(), disk_to_replace)[disk]["src"]
         )
@@ -492,6 +492,10 @@ class DomCompleteBackup(_BaseDomBackup):
         result = self.restore_disk_to(disk, disk_target_path)
         self._copy_disk_driver_with_domain(disk, domain, disk_to_replace)
         return result
+
+    def _ensure_domain_not_running(self, domain):
+        if domain.isActive():
+            raise DomainRunningError(domain)
 
     def _copy_disk_driver_with_domain(self, disk, domain, domain_disk):
         disk_xml = self._get_elemxml_of_domain_disk(
