@@ -11,6 +11,7 @@ from virt_backup.domain import (
     DomBackup, search_domains_regex, list_backups_by_domain,
     build_dom_complete_backup_from_def, get_domain_disks_of
 )
+from virt_backup.exceptions import DiskNotFound
 
 from helper.virt_backup import (
     MockDomain, build_complete_backup_files_from_domainbackup
@@ -77,6 +78,19 @@ def get_compressed_complete_backup(get_compressed_dombackup, tmpdir):
     dombkup.target_dir = str(tmpdir)
 
     return transform_dombackup_to_dom_complete_backup(dombkup)
+
+
+def test_get_domain_disks_of(build_mock_domain):
+    domain = build_mock_domain
+    vda = get_domain_disks_of(domain.XMLDesc(), "vda", "vdb")
+
+    assert "vda" in vda
+
+
+def test_get_domain_disks_of_disk_not_found(build_mock_domain):
+    domain = build_mock_domain
+    with pytest.raises(DiskNotFound):
+        get_domain_disks_of(domain.XMLDesc(), "vda", "vdc")
 
 
 class TestDomBackup():

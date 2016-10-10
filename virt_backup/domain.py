@@ -16,6 +16,7 @@ from tqdm import tqdm
 from virt_backup.tools import (
     copy_file_progress, copy_stream_to_file_progress, get_progress_bar_tar
 )
+from virt_backup.exceptions import DiskNotFound
 
 
 logger = logging.getLogger("virt_backup")
@@ -71,6 +72,7 @@ def get_domain_disks_of(dom_xml, *filter_dev):
     """
     if isinstance(dom_xml, str):
         dom_xml = defusedxml.lxml.fromstring(dom_xml)
+    filter_dev = sorted(list(filter_dev))
     disks = {}
     for elem in dom_xml.xpath("devices/disk"):
         try:
@@ -82,10 +84,17 @@ def get_domain_disks_of(dom_xml, *filter_dev):
                 disk_type = elem.xpath("driver")[0].get("type")
 
                 disks[dev] = {"src": src, "type": disk_type}
+
+                # all disks captured
+                if filter_dev in list(sorted(disks.keys())):
+                    break
         except IndexError:
             continue
-    # TODO: raise an exception if a disk was part of the filter but not
-    #       found in the domain
+
+    for disk in filter_dev:
+        if disk not in disks:
+            raise DiskNotFound(disk)
+
     return disks
 
 
