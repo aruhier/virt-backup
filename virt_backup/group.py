@@ -113,7 +113,7 @@ def groups_from_dict(groups_dict, conn):
             for domain_name in i["domains"]:
                 if domain_name not in exclude:
                     domain = conn.lookupByName(domain_name)
-                    backup_group.add_backup(domain, matches.get("disks", ()))
+                    backup_group.add_domain(domain, matches.get("disks", ()))
 
         return backup_group
 
@@ -125,54 +125,6 @@ class BackupGroup():
     """
     Group of libvirt domain backups
     """
-    def search(self, dom):
-        """
-        Search for a domain
-
-        :param dom: domain to search the associated DomBackup object.
-                    libvirt.virDomain object
-        :returns: a generator of DomBackup matching
-        """
-        for backup in self.backups:
-            if backup.dom == dom:
-                yield backup
-
-    def add_backup(self, dom, disks=()):
-        """
-        Add a domain and disks to backup in this group
-
-        If a backup already exists for the domain, will add the disks to the
-        first backup found
-
-        :param dom: dom to backup
-        :param disks: disks to backup and attached to dom
-        """
-        try:
-            # if a backup of `dom` already exists, add the disks to the first
-            # backup found
-            existing_bak = next(self.search(dom))
-            existing_bak.add_disks(*disks)
-        except StopIteration:
-            # spawn a new DomBackup instance otherwise
-            self.backups.append(DomBackup(
-                dom=dom, dev_disks=disks, **self.default_bak_param
-            ))
-
-    def propagate_default_backup_attr(self):
-        """
-        Propagate default backup attributes to all attached backups
-        """
-        for backup in self.backups:
-            for attr, val in self.default_bak_param.items():
-                setattr(backup, attr, val)
-
-    def start(self):
-        """
-        Start to backup all DomBackup objects attached
-        """
-        for b in self.backups:
-            b.start()
-
     def __init__(self, name="unnamed", domlst=None, autostart=True,
                  **default_bak_param):
         """
@@ -200,4 +152,52 @@ class BackupGroup():
                     dom, disks = bak_item
                 except TypeError:
                     dom, disks = (bak_item, ())
-                self.add_backup(dom, disks)
+                self.add_domain(dom, disks)
+
+    def add_domain(self, dom, disks=()):
+        """
+        Add a domain and disks to backup in this group
+
+        If a backup already exists for the domain, will add the disks to the
+        first backup found
+
+        :param dom: dom to backup
+        :param disks: disks to backup and attached to dom
+        """
+        try:
+            # if a backup of `dom` already exists, add the disks to the first
+            # backup found
+            existing_bak = next(self.search(dom))
+            existing_bak.add_disks(*disks)
+        except StopIteration:
+            # spawn a new DomBackup instance otherwise
+            self.backups.append(DomBackup(
+                dom=dom, dev_disks=disks, **self.default_bak_param
+            ))
+
+    def search(self, dom):
+        """
+        Search for a domain
+
+        :param dom: domain to search the associated DomBackup object.
+                    libvirt.virDomain object
+        :returns: a generator of DomBackup matching
+        """
+        for backup in self.backups:
+            if backup.dom == dom:
+                yield backup
+
+    def propagate_default_backup_attr(self):
+        """
+        Propagate default backup attributes to all attached backups
+        """
+        for backup in self.backups:
+            for attr, val in self.default_bak_param.items():
+                setattr(backup, attr, val)
+
+    def start(self):
+        """
+        Start to backup all DomBackup objects attached
+        """
+        for b in self.backups:
+            b.start()

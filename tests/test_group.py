@@ -23,24 +23,24 @@ def test_backup_group_with_domain(build_mock_domain):
     assert backup_group.backups[0].dom == dom
 
 
-def test_backup_group_add_backup(build_mock_domain):
+def test_backup_group_add_domain(build_mock_domain):
     backup_group = BackupGroup()
     dom = build_mock_domain
 
-    backup_group.add_backup(dom)
+    backup_group.add_domain(dom)
 
     assert len(backup_group.backups) == 1
     assert backup_group.backups[0].dom == dom
 
 
-def test_backup_group_dedup_backup_domain(build_mock_domain):
+def test_backup_group_dedup_add_domain(build_mock_domain):
     """
     Test to add 2 times the same backup and check that it's not duplicated
     """
     dom = build_mock_domain
     backup_group = BackupGroup(domlst=(dom, ))
 
-    backup_group.add_backup(dom)
+    backup_group.add_domain(dom)
     assert len(backup_group.backups) == 1
 
 

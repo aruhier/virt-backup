@@ -114,6 +114,48 @@ class DomBackup(_BaseDomBackup):
     """
     Libvirt domain backup
     """
+    def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
+                 compression_lvl=None, conn=None, timeout=None, _disks=None):
+        """
+        :param dev_disks: list of disks dev names to backup. Disks will be
+                          searched in the domain to pull more informations, and
+                          an exception will be thrown if one of them is not
+                          found
+        """
+        #: domain to backup. Has to be a libvirt.virDomain object
+        self.dom = dom
+
+        #: directory where backups will be saved
+        self.target_dir = target_dir
+
+        #: disks to backups. If None, will backup every vm disks
+        if dev_disks:
+            _disks = self._get_self_domain_disks(*dev_disks)
+        self.disks = (self._get_self_domain_disks()
+                      if _disks is None else _disks)
+
+        #: string indicating how to compress the backups:
+        #    * None: no compression, backups will be only copied
+        #    * "tar": backups will not be compressed, but packaged in a tar
+        #    * "gz"/"bz2"/"xz": backups will be compressed in a tar +
+        #        compression selected. For more informations, read the
+        #        documentation about the mode argument of tarfile.open
+        self.compression = compression
+
+        #: If compression, indicates the lvl to use
+        self.compression_lvl = compression_lvl
+
+        #: libvirt connection to use. If not sent, will use the connection used
+        #  for self.domain
+        self.conn = self.dom._conn if conn is None else conn
+
+        #: timeout when waiting for the block pivot to end. Infinite wait if
+        #  timeout is None
+        self.timeout = timeout
+
+        #: used to trigger when block pivot ends
+        self._wait_for_pivot = threading.Event()
+
     def add_disks(self, *dev_disks):
         """
         Add disk by dev name
@@ -392,48 +434,6 @@ class DomBackup(_BaseDomBackup):
         str_snapdate = snapdate.strftime("%Y%m%d-%H%M%S")
         return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
-    def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
-                 compression_lvl=None, conn=None, timeout=None, _disks=None):
-        """
-        :param dev_disks: list of disks dev names to backup. Disks will be
-                          searched in the domain to pull more informations, and
-                          an exception will be thrown if one of them is not
-                          found
-        """
-        #: domain to backup. Has to be a libvirt.virDomain object
-        self.dom = dom
-
-        #: directory where backups will be saved
-        self.target_dir = target_dir
-
-        #: disks to backups. If None, will backup every vm disks
-        if dev_disks:
-            _disks = self._get_self_domain_disks(*dev_disks)
-        self.disks = (self._get_self_domain_disks()
-                      if _disks is None else _disks)
-
-        #: string indicating how to compress the backups:
-        #    * None: no compression, backups will be only copied
-        #    * "tar": backups will not be compressed, but packaged in a tar
-        #    * "gz"/"bz2"/"xz": backups will be compressed in a tar +
-        #        compression selected. For more informations, read the
-        #        documentation about the mode argument of tarfile.open
-        self.compression = compression
-
-        #: If compression, indicates the lvl to use
-        self.compression_lvl = compression_lvl
-
-        #: libvirt connection to use. If not sent, will use the connection used
-        #  for self.domain
-        self.conn = self.dom._conn if conn is None else conn
-
-        #: timeout when waiting for the block pivot to end. Infinite wait if
-        #  timeout is None
-        self.timeout = timeout
-
-        #: used to trigger when block pivot ends
-        self._wait_for_pivot = threading.Event()
-
 
 def build_dom_complete_backup_from_def(definition, backup_dir):
     backup = DomCompleteBackup(
@@ -446,6 +446,19 @@ def build_dom_complete_backup_from_def(definition, backup_dir):
 
 
 class DomCompleteBackup(_BaseDomBackup):
+    def __init__(self, backup_dir, dom_xml=None, disks=None, tar=None):
+        #: backup directory path
+        self.backup_dir = backup_dir
+
+        #: domain XML as it was during the backup
+        self.dom_xml = dom_xml
+
+        #: if disks were compressed or contained into a tar file
+        self.tar = tar
+
+        #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
+        self.disks = disks
+
     def get_size_of_disk(self, disk):
         if self.tar is None:
             return os.path.getsize(self.get_complete_path_of(self.disks[disk]))
@@ -553,16 +566,3 @@ class DomCompleteBackup(_BaseDomBackup):
 
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)
-
-    def __init__(self, backup_dir, dom_xml=None, disks=None, tar=None):
-        #: backup directory path
-        self.backup_dir = backup_dir
-
-        #: domain XML as it was during the backup
-        self.dom_xml = dom_xml
-
-        #: if disks were compressed or contained into a tar file
-        self.tar = tar
-
-        #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
-        self.disks = disks
