@@ -175,6 +175,22 @@ class BackupGroup():
                 dom=dom, dev_disks=disks, **self.default_bak_param
             ))
 
+    def add_dombackup(self, dombackup):
+        """
+        Add a DomBackup to this group
+
+        If a backup already exists for the same domain with the same
+        properties, will add the disks to the first backup found
+
+        :param dombackup: dombackup to add
+        """
+        for existing_bak in self.search(dombackup.dom):
+            if existing_bak.compatible_with(dombackup):
+                existing_bak.merge_with(dombackup)
+                return
+        else:
+            self.backups.append(dombackup)
+
     def search(self, dom):
         """
         Search for a domain

@@ -5,6 +5,7 @@ from virt_backup.group import (
     BackupGroup, parse_host_pattern, match_domains_from_config,
     groups_from_dict
 )
+from virt_backup.domain import DomBackup
 
 from helper.virt_backup import MockDomain
 
@@ -42,6 +43,24 @@ def test_backup_group_dedup_add_domain(build_mock_domain):
 
     backup_group.add_domain(dom)
     assert len(backup_group.backups) == 1
+
+
+def test_backup_group_add_dombackup(build_mock_domain):
+    dom = build_mock_domain
+    backup_group = BackupGroup(domlst=(dom, ))
+
+    backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
+    assert len(backup_group.backups) == 1
+
+
+def test_backup_group_add_dombackup_dedup(build_mock_domain):
+    dom = build_mock_domain
+    backup_group = BackupGroup(domlst=(dom, ))
+
+    backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
+    backup_group.add_dombackup(DomBackup(dom, dev_disks=("vdb", )))
+    assert len(backup_group.backups) == 1
+    assert len(backup_group.backups[0].disks.keys()) == 2
 
 
 def test_backup_group_search(build_mock_domain):

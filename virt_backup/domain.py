@@ -434,6 +434,32 @@ class DomBackup(_BaseDomBackup):
         str_snapdate = snapdate.strftime("%Y%m%d-%H%M%S")
         return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
+    def compatible_with(self, dombackup):
+        """
+        Is compatible with dombackup ?
+
+        If the target is the same for both dombackup and self, same thing for
+        compression and compression_lvl, self and dombackup are considered
+        compatibles.
+        """
+        def same_dombackup_and_self_attr(attr):
+            return getattr(self, attr) == getattr(dombackup, attr)
+
+        attributes_to_compare = (
+            "target_dir", "compression", "compression_lvl"
+        )
+        for a in attributes_to_compare:
+            if not same_dombackup_and_self_attr(a):
+                return False
+
+        same_domain = dombackup.dom.ID() == self.dom.ID()
+        return same_domain
+
+    def merge_with(self, dombackup):
+        self.add_disks(*dombackup.disks.keys())
+        timeout = self.timeout or dombackup.timeout
+        self.timeout = timeout
+
 
 def build_dom_complete_backup_from_def(definition, backup_dir):
     backup = DomCompleteBackup(

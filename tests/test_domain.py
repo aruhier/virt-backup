@@ -259,6 +259,25 @@ class TestDomBackup():
         assert len(target_dir.listdir()) == 1
         assert json.loads(target_dir.listdir()[0].read()) == definition
 
+    def test_compatible_with(self, get_uncompressed_dombackup,
+                             build_mock_domain):
+        dombackup1 = get_uncompressed_dombackup
+        dombackup2 = DomBackup(
+            dom=build_mock_domain, dev_disks=("vdb", ), compression=None,
+        )
+
+        assert dombackup1.compatible_with(dombackup2)
+
+    def test_not_compatible_with(self, get_uncompressed_dombackup,
+                                 build_mock_domain):
+        dombackup1 = get_uncompressed_dombackup
+        dombackup1.target_dir = "/tmp/test"
+        dombackup2 = DomBackup(
+            dom=build_mock_domain, dev_disks=("vdb", ), compression=None,
+        )
+
+        assert not dombackup1.compatible_with(dombackup2)
+
 
 def test_search_domains_regex(build_mock_libvirtconn):
     conn = build_mock_libvirtconn
