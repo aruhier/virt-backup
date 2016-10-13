@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import libvirt
 import logging
 import sys
@@ -7,6 +8,7 @@ import threading
 
 from .group import groups_from_dict, BackupGroup
 from .config import get_config, Config
+from . import APP_NAME, VERSION
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -34,7 +36,7 @@ def build_main_backup_group(groups):
     return main_group
 
 
-def start_backups():
+def start_backups(parsed_args, *args, **kwargs):
     vir_event_loop_native_start()
 
     config = Config(defaults={"debug": False, })
@@ -50,11 +52,51 @@ def start_backups():
     conn.setKeepAlive(5, 3)
 
     if config.get("groups", None):
-        groups = [g for g in groups_from_dict(config["groups"], conn)
-                  if g.autostart]
+        if not parsed_args.groups:
+            groups = [g for g in groups_from_dict(config["groups"], conn)
+                      if g.autostart]
+        else:
+            groups = [g for g in groups_from_dict(config["groups"], conn)
+                      if g.name in parsed_args.groups]
         main_group = build_main_backup_group(groups)
         main_group.start()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Backup and restore your kvm libvirt domains"
+    )
+
+    # Start/Stop/Show command
+    sp_action = parser.add_subparsers()
+
+    sp_backup = sp_action.add_parser("backup", help=("backup a group"))
+    sp_backup.add_argument("groups", metavar="group", type=str, nargs="*",
+                           help="domain group to backup")
+    sp_backup.set_defaults(func=start_backups)
+
+    # Debug option
+    parser.add_argument("-d", "--debug", help="set the debug level",
+                        dest="debug", action="store_true")
+    parser.add_argument(
+        "--version", action="version",
+        version="{} {}".format(APP_NAME, VERSION)
+    )
+    arg_parser = parser
+
+    # Parse argument
+    args = arg_parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+
+    # Execute correct function, or print usage
+    if hasattr(args, "func"):
+        args.func(parsed_args=args)
+    else:
+        arg_parser.print_help()
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    start_backups()
+    parse_args()
