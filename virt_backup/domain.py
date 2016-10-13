@@ -188,6 +188,7 @@ class DomBackup(_BaseDomBackup):
         self._wait_for_pivot.clear()
         print("Backup started for domain {}".format(self.dom.name()))
         definition = self.get_definition()
+        definition["disks"] = {}
         try:
             callback_id = self.conn.domainEventRegisterAny(
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
@@ -330,6 +331,9 @@ class DomBackup(_BaseDomBackup):
                 # all disks will be compacted in the same tar, so already
                 # store it in definition if it was not set before
                 definition["tar"] = os.path.basename(backup_path)
+
+        if definition.get("disks", None) is None:
+            definition["disks"] = {}
         definition["disks"][disk] = target_img
 
     def _disk_backup_name_format(self, snapdate, disk_name, *args, **kwargs):
