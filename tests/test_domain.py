@@ -224,6 +224,20 @@ class TestDomBackup():
             build_mock_domain, tmpdir, compression="xz"
         )
 
+    def test_get_new_tar_already_exists(self, build_mock_domain, tmpdir):
+        dombkup = DomBackup(
+            dom=build_mock_domain, compression="tar"
+        )
+
+        snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
+        tar_path = tmpdir.join(
+            "{}.tar".format(dombkup._main_backup_name_format(snapdate))
+        )
+        tar_path.write("test")
+
+        with pytest.raises(FileExistsError):
+            dombkup.get_new_tar(str(tmpdir), snapshot_date=snapdate)
+
     def test_get_new_tar_unvalid_compression(self, build_mock_domain, tmpdir):
         with pytest.raises(tarfile.CompressionError):
             return self.test_get_new_tar(

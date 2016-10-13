@@ -302,7 +302,7 @@ class DomBackup(_BaseDomBackup):
             )
         )
         if os.path.exists(complete_path):
-            raise FileExistsError
+            raise FileExistsError()
         return tarfile.open(complete_path, mode)
 
     def _backup_disk(self, disk, disk_properties, backup_target, definition):
