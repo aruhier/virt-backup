@@ -10,111 +10,103 @@ from virt_backup.domain import DomBackup
 from helper.virt_backup import MockDomain
 
 
-def test_backup_group():
-    backup_group = BackupGroup()
+class TestBackupGroup():
+    def test_self(self):
+        backup_group = BackupGroup()
 
-    assert len(backup_group.backups) == 0
+        assert len(backup_group.backups) == 0
 
+    def test_self_with_domain(self, build_mock_domain):
+        dom = build_mock_domain
+        backup_group = BackupGroup(domlst=((dom, None),))
 
-def test_backup_group_with_domain(build_mock_domain):
-    dom = build_mock_domain
-    backup_group = BackupGroup(domlst=((dom, None),))
+        assert len(backup_group.backups) == 1
+        assert backup_group.backups[0].dom == dom
 
-    assert len(backup_group.backups) == 1
-    assert backup_group.backups[0].dom == dom
+    def test_add_domain(self, build_mock_domain):
+        backup_group = BackupGroup()
+        dom = build_mock_domain
 
+        backup_group.add_domain(dom)
 
-def test_backup_group_add_domain(build_mock_domain):
-    backup_group = BackupGroup()
-    dom = build_mock_domain
+        assert len(backup_group.backups) == 1
+        assert backup_group.backups[0].dom == dom
 
-    backup_group.add_domain(dom)
+    def test_dedup_add_domain(self, build_mock_domain):
+        """
+        Test to add 2 times the same backup and check that it's not duplicated
+        """
+        dom = build_mock_domain
+        backup_group = BackupGroup(domlst=(dom, ))
 
-    assert len(backup_group.backups) == 1
-    assert backup_group.backups[0].dom == dom
+        backup_group.add_domain(dom)
+        assert len(backup_group.backups) == 1
 
+    def test_add_dombackup(self, build_mock_domain):
+        dom = build_mock_domain
+        backup_group = BackupGroup(domlst=(dom, ))
 
-def test_backup_group_dedup_add_domain(build_mock_domain):
-    """
-    Test to add 2 times the same backup and check that it's not duplicated
-    """
-    dom = build_mock_domain
-    backup_group = BackupGroup(domlst=(dom, ))
+        backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
+        assert len(backup_group.backups) == 1
 
-    backup_group.add_domain(dom)
-    assert len(backup_group.backups) == 1
+    def test_add_dombackup_dedup(self, build_mock_domain):
+        dom = build_mock_domain
+        backup_group = BackupGroup(domlst=(dom, ))
 
+        backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
+        backup_group.add_dombackup(DomBackup(dom, dev_disks=("vdb", )))
+        assert len(backup_group.backups) == 1
+        assert len(backup_group.backups[0].disks.keys()) == 2
 
-def test_backup_group_add_dombackup(build_mock_domain):
-    dom = build_mock_domain
-    backup_group = BackupGroup(domlst=(dom, ))
+    def test_search(self, build_mock_domain):
+        dom = build_mock_domain
+        backup_group = BackupGroup(domlst=(dom, ))
 
-    backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
-    assert len(backup_group.backups) == 1
+        dombak = next(backup_group.search(dom))
+        assert dombak == backup_group.backups[0]
 
+    def test_search_not_found(self, build_mock_domain):
+        dom = build_mock_domain
+        backup_group = BackupGroup()
 
-def test_backup_group_add_dombackup_dedup(build_mock_domain):
-    dom = build_mock_domain
-    backup_group = BackupGroup(domlst=(dom, ))
+        with pytest.raises(StopIteration):
+            next(backup_group.search(dom))
 
-    backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
-    backup_group.add_dombackup(DomBackup(dom, dev_disks=("vdb", )))
-    assert len(backup_group.backups) == 1
-    assert len(backup_group.backups[0].disks.keys()) == 2
+    def test_start(self, build_mock_domain, mocker):
+        backup_group = BackupGroup(domlst=(build_mock_domain, ))
+        backup_group.backups[0].start = mocker.stub()
 
+        backup_group.start()
+        assert backup_group.backups[0].start.called
 
-def test_backup_group_search(build_mock_domain):
-    dom = build_mock_domain
-    backup_group = BackupGroup(domlst=(dom, ))
+    def test_propagate_attr(self, build_mock_domain):
+        backup_group = BackupGroup(
+            domlst=(build_mock_domain, ), compression="xz"
+        )
+        assert backup_group.backups[0].compression == "xz"
 
-    dombak = next(backup_group.search(dom))
-    assert dombak == backup_group.backups[0]
+        backup_group.default_bak_param["target_dir"] = "/test"
+        assert backup_group.backups[0].target_dir is None
+        backup_group.propagate_default_backup_attr()
+        assert backup_group.backups[0].target_dir == "/test"
 
+    def test_propagate_attr_multiple_domains(self, mocker):
+        backup_group = BackupGroup(
+            domlst=(
+                MockDomain(_conn=mocker.stub()),
+                MockDomain(_conn=mocker.stub())
+            ), compression="xz"
+        )
+        for b in backup_group.backups:
+            assert b.compression == "xz"
 
-def test_backup_group_search_not_found(build_mock_domain):
-    dom = build_mock_domain
-    backup_group = BackupGroup()
+        backup_group.default_bak_param["target_dir"] = "/test"
+        for b in backup_group.backups:
+            assert b.target_dir is None
 
-    with pytest.raises(StopIteration):
-        next(backup_group.search(dom))
-
-
-def test_backup_group_start(build_mock_domain, mocker):
-    backup_group = BackupGroup(domlst=(build_mock_domain, ))
-    backup_group.backups[0].start = mocker.stub()
-
-    backup_group.start()
-    assert backup_group.backups[0].start.called
-
-
-def test_backup_group_propagate_attr(build_mock_domain):
-    backup_group = BackupGroup(
-        domlst=(build_mock_domain, ), compression="xz"
-    )
-    assert backup_group.backups[0].compression == "xz"
-
-    backup_group.default_bak_param["target_dir"] = "/test"
-    assert backup_group.backups[0].target_dir is None
-    backup_group.propagate_default_backup_attr()
-    assert backup_group.backups[0].target_dir == "/test"
-
-
-def test_backup_group_propagate_attr_multiple_domains(mocker):
-    backup_group = BackupGroup(
-        domlst=(
-            MockDomain(_conn=mocker.stub()), MockDomain(_conn=mocker.stub())
-        ), compression="xz"
-    )
-    for b in backup_group.backups:
-        assert b.compression == "xz"
-
-    backup_group.default_bak_param["target_dir"] = "/test"
-    for b in backup_group.backups:
-        assert b.target_dir is None
-
-    backup_group.propagate_default_backup_attr()
-    for b in backup_group.backups:
-        assert b.target_dir is "/test"
+        backup_group.propagate_default_backup_attr()
+        for b in backup_group.backups:
+            assert b.target_dir is "/test"
 
 
 def test_parse_host_pattern_regex(build_mock_libvirtconn_filled):
