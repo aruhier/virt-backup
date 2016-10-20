@@ -7,6 +7,7 @@ import os
 import pytest
 import tarfile
 
+import virt_backup
 from virt_backup.domain import (
     DomBackup, search_domains_regex, list_backups_by_domain,
     build_dom_complete_backup_from_def, get_domain_disks_of
@@ -254,7 +255,8 @@ class TestDomBackup():
             "compression": "xz", "compression_lvl": 4,
             "domain_id": build_mock_domain.ID(),
             "domain_name": build_mock_domain.name(),
-            "domain_xml": build_mock_domain.XMLDesc()
+            "domain_xml": build_mock_domain.XMLDesc(),
+            "version": virt_backup.VERSION
         }
         assert dombkup.get_definition() == expected_def
 

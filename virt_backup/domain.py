@@ -13,6 +13,7 @@ import tarfile
 import threading
 from tqdm import tqdm
 
+import virt_backup
 from virt_backup.tools import (
     copy_file_progress, copy_stream_to_file_progress, get_progress_bar_tar
 )
@@ -273,7 +274,7 @@ class DomBackup(_BaseDomBackup):
             "compression": self.compression,
             "compression_lvl": self.compression_lvl,
             "domain_id": self.dom.ID(), "domain_name": self.dom.name(),
-            "domain_xml": self.dom.XMLDesc()
+            "domain_xml": self.dom.XMLDesc(), "version": virt_backup.VERSION
         }
 
     def get_new_tar(self, target, snapshot_date):
