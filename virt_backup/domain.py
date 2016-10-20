@@ -294,7 +294,7 @@ class DomBackup(_BaseDomBackup):
             extension = "tar"
 
         if not os.path.isdir(target):
-            os.path.makedirs(target)
+            os.makedirs(target)
 
         complete_path = os.path.join(
             target,

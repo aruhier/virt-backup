@@ -206,7 +206,7 @@ class TestDomBackup():
         )
         snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
 
-        target_dir = tmpdir.mkdir("get_new_tar")
+        target_dir = tmpdir.join("get_new_tar")
 
         if compression == "tar":
             extension = "tar"
