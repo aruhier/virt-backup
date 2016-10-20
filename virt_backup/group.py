@@ -2,6 +2,7 @@
 
 import libvirt
 import logging
+import os
 
 from virt_backup.domain import DomBackup, search_domains_regex
 
@@ -126,7 +127,7 @@ class BackupGroup():
     Group of libvirt domain backups
     """
     def __init__(self, name="unnamed", domlst=None, autostart=True,
-                 **default_bak_param):
+                 directory_by_domain=False, **default_bak_param):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -216,4 +217,18 @@ class BackupGroup():
         Start to backup all DomBackup objects attached
         """
         for b in self.backups:
+            self._ensure_backup_is_set_in_domain_dir(b)
             b.start()
+
+    def _ensure_backup_is_set_in_domain_dir(self, dombackup):
+        """
+        Ensure that a dombackup is set to be in a directory having the name of
+        the related Domain
+        """
+        if not dombackup.target_dir:
+            return
+
+        if os.path.dirname(dombackup.target_dir) != dombackup.dom.name():
+            dombackup.target_dir = os.path.join(
+                dombackup.target_dir, dombackup.dom.name()
+            )

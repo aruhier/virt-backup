@@ -1,4 +1,5 @@
 
+import os
 import pytest
 
 from virt_backup.group import (
@@ -78,6 +79,18 @@ class TestBackupGroup():
 
         backup_group.start()
         assert backup_group.backups[0].start.called
+
+    def test_start_with_dir_by_domain(self, build_mock_domain, mocker):
+        backup_group = BackupGroup(
+            domlst=(build_mock_domain, ), directory_by_domain=True,
+            target_dir="/tmp"
+        )
+        dombackup = backup_group.backups[0]
+        dombackup.start = mocker.stub()
+
+        expected_target_dir = os.path.join("/tmp", dombackup.dom.name())
+        backup_group.start()
+        assert dombackup.target_dir == expected_target_dir
 
     def test_propagate_attr(self, build_mock_domain):
         backup_group = BackupGroup(
