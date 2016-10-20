@@ -30,7 +30,12 @@ def copy_stream_to_file_progress(src, dst, total_size,
 def copy_stream_progress(stsrc, stdst, total_size,
                          buffersize=DEFAULT_BUFFERSIZE):
     # Load tqdm with size counter instead of files counter
-    with tqdm(total=total_size, unit="B", unit_scale=True, ncols=0) as pbar:
+
+    tqdm_kwargs = {
+        "total": total_size, "unit": "B", "unit_scale": True,
+        "ncols": 0, "mininterval": 0.5
+    }
+    with tqdm(**tqdm_kwargs) as pbar:
         while True:
             buf = stsrc.read(buffersize)
             if not buf:

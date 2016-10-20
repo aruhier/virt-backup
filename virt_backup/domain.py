@@ -364,7 +364,7 @@ class DomBackup(_BaseDomBackup):
             total_size = os.path.getsize(disk)
             tqdm_kwargs = {
                 "total": total_size, "unit": "B", "unit_scale": True,
-                "ncols": 0
+                "ncols": 0, "mininterval": 0.5
             }
             logger.debug("Copy {}…".format(disk))
             with tqdm(**tqdm_kwargs) as pbar:
