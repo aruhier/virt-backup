@@ -5,6 +5,15 @@ uri: "qemu:///system"
 # username:
 # passphrase:
 
+default:
+  directory_by_domain: True
+
+  daily: 4
+  weekly: 2
+  monthly: 5
+  yearly: 1
+
+
 groups:
   test:
     target: /mnt/kvm/backups
@@ -14,7 +23,6 @@ groups:
     daily: 3
     weekly: 2
     monthly: 5
-    yearly: 1
 
     hosts:
       - host: domainname

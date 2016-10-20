@@ -44,32 +44,39 @@ def test_get_config_not_existing(tmpdir):
         get_config(custom_path=testconf_path)
 
 
-def test_config():
-    Config()
+class TestConfig():
+    def test_config(self):
+        Config()
 
+    def test_with_default_config(self):
+        conf = Config(defaults={"debug": True})
+        assert conf["debug"]
 
-def test_config_with_default_config():
-    conf = Config(defaults={"debug": True})
-    assert conf["debug"]
+    def test_from_dict(self, get_testing_config):
+        conf = Config()
+        conf.from_dict(get_testing_config)
 
+        assert sorted(conf.items()) == sorted(get_testing_config.items())
 
-def test_config_from_dict(get_testing_config):
-    conf = Config()
-    conf.from_dict(get_testing_config)
+    def test_from_yaml(self, get_testing_config):
+        conf = Config()
+        conf.from_yaml(TESTCONF_PATH)
 
-    assert sorted(conf.items()) == sorted(get_testing_config.items())
+        assert sorted(conf.items()) == sorted(get_testing_config.items())
 
+    def test_from_str(self, get_testing_config):
+        conf = Config()
+        with open(TESTCONF_PATH, "r") as conf_file:
+            conf.from_str(conf_file.read())
 
-def test_config_from_yaml(get_testing_config):
-    conf = Config()
-    conf.from_yaml(TESTCONF_PATH)
+        assert sorted(conf.items()) == sorted(get_testing_config.items())
 
-    assert sorted(conf.items()) == sorted(get_testing_config.items())
+    def test_get_groups(self, get_testing_config):
+        conf = Config()
 
+        conf["default"] = {"directory_by_domain": True, "daily": 4}
+        conf["groups"] = {"test_group": {"daily": 3, }, }
 
-def test_config_from_str(get_testing_config):
-    conf = Config()
-    with open(TESTCONF_PATH, "r") as conf_file:
-        conf.from_str(conf_file.read())
-
-    assert sorted(conf.items()) == sorted(get_testing_config.items())
+        groups = conf.get_groups()
+        assert groups["test_group"]["daily"] == 3
+        assert groups["test_group"]["directory_by_domain"]

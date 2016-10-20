@@ -96,3 +96,14 @@ class Config(dict):
             e.strerror = 'Unable to load configuration file (%s)' % e.strerror
             raise
         return True
+
+    def get_groups(self):
+        """
+        Get backup groups with default values
+        """
+        groups = {}
+        for g, prop in self.get("groups", {}).items():
+            d = self.get("default", {}).copy()
+            d.update(prop)
+            groups[g] = d
+        return groups
