@@ -14,54 +14,6 @@ from . import APP_NAME, VERSION
 logging.basicConfig(level=logging.DEBUG)
 
 
-def vir_event_loop_native_run():
-    while True:
-        libvirt.virEventRunDefaultImpl()
-
-
-def vir_event_loop_native_start():
-    libvirt.virEventRegisterDefaultImpl()
-    eventLoopThread = threading.Thread(
-        target=vir_event_loop_native_run, name="libvirtEventLoop"
-    )
-    eventLoopThread.setDaemon(True)
-    eventLoopThread.start()
-
-
-def build_main_backup_group(groups):
-    main_group = BackupGroup()
-    for g in groups:
-        for d in g.backups:
-            main_group.add_dombackup(d)
-    return main_group
-
-
-def start_backups(parsed_args, *args, **kwargs):
-    vir_event_loop_native_start()
-
-    config = Config(defaults={"debug": False, })
-    try:
-        config.from_dict(get_config())
-    except FileNotFoundError:
-        sys.exit(1)
-
-    conn = libvirt.open(None)
-    if conn is None:
-        print('Failed to open connection to the hypervisor')
-        sys.exit(1)
-    conn.setKeepAlive(5, 3)
-
-    if config.get("groups", None):
-        if not parsed_args.groups:
-            groups = [g for g in groups_from_dict(config["groups"], conn)
-                      if g.autostart]
-        else:
-            groups = [g for g in groups_from_dict(config["groups"], conn)
-                      if g.name in parsed_args.groups]
-        main_group = build_main_backup_group(groups)
-        main_group.start()
-
-
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Backup and restore your kvm libvirt domains"
@@ -96,6 +48,54 @@ def parse_args():
     else:
         arg_parser.print_help()
         sys.exit(1)
+
+
+def start_backups(parsed_args, *args, **kwargs):
+    vir_event_loop_native_start()
+
+    config = Config(defaults={"debug": False, })
+    try:
+        config.from_dict(get_config())
+    except FileNotFoundError:
+        sys.exit(1)
+
+    conn = libvirt.open(None)
+    if conn is None:
+        print('Failed to open connection to the hypervisor')
+        sys.exit(1)
+    conn.setKeepAlive(5, 3)
+
+    if config.get("groups", None):
+        if not parsed_args.groups:
+            groups = [g for g in groups_from_dict(config["groups"], conn)
+                      if g.autostart]
+        else:
+            groups = [g for g in groups_from_dict(config["groups"], conn)
+                      if g.name in parsed_args.groups]
+        main_group = build_main_backup_group(groups)
+        main_group.start()
+
+
+def vir_event_loop_native_start():
+    libvirt.virEventRegisterDefaultImpl()
+    eventLoopThread = threading.Thread(
+        target=vir_event_loop_native_run, name="libvirtEventLoop"
+    )
+    eventLoopThread.setDaemon(True)
+    eventLoopThread.start()
+
+
+def vir_event_loop_native_run():
+    while True:
+        libvirt.virEventRunDefaultImpl()
+
+
+def build_main_backup_group(groups):
+    main_group = BackupGroup()
+    for g in groups:
+        for d in g.backups:
+            main_group.add_dombackup(d)
+    return main_group
 
 
 if __name__ == "__main__":
