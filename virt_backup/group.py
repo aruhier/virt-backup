@@ -1,49 +1,21 @@
 #!/usr/bin/env python3
 
+from collections import defaultdict
 import libvirt
 import logging
 import os
+import re
 
-from virt_backup.domain import DomBackup, search_domains_regex
+from virt_backup.domain import (
+    DomBackup, search_domains_regex, list_backups_by_domain,
+    build_dom_complete_backup_from_def
+)
 
 
 logger = logging.getLogger("virt_backup")
 
 
-def parse_host_pattern(pattern, conn):
-    """
-    Parse the host pattern as written in the config
-
-    :param pattern: pattern to match on one or several domain names
-    :param conn: connection with libvirt
-    """
-    # if the pattern starts with !, exclude the matching domains
-    exclude = pattern.startswith("!")
-    if exclude:
-        # clean pattern to remove the '!' char
-        pattern = pattern[1:]
-
-    if pattern.startswith("r:"):
-        pattern = pattern[2:]
-        domains = search_domains_regex(pattern, conn)
-    elif pattern.startswith("g:"):
-        # TODO: option to include another group into this one. It would
-        # need to include all domains of this group.
-        pattern = pattern[2:]
-        # domains =
-    else:
-        try:
-            # will raise libvirt.libvirtError if the domain is not found
-            conn.lookupByName(pattern)
-            domains = (pattern,)
-        except libvirt.libvirtError as e:
-            logger.error(e)
-            domains = tuple()
-
-    return {"domains": domains, "exclude": exclude}
-
-
-def match_domains_from_config(host, conn):
+def matching_libvirt_domains_from_config(host, conn):
     """
     Return matching domains with the host definition
 
@@ -69,7 +41,7 @@ def match_domains_from_config(host, conn):
                 "{}".format(host)
             )
             raise e
-    matches = parse_host_pattern(pattern, conn)
+    matches = pattern_matching_domains_in_libvirt(pattern, conn)
     # not useful to continue if no domain matches or if the host variable
     # doesn't bring any property for our domain (like which disks to backup)
     if not isinstance(host, dict) or not matches["domains"]:
@@ -78,6 +50,89 @@ def match_domains_from_config(host, conn):
     if host.get("disks", None):
         matches["disks"] = sorted(host["disks"])
     return matches
+
+
+def pattern_matching_domains_in_libvirt(pattern, conn):
+    """
+    Parse the host pattern as written in the config and find matching hosts
+
+    :param pattern: pattern to match on one or several domain names
+    :param conn: connection with libvirt
+    """
+    exclude, pattern = _handle_possible_exclusion_host_pattern(pattern)
+    if pattern.startswith("r:"):
+        pattern = pattern[2:]
+        domains = search_domains_regex(pattern, conn)
+    elif pattern.startswith("g:"):
+        domains = _include_group_domains(pattern)
+    else:
+        try:
+            # will raise libvirt.libvirtError if the domain is not found
+            conn.lookupByName(pattern)
+            domains = (pattern,)
+        except libvirt.libvirtError as e:
+            logger.error(e)
+            domains = tuple()
+
+    return {"domains": domains, "exclude": exclude}
+
+
+def domains_matching_with_patterns(domains, patterns):
+    include, exclude = set(), set()
+    for pattern in patterns:
+        for domain in domains:
+            pattern_comparaison = is_domain_matching_with(domain, pattern)
+            if not pattern_comparaison["matches"]:
+                continue
+            if pattern_comparaison["exclude"]:
+                exclude.add(domain)
+            else:
+                include.add(domain)
+    return include.difference(exclude)
+
+
+def is_domain_matching_with(domain_name, pattern):
+    """
+    Parse the host pattern as written in the config and check if the domain
+    name matches
+
+    :param domain_name: domain name
+    :param pattern: pattern to match on
+    :returns: {matches: bool, exclude: bool}
+    """
+    exclude, pattern = _handle_possible_exclusion_host_pattern(pattern)
+    if pattern.startswith("r:"):
+        pattern = pattern[2:]
+        matches = re.match(pattern, domain_name)
+    elif pattern.startswith("g:"):
+        # TODO: to implement
+        pass
+    else:
+        matches = pattern == domain_name
+
+    return {"matches": matches, "exclude": exclude}
+
+
+def _handle_possible_exclusion_host_pattern(pattern):
+    """
+    Check if pattern starts with "!", meaning matching hosts will be excluded
+
+    :returns: exclude, sanitized_pattern
+    """
+    # if the pattern starts with !, exclude the matching domains
+    exclude = pattern.startswith("!")
+    if exclude:
+        # clean pattern to remove the '!' char
+        pattern = pattern[1:]
+    return exclude, pattern
+
+
+def _include_group_domains(pattern):
+    pattern = pattern[2:]
+    # TODO: option to include another group into this one. It would
+    # need to include all domains of this group.
+    # domains =
+    return []
 
 
 def groups_from_dict(groups_dict, conn):
@@ -93,7 +148,7 @@ def groups_from_dict(groups_dict, conn):
         hosts = properties.pop("hosts")
         include, exclude = [], []
         for host in hosts:
-            matches = match_domains_from_config(host, conn)
+            matches = matching_libvirt_domains_from_config(host, conn)
             if not matches.get("domains", None):
                 continue
             if matches["exclude"]:
@@ -232,3 +287,39 @@ class BackupGroup():
             dombackup.target_dir = os.path.join(
                 dombackup.target_dir, dombackup.dom.name()
             )
+
+
+class CompleteBackupGroup():
+    """
+    Group of complete libvirt domain backups
+    """
+    def __init__(
+        self, name="unnamed", backup_dir=None, hosts=None, backups=None
+    ):
+        #: dict of domains and their backups (CompleteDomBackup)
+        self.backups = backups or dict()
+
+        #: hosts_patterns
+        self.hosts = hosts or []
+
+        self.name = name
+
+        #: Base backup directory
+        self.backup_dir = backup_dir
+
+    def scan_backup_dir(self):
+        if not self.backup_dir:
+            raise NotADirectoryError("backup_dir not defined")
+
+        backups_def = list_backups_by_domain(self.backup_dir)
+        backups = {}
+        domains_to_include = domains_matching_with_patterns(
+            backups_def.keys(), self.hosts
+        )
+        for dom_name in domains_to_include:
+            backups[dom_name] = [
+                build_dom_complete_backup_from_def(definition, self.backup_dir)
+                for _, definition in backups_def[dom_name]
+            ]
+
+        self.backups = backups

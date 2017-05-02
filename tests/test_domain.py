@@ -322,9 +322,6 @@ def test_search_domains_regex_not_found(
 
 
 def test_list_backups_by_domain(build_backup_directory):
-    """
-    Search a non existing domain
-    """
     backup_dir = str(build_backup_directory["backup_dir"])
     backup_dates = tuple(build_backup_directory["backup_dates"])
     domain_names = build_backup_directory["domain_names"]

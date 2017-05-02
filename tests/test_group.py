@@ -3,8 +3,8 @@ import os
 import pytest
 
 from virt_backup.group import (
-    BackupGroup, parse_host_pattern, match_domains_from_config,
-    groups_from_dict
+    BackupGroup, pattern_matching_domains_in_libvirt,
+    matching_libvirt_domains_from_config, groups_from_dict
 )
 from virt_backup.domain import DomBackup
 
@@ -122,9 +122,11 @@ class TestBackupGroup():
             assert b.target_dir is "/test"
 
 
-def test_parse_host_pattern_regex(build_mock_libvirtconn_filled):
+def test_pattern_matching_domains_in_libvirt_regex(
+    build_mock_libvirtconn_filled
+):
     conn = build_mock_libvirtconn_filled
-    matches = parse_host_pattern("r:^matching.?$", conn)
+    matches = pattern_matching_domains_in_libvirt("r:^matching.?$", conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
 
@@ -132,12 +134,14 @@ def test_parse_host_pattern_regex(build_mock_libvirtconn_filled):
     assert not exclude
 
 
-def test_parse_host_pattern_direct_name(build_mock_libvirtconn_filled):
+def test_pattern_matching_domains_in_libvirt_direct_name(
+    build_mock_libvirtconn_filled
+):
     """
     Test parse_host_pattern directly with a domain name
     """
     conn = build_mock_libvirtconn_filled
-    matches = parse_host_pattern("matching", conn)
+    matches = pattern_matching_domains_in_libvirt("matching", conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
 
@@ -145,12 +149,14 @@ def test_parse_host_pattern_direct_name(build_mock_libvirtconn_filled):
     assert not exclude
 
 
-def test_parse_host_pattern_exclude(build_mock_libvirtconn_filled):
+def test_pattern_matching_domains_in_libvirt_exclude(
+    build_mock_libvirtconn_filled
+):
     """
     Test parse_host_pattern with a pattern excluding a domain
     """
     conn = build_mock_libvirtconn_filled
-    matches = parse_host_pattern("!matching", conn)
+    matches = pattern_matching_domains_in_libvirt("!matching", conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
 
@@ -158,11 +164,11 @@ def test_parse_host_pattern_exclude(build_mock_libvirtconn_filled):
     assert exclude
 
 
-def test_match_domains_from_config(build_mock_libvirtconn_filled):
+def test_matching_libvirt_domains_from_config(build_mock_libvirtconn_filled):
     conn = build_mock_libvirtconn_filled
     host_config = {"host": "matching", "disks": ["vda", "vdb"]}
 
-    matches = match_domains_from_config(host_config, conn)
+    matches = matching_libvirt_domains_from_config(host_config, conn)
     domains = tuple(sorted(matches["domains"]))
     exclude, disks = matches["exclude"], tuple(sorted(matches["disks"]))
 
@@ -171,14 +177,16 @@ def test_match_domains_from_config(build_mock_libvirtconn_filled):
     assert disks == ("vda", "vdb")
 
 
-def test_match_domains_from_config_unexisting(build_mock_libvirtconn_filled):
+def test_matching_libvirt_domains_from_config_unexisting(
+    build_mock_libvirtconn_filled
+):
     """
     Test match_domains_from_config with a non existing domain
     """
     conn = build_mock_libvirtconn_filled
     host_config = {"host": "nonexisting", "disks": ["vda", "vdb"]}
 
-    matches = match_domains_from_config(host_config, conn)
+    matches = matching_libvirt_domains_from_config(host_config, conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
 
@@ -186,14 +194,16 @@ def test_match_domains_from_config_unexisting(build_mock_libvirtconn_filled):
     assert not exclude
 
 
-def test_match_domains_from_config_str(build_mock_libvirtconn_filled):
+def test_matching_libvirt_domains_from_config_str(
+    build_mock_libvirtconn_filled
+):
     """
     Test match_domains_from_config with a str pattern
     """
     conn = build_mock_libvirtconn_filled
     host_config = "r:matching\d?"
 
-    matches = match_domains_from_config(host_config, conn)
+    matches = matching_libvirt_domains_from_config(host_config, conn)
     domains = tuple(sorted(matches["domains"]))
     exclude = matches["exclude"]
 
