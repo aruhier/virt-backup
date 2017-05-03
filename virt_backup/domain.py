@@ -470,6 +470,7 @@ def build_dom_complete_backup_from_def(definition, backup_dir):
     backup = DomCompleteBackup(
         dom_name=definition["domain_name"],
         backup_dir=backup_dir,
+        date=arrow.get(definition["date"]),
         dom_xml=definition.get("domain_xml", None),
         disks=definition.get("disks", None),
         tar=definition.get("tar", None),
@@ -478,14 +479,16 @@ def build_dom_complete_backup_from_def(definition, backup_dir):
 
 
 class DomCompleteBackup(_BaseDomBackup):
-    def __init__(
-            self, dom_name, backup_dir, dom_xml=None, disks=None, tar=None
-    ):
+    def __init__(self, dom_name, backup_dir, date=None, dom_xml=None,
+                 disks=None, tar=None):
         #: domain name
         self.dom_name = dom_name
 
         #: backup directory path
         self.backup_dir = backup_dir
+
+        #: backup date
+        self.date = date
 
         #: domain XML as it was during the backup
         self.dom_xml = dom_xml

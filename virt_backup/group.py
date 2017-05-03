@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import arrow
 from collections import defaultdict
 import libvirt
 import logging
@@ -323,3 +324,49 @@ class CompleteBackupGroup():
             ]
 
         self.backups = backups
+
+    def clean(self, hourly="*", daily="*", weekly="*", monthly="*",
+              yearly="*"):
+        for domain, domain_backups in self.backups:
+            domain_backups = sorted(domain_backups, key=lambda b: b.date)
+            keep_backups = set()
+
+            period_tuples = (
+                ("hour", "hourly"), ("day", "daily"), ("week", "weekly"),
+                ("month", "monthly"), ("year", "yearly"),
+            )
+            for period, periodly in period_tuples:
+                n_to_keep = locals()[periodly]
+                if n_to_keep:
+                    keep_backups.update(self._keep_n_periodly_backups(
+                        domain_backups, period, periodly
+                    ))
+            for b in keep_backups.difference(set(domain_backups)):
+                remove_backup(b)
+
+    def _keep_n_periodly_backups(self, sorted_backups, period, n):
+        if not n:
+            return []
+
+        grouped_backups = self._group_backup_by_period(sorted_backups, period)
+
+        # will keep all yearly backups
+        if n == "*":
+            n = 0
+        return set(
+            backups[0] for group, backups in list(grouped_backups.items())[-n:]
+        )
+
+    def _group_backup_by_period(self, sorted_backups, period):
+        grouped_backups = defaultdict(list)
+        periods = ("hour", "day", "week", "month", "year")
+        for backup in sorted_backups:
+            key = tuple(
+                getattr(backup.date, p)
+                for p in periods[periods.index(period):]
+            )
+            grouped_backups[key].append(backup)
+        return grouped_backups
+
+    def remove_backup(self, dombackup):
+        raise NotImplementedError()

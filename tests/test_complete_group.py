@@ -1,4 +1,5 @@
 
+import pytest
 from virt_backup.group import CompleteBackupGroup
 from virt_backup.domain import list_backups_by_domain
 
@@ -27,3 +28,7 @@ class TestCompleteBackupGroup():
         group.scan_backup_dir()
 
         assert not group.backups.keys()
+
+    @pytest.mark.skip(reason="to implement")
+    def test_clean(self, build_backup_directory):
+        pass
