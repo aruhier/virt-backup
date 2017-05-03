@@ -290,6 +290,40 @@ class BackupGroup():
             )
 
 
+def complete_groups_from_dict(groups_dict):
+    """
+    Construct and yield CompleteBackupGroups from a dict (typically as stored
+    in config)
+
+    :param groups_dict: dict of groups properties (take a look at the
+                        config syntax for more info)
+    """
+    def build(name, properties):
+        attrs = {}
+        attrs["hosts"] = []
+        for host in properties.get("hosts", []):
+            if isinstance(host, str):
+                attrs["hosts"].append(host)
+            else:
+                try:
+                    attrs["hosts"].append(host["host"])
+                except KeyError as e:
+                    logger.error(
+                        "Configuration error, missing host for lines: \n"
+                        "{}".format(host)
+                    )
+                    raise e
+
+        if properties.get("target", None):
+            attrs["backup_dir"] = properties["target"]
+
+        complete_backup_group = CompleteBackupGroup(name=name, **attrs)
+        return complete_backup_group
+
+    for group_name, group_properties in groups_dict.items():
+        yield build(group_name, group_properties)
+
+
 class CompleteBackupGroup():
     """
     Group of complete libvirt domain backups
@@ -319,15 +353,20 @@ class CompleteBackupGroup():
         )
         for dom_name in domains_to_include:
             backups[dom_name] = [
-                build_dom_complete_backup_from_def(definition, self.backup_dir)
-                for _, definition in backups_def[dom_name]
+                build_dom_complete_backup_from_def(
+                    definition,
+                    backup_dir=os.path.dirname(definition_filename),
+                    definition_filename=definition_filename
+                )
+                for definition_filename, definition in backups_def[dom_name]
             ]
 
         self.backups = backups
 
     def clean(self, hourly="*", daily="*", weekly="*", monthly="*",
               yearly="*"):
-        for domain, domain_backups in self.backups:
+        backups_removed = set()
+        for domain, domain_backups in self.backups.items():
             domain_backups = sorted(domain_backups, key=lambda b: b.date)
             keep_backups = set()
 
@@ -339,10 +378,19 @@ class CompleteBackupGroup():
                 n_to_keep = locals()[periodly]
                 if n_to_keep:
                     keep_backups.update(self._keep_n_periodly_backups(
-                        domain_backups, period, periodly
+                        domain_backups, period, n_to_keep
                     ))
-            for b in keep_backups.difference(set(domain_backups)):
-                remove_backup(b)
+
+            backups_to_remove = set(domain_backups).difference(keep_backups)
+            for b in backups_to_remove:
+                logger.info(
+                    "Cleaning backup {} for domain {}".format(b.date, domain)
+                )
+                b.delete()
+                self.backups[domain].remove(b)
+                backups_removed.add(b)
+
+        return backups_removed
 
     def _keep_n_periodly_backups(self, sorted_backups, period, n):
         if not n:
@@ -367,6 +415,3 @@ class CompleteBackupGroup():
             )
             grouped_backups[key].append(backup)
         return grouped_backups
-
-    def remove_backup(self, dombackup):
-        raise NotImplementedError()

@@ -6,7 +6,7 @@ import logging
 import sys
 import threading
 
-from .group import groups_from_dict, BackupGroup
+from .group import groups_from_dict, BackupGroup, complete_groups_from_dict
 from .config import get_config, Config
 from . import APP_NAME, VERSION
 
@@ -22,10 +22,15 @@ def parse_args():
     # Start/Stop/Show command
     sp_action = parser.add_subparsers()
 
-    sp_backup = sp_action.add_parser("backup", help=("backup a group"))
+    sp_backup = sp_action.add_parser("backup", help=("backup groups"))
     sp_backup.add_argument("groups", metavar="group", type=str, nargs="*",
                            help="domain group to backup")
     sp_backup.set_defaults(func=start_backups)
+
+    sp_clean = sp_action.add_parser("clean", help=("clean groups"))
+    sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
+                          help="domain group to clean")
+    sp_clean.set_defaults(func=clean_backups)
 
     # Debug option
     parser.add_argument("-d", "--debug", help="set the debug level",
@@ -86,7 +91,25 @@ def build_main_backup_group(groups):
 
 def clean_backups(parsed_args, *args, **kwargs):
     config = get_setup_config()
-    # use CompleteBackupGroups
+    groups = complete_groups_from_dict(config.get_groups())
+    for g in groups:
+        if not g.backup_dir:
+            continue
+        elif parsed_args.groups and g.name not in parsed_args.groups:
+            continue
+
+        g.scan_backup_dir()
+        current_group_config = config.get_groups()[g.name]
+        clean_params = {
+            "hourly": current_group_config.get("hourly", "*"),
+            "daily": current_group_config.get("daily", "*"),
+            "weekly": current_group_config.get("weekly", "*"),
+            "monthly": current_group_config.get("monthly", "*"),
+            "yearly": current_group_config.get("yearly", "*"),
+        }
+        print("Backups removed for group {}: {}".format(
+            g.name or "Undefined", len(g.clean(**clean_params))
+        ))
 
 
 def get_setup_config():

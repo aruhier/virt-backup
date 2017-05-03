@@ -466,7 +466,9 @@ class DomBackup(_BaseDomBackup):
         self.timeout = timeout
 
 
-def build_dom_complete_backup_from_def(definition, backup_dir):
+def build_dom_complete_backup_from_def(
+        definition, backup_dir, definition_filename=None
+    ):
     backup = DomCompleteBackup(
         dom_name=definition["domain_name"],
         backup_dir=backup_dir,
@@ -475,17 +477,24 @@ def build_dom_complete_backup_from_def(definition, backup_dir):
         disks=definition.get("disks", None),
         tar=definition.get("tar", None),
     )
+
+    if definition_filename:
+        backup.definition_filename = definition_filename
+
     return backup
 
 
 class DomCompleteBackup(_BaseDomBackup):
     def __init__(self, dom_name, backup_dir, date=None, dom_xml=None,
-                 disks=None, tar=None):
+                 disks=None, tar=None, definition_filename=None):
         #: domain name
         self.dom_name = dom_name
 
         #: backup directory path
         self.backup_dir = backup_dir
+
+        #: definition filename
+        self.definition_filename = definition_filename
 
         #: backup date
         self.date = date
@@ -603,6 +612,28 @@ class DomCompleteBackup(_BaseDomBackup):
             copy_stream_to_file_progress(
                 tar_f.extractfile(disk_tarinfo), target, disk_tarinfo.size
             )
+
+    def delete(self):
+        if not self.backup_dir:
+            raise Exception("Backup dir not defined, cannot clean backup")
+
+        if self.tar:
+            self._delete_with_error_printing(
+                self.get_complete_path_of(self.tar)
+            )
+        else:
+            for d in self.disks.values():
+                self._delete_with_error_printing(self.get_complete_path_of(d))
+        if self.definition_filename:
+            self._delete_with_error_printing(
+                self.get_complete_path_of(self.definition_filename)
+            )
+
+    def _delete_with_error_printing(self, file_to_remove):
+        try:
+            os.remove(self.get_complete_path_of(file_to_remove))
+        except Exception as e:
+            logger.error("Error removing {}: {}".format(file_to_remove, e))
 
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)

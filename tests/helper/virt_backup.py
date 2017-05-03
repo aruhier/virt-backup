@@ -134,9 +134,16 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
 def build_completed_backups(backup_dir):
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
     backup_properties = (
+        (arrow.get("2016-07-08 19:40:02").to("local"), None),
+        (arrow.get("2016-07-08 18:40:02").to("local"), None),
         (arrow.get("2016-07-08 18:30:02").to("local"), None),
+        (arrow.get("2016-07-08 17:40:02").to("local"), None),
+        (arrow.get("2016-07-07 19:40:02").to("local"), None),
+        (arrow.get("2016-07-07 21:40:02").to("local"), None),
+        (arrow.get("2016-07-06 20:40:02").to("local"), None),
+        (arrow.get("2016-04-08 19:40:02").to("local"), None),
         (arrow.get("2014-05-01 00:30:00").to("local"), "tar"),
-        (arrow.get("2016-12-08 14:28:13").to("local"), "xz"),
+        (arrow.get("2016-03-08 14:28:13").to("local"), "xz"),
     )
     conn = MockConn()
     for domain_id, domain_name in enumerate(domain_names):
