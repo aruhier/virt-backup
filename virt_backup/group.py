@@ -402,7 +402,8 @@ class CompleteBackupGroup():
         if n == "*":
             n = 0
         return set(
-            backups[0] for group, backups in list(grouped_backups.items())[-n:]
+            backups[0] for group, backups in
+            sorted(grouped_backups.items())[-n:]
         )
 
     def _group_backup_by_period(self, sorted_backups, period):
@@ -411,7 +412,7 @@ class CompleteBackupGroup():
         for backup in sorted_backups:
             key = tuple(
                 getattr(backup.date, p)
-                for p in periods[periods.index(period):]
+                for p in reversed(periods[periods.index(period):])
             )
             grouped_backups[key].append(backup)
         return grouped_backups
