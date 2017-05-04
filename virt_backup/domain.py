@@ -9,6 +9,7 @@ import logging
 import lxml.etree
 import os
 import re
+import subprocess
 import tarfile
 import threading
 from tqdm import tqdm
@@ -195,7 +196,7 @@ class DomBackup(_BaseDomBackup):
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
                 self.pivot_callback, None
             )
-            self.external_snapshot()
+            snapshot = self.external_snapshot()
 
             # all of our disks are frozen, so the backup date is right now
             snapshot_date = arrow.now()
@@ -208,8 +209,16 @@ class DomBackup(_BaseDomBackup):
             # TODO: handle backingStore cases
             for disk, prop in self.disks.items():
                 self._backup_disk(disk, prop, backup_target, definition)
-                self._blockcommit_disk_and_wait(disk)
-
+                if self.dom.isActive():
+                    self._blockcommit_disk(disk)
+                else:
+                    snapshot_path = self._get_snapshot_path(
+                        prop["src"], snapshot
+                    )
+                    self._qemu_img_commit(prop["src"], snapshot_path)
+                    # TODO: be more specific when redefining the disk
+                    self.conn.defineXML(definition["domain_xml"])
+                    os.remove(snapshot_path)
             self._dump_json_definition(definition)
         finally:
             self.conn.domainEventDeregisterAny(callback_id)
@@ -226,6 +235,7 @@ class DomBackup(_BaseDomBackup):
         abort the blockjob and pivot it.
         """
         domain_matches = dom.ID() == self.dom.ID()
+        remove_disk = False
         if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
             dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
             os.remove(disk)
@@ -236,7 +246,7 @@ class DomBackup(_BaseDomBackup):
         Create an external snapshot in order to freeze the base image
         """
         snap_xml = self.gen_libvirt_snapshot_xml()
-        self.dom.snapshotCreateXML(
+        return self.dom.snapshotCreateXML(
             snap_xml,
             (
                 libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY +
@@ -394,12 +404,13 @@ class DomBackup(_BaseDomBackup):
         """
         return defusedxml.lxml.fromstring(self.dom.XMLDesc())
 
-    def _blockcommit_disk_and_wait(self, disk):
+    def _blockcommit_disk(self, disk):
         """
-        Block commit and wait for the pivot to be triggered
+        Block commit
 
         Will allow to merge the external snapshot previously created with the
         disk main image
+        Wait for the pivot to be triggered in case of active blockcommit.
 
         :param disk: diskname to blockcommit
         """
@@ -412,6 +423,16 @@ class DomBackup(_BaseDomBackup):
             )
         )
         self._wait_for_pivot.wait(timeout=self.timeout)
+
+    def _qemu_img_commit(self, parent_disk_path, snapshot_path):
+        return subprocess.check_call(
+            ("qemu-img", "commit", "-b", parent_disk_path, snapshot_path)
+        )
+
+    def _get_snapshot_path(self, parent_disk_path, snapshot):
+        return "{}.{}".format(
+            os.path.splitext(parent_disk_path)[0], snapshot.getName()
+        )
 
     def _dump_json_definition(self, definition):
         """
