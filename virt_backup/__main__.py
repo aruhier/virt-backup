@@ -32,6 +32,14 @@ def parse_args():
                           help="domain group to clean")
     sp_clean.set_defaults(func=clean_backups)
 
+    sp_clean = sp_action.add_parser("list", help=("list groups"))
+    sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
+                          help="domain group to clean")
+    sp_clean.add_argument("-s", "--short",
+                          help="short version, do not print details",
+                          dest="short", action="store_true")
+    sp_clean.set_defaults(func=list_groups)
+
     # Debug option
     parser.add_argument("-d", "--debug", help="set the debug level",
                         dest="debug", action="store_true")
@@ -91,13 +99,8 @@ def build_main_backup_group(groups):
 
 def clean_backups(parsed_args, *args, **kwargs):
     config = get_setup_config()
-    groups = complete_groups_from_dict(config.get_groups())
+    groups = get_usable_complete_groups(config, parsed_args.groups)
     for g in groups:
-        if not g.backup_dir:
-            continue
-        elif parsed_args.groups and g.name not in parsed_args.groups:
-            continue
-
         g.scan_backup_dir()
         current_group_config = config.get_groups()[g.name]
         clean_params = {
@@ -110,6 +113,23 @@ def clean_backups(parsed_args, *args, **kwargs):
         print("Backups removed for group {}: {}".format(
             g.name or "Undefined", len(g.clean(**clean_params))
         ))
+
+
+def list_groups(parsed_args, *args, **kwargs):
+    config = get_setup_config()
+    groups = get_usable_complete_groups(config, parsed_args.groups)
+    for g in groups:
+        g.scan_backup_dir()
+        print(" {}\n{}\n".format(g.name, (2 + len(g.name))*"="))
+        print("Total backups: {} hosts, {} backups".format(
+            len(g.backups), sum(len(backups) for backups in g.backups.values())
+        ))
+        if not parsed_args.short:
+            print("Hosts:")
+            # TODO: Should also print hosts matching in libvirt but not backup
+            # yet
+            for dom, backups in g.backups.items():
+                print("\t{}: {} backup(s)".format(dom, len(backups)))
 
 
 def get_setup_config():
@@ -128,6 +148,16 @@ def get_setup_conn(config):
         sys.exit(1)
     conn.setKeepAlive(5, 3)
     return conn
+
+
+def get_usable_complete_groups(config, only_groups_in=None):
+    groups = complete_groups_from_dict(config.get_groups())
+    for g in groups:
+        if not g.backup_dir:
+            continue
+        elif only_groups_in and g.name not in only_groups_in:
+            continue
+        yield g
 
 
 def build_all_or_selected_groups(config, conn, groups=None):
