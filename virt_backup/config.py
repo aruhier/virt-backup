@@ -66,7 +66,7 @@ class Config(dict):
         if self.get("debug", None):
             logging.getLogger("virt_backup").setLevel(logging.DEBUG)
         else:
-            logging.getLogger("virt_backup").setLevel(logging.ERROR)
+            logging.getLogger("virt_backup").setLevel(logging.INFO)
 
     def from_dict(self, conf_dict):
         """

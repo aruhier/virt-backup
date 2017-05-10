@@ -188,7 +188,7 @@ class DomBackup(_BaseDomBackup):
         """
         backup_target = None
         self._wait_for_pivot.clear()
-        print("Backup started for domain {}".format(self.dom.name()))
+        logger.info("Backup started for domain {}".format(self.dom.name()))
         definition = self.get_definition()
         definition["disks"] = {}
         try:
@@ -225,7 +225,7 @@ class DomBackup(_BaseDomBackup):
             if isinstance(backup_target, tarfile.TarFile):
                 backup_target.close()
             # TODO: remove our broken backup if it failed
-        print("Backup finished for domain {}".format(self.dom.name()))
+        logger.info("Backup finished for domain {}".format(self.dom.name()))
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
         """
