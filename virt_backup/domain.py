@@ -234,7 +234,6 @@ class DomBackup(_BaseDomBackup):
         abort the blockjob and pivot it.
         """
         domain_matches = dom.ID() == self.dom.ID()
-        remove_disk = False
         if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
             dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
             os.remove(disk)
@@ -513,9 +512,8 @@ class DomBackup(_BaseDomBackup):
         self.timeout = timeout
 
 
-def build_dom_complete_backup_from_def(
-        definition, backup_dir, definition_filename=None
-    ):
+def build_dom_complete_backup_from_def(definition, backup_dir,
+                                       definition_filename=None):
     backup = DomCompleteBackup(
         dom_name=definition["domain_name"],
         backup_dir=backup_dir,
