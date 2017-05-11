@@ -269,6 +269,13 @@ class TestDomBackup():
         dom_xml = conn.listAllDomains()[0].dom_xml
         assert self.get_src_for_disk(dom_xml, "vda") == "/testvda"
 
+    def test_manually_pivot_unexistant_disk(self, build_mock_domain,
+                                            build_mock_libvirtconn):
+        conn = build_mock_libvirtconn
+        dombkup = DomBackup(dom=build_mock_domain, conn=conn)
+        with pytest.raises(DiskNotFoundError):
+            dombkup._manually_pivot_disk("sda", "/testvda")
+
     def get_src_for_disk(self, dom_xml, disk):
         disks_xml = dom_xml.xpath("devices/disk")
         for elem in disks_xml:
