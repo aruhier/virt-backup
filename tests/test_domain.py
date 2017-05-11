@@ -10,7 +10,8 @@ import tarfile
 import virt_backup
 from virt_backup.domain import (
     DomBackup, search_domains_regex, list_backups_by_domain,
-    build_dom_complete_backup_from_def, get_domain_disks_of
+    build_dom_complete_backup_from_def, get_domain_disks_of,
+    get_xml_block_of_disk
 )
 from virt_backup.exceptions import DiskNotFoundError, DomainRunningError
 
@@ -264,6 +265,7 @@ class TestDomBackup():
                                  build_mock_libvirtconn):
         conn = build_mock_libvirtconn
         dombkup = DomBackup(dom=build_mock_domain, conn=conn)
+
         dombkup._manually_pivot_disk("vda", "/testvda")
 
         dom_xml = conn.listAllDomains()[0].dom_xml
@@ -273,18 +275,13 @@ class TestDomBackup():
                                             build_mock_libvirtconn):
         conn = build_mock_libvirtconn
         dombkup = DomBackup(dom=build_mock_domain, conn=conn)
+
         with pytest.raises(DiskNotFoundError):
             dombkup._manually_pivot_disk("sda", "/testvda")
 
     def get_src_for_disk(self, dom_xml, disk):
-        disks_xml = dom_xml.xpath("devices/disk")
-        for elem in disks_xml:
-            if elem.get("device", None) == "disk":
-                dev = elem.xpath("target")[0].get("dev")
-                if dev == "vda":
-                    return elem.xpath("source")[0].get("file")
-
-        raise DiskNotFoundError()
+        elem = get_xml_block_of_disk(dom_xml, disk)
+        return elem.xpath("source")[0].get("file")
 
     def test_dump_json_definition(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("json_dump")

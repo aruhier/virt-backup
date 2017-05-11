@@ -100,6 +100,20 @@ def get_domain_disks_of(dom_xml, *filter_dev):
     return disks
 
 
+def get_xml_block_of_disk(dom_xml, disk):
+    if isinstance(dom_xml, str):
+        dom_xml = defusedxml.lxml.fromstring(dom_xml)
+    for elem in dom_xml.xpath("devices/disk"):
+        try:
+            if elem.get("device", None) == "disk":
+                dev = elem.xpath("target")[0].get("dev")
+                if dev == disk:
+                    return elem
+        except IndexError:
+            continue
+    raise DiskNotFoundError(disk)
+
+
 class _BaseDomBackup():
     def _parse_dom_xml(self):
         """
@@ -209,15 +223,10 @@ class DomBackup(_BaseDomBackup):
             # TODO: handle backingStore cases
             for disk, prop in self.disks.items():
                 self._backup_disk(disk, prop, backup_target, definition)
-                if self.dom.isActive():
-                    self._blockcommit_disk(disk)
-                else:
-                    snapshot_path = self._get_snapshot_path(
-                        prop["src"], snapshot
-                    )
-                    self._qemu_img_commit(prop["src"], snapshot_path)
-                    self._manually_pivot_disk(disk, prop["src"])
-                    os.remove(snapshot_path)
+                snapshot_path = self._get_snapshot_path(prop["src"], snapshot)
+                self.post_backup_cleaning_snapshot(
+                    disk, prop["src"], snapshot_path
+                )
             self._dump_json_definition(definition)
         finally:
             self.conn.domainEventDeregisterAny(callback_id)
@@ -396,6 +405,22 @@ class DomBackup(_BaseDomBackup):
         logger.debug("{} successfully copied".format(disk))
         return os.path.abspath(backup_path)
 
+    def post_backup_cleaning_snapshot(self, disk, disk_path, snapshot_path):
+        snapshot_path = os.path.abspath(snapshot_path)
+        if self.dom.isActive():
+            self._blockcommit_disk(disk)
+        else:
+            self._qemu_img_commit(disk_path, snapshot_path)
+
+            # Only pivot disk if our snapshot is the current top disk
+            current_disk_path = get_xml_block_of_disk(
+                self.dom.XMLDesc(), disk
+            ).xpath("source")[0].get("file")
+            if os.path.abspath(current_disk_path) == snapshot_path:
+                self._manually_pivot_disk(disk, disk_path)
+
+            os.remove(snapshot_path)
+
     def _parse_dom_xml(self):
         """
         Parse the domain's definition
@@ -446,18 +471,12 @@ class DomBackup(_BaseDomBackup):
         :param src: new disk path
         """
         dom_xml = defusedxml.lxml.fromstring(self.dom.XMLDesc())
-        for elem in dom_xml.xpath("devices/disk"):
-            try:
-                if elem.get("device", None) == "disk":
-                    dev = elem.xpath("target")[0].get("dev")
-                    if dev == disk:
-                        elem.xpath("source")[0].set("file", src)
-                        return self.conn.defineXML(
-                            defusedxml.lxml.tostring(dom_xml)
-                        )
-            except IndexError:
-                continue
-        raise DiskNotFoundError(disk)
+        elem = get_xml_block_of_disk(dom_xml, disk)
+        elem.xpath("source")[0].set("file", src)
+        # TODO: use update from domain instead of redefining it
+        return self.conn.defineXML(
+            defusedxml.lxml.tostring(dom_xml)
+        )
 
     def _dump_json_definition(self, definition):
         """
