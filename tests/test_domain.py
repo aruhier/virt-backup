@@ -260,6 +260,25 @@ class TestDomBackup():
         }
         assert dombkup.get_definition() == expected_def
 
+    def test_manually_pivot_disk(self, build_mock_domain,
+                                 build_mock_libvirtconn):
+        conn = build_mock_libvirtconn
+        dombkup = DomBackup(dom=build_mock_domain, conn=conn)
+        dombkup._manually_pivot_disk("vda", "/testvda")
+
+        dom_xml = conn.listAllDomains()[0].dom_xml
+        assert self.get_src_for_disk(dom_xml, "vda") == "/testvda"
+
+    def get_src_for_disk(self, dom_xml, disk):
+        disks_xml = dom_xml.xpath("devices/disk")
+        for elem in disks_xml:
+            if elem.get("device", None) == "disk":
+                dev = elem.xpath("target")[0].get("dev")
+                if dev == "vda":
+                    return elem.xpath("source")[0].get("file")
+
+        raise DiskNotFoundError()
+
     def test_dump_json_definition(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("json_dump")
         dombkup = DomBackup(

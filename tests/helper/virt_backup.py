@@ -22,10 +22,10 @@ class MockDomain():
         return lxml.etree.tostring(self.dom_xml, pretty_print=True).decode()
 
     def ID(self):
-        return self._id
+        return self.dom_xml.get("id")
 
     def name(self):
-        return self._name
+        return self.dom_xml.xpath("name")[0].text
 
     def state(self):
         return self._state
@@ -39,10 +39,10 @@ class MockDomain():
         if elem_name is None:
             elem_name = self.dom_xml.makeelement("name")
             self.dom_xml.insert(0, elem_name)
-        elem_name.text = self._name
+        elem_name.text = name
 
     def set_id(self, id):
-        self.dom_xml.set("id", str(self._id))
+        self.dom_xml.set("id", str(id))
 
     def set_state(self, state_id, reason_id):
         self._state = [state_id, reason_id]
@@ -65,8 +65,6 @@ class MockDomain():
 
     def __init__(self, _conn, name="test", id=1, *args, **kwargs):
         self._conn = _conn
-        self._name = name
-        self._id = id
         self._state = [1, 1]
 
         with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
@@ -89,8 +87,13 @@ class MockConn():
         raise libvirt.libvirtError("Domain not found")
 
     def defineXML(self, xml):
-        # TODO: set the domain id and name as defined in the xml
-        return MockDomain(_conn=self)
+        md = MockDomain(_conn=self)
+        md.dom_xml = defusedxml.lxml.fromstring(xml)
+        for i, d in enumerate(self._domains):
+            if d.ID() == md.ID():
+                self._domains.pop(i)
+        self._domains.append(md)
+        return md
 
     def __init__(self, _domains=None, *args, **kwargs):
         self._domains = _domains or []

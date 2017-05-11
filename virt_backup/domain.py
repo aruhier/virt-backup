@@ -216,8 +216,7 @@ class DomBackup(_BaseDomBackup):
                         prop["src"], snapshot
                     )
                     self._qemu_img_commit(prop["src"], snapshot_path)
-                    # TODO: be more specific when redefining the disk
-                    self.conn.defineXML(definition["domain_xml"])
+                    self._manually_pivot_disk(disk, prop["src"])
                     os.remove(snapshot_path)
             self._dump_json_definition(definition)
         finally:
@@ -424,15 +423,42 @@ class DomBackup(_BaseDomBackup):
         )
         self._wait_for_pivot.wait(timeout=self.timeout)
 
-    def _qemu_img_commit(self, parent_disk_path, snapshot_path):
-        return subprocess.check_call(
-            ("qemu-img", "commit", "-b", parent_disk_path, snapshot_path)
-        )
-
     def _get_snapshot_path(self, parent_disk_path, snapshot):
         return "{}.{}".format(
             os.path.splitext(parent_disk_path)[0], snapshot.getName()
         )
+
+    def _qemu_img_commit(self, parent_disk_path, snapshot_path):
+        """
+        Use qemu-img to BlockCommit
+
+        Libvirt does not allow to blockcommit a inactive domain, so have to use
+        qemu-img instead.
+        """
+        return subprocess.check_call(
+            ("qemu-img", "commit", "-b", parent_disk_path, snapshot_path)
+        )
+
+    def _manually_pivot_disk(self, disk, src):
+        """
+        Replace the disk src
+
+        :param disk: disk name
+        :param src: new disk path
+        """
+        dom_xml = defusedxml.lxml.fromstring(self.dom.XMLDesc())
+        for elem in dom_xml.xpath("devices/disk"):
+            try:
+                if elem.get("device", None) == "disk":
+                    dev = elem.xpath("target")[0].get("dev")
+                    if dev == disk:
+                        elem.xpath("source")[0].set("file", src)
+                        return self.conn.defineXML(
+                            defusedxml.lxml.tostring(dom_xml)
+                        )
+            except IndexError:
+                continue
+        raise DiskNotFoundError(disk)
 
     def _dump_json_definition(self, definition):
         """
