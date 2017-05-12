@@ -63,6 +63,25 @@ class MockDomain():
             except IndexError:
                 continue
 
+    def updateDeviceFlags(self, xml, flags):
+        new_device_xml = defusedxml.lxml.fromstring(xml)
+
+        address = new_device_xml.get("address")
+        device_to_replace = self._find_device_with_address(address)
+
+        self.dom_xml.xpath("devices")[0].replace(
+            device_to_replace, new_device_xml
+        )
+
+    def _find_device_with_address(self, address):
+        for elem in self.dom_xml.xpath("devices/*"):
+            try:
+                if elem.get("address", None) == address:
+                    return elem
+            except IndexError:
+                continue
+        raise Exception("Device not found")
+
     def __init__(self, _conn, name="test", id=1, *args, **kwargs):
         self._conn = _conn
         self._state = [1, 1]
@@ -77,6 +96,8 @@ class MockConn():
     """
     Simulate a libvirt connection
     """
+    _libvirt_version = 3000000
+
     def listAllDomains(self):
         return self._domains
 
@@ -91,9 +112,14 @@ class MockConn():
         md.dom_xml = defusedxml.lxml.fromstring(xml)
         for i, d in enumerate(self._domains):
             if d.ID() == md.ID():
-                self._domains.pop(i)
+                d.dom_xml = md.dom_xml
+                return d
+
         self._domains.append(md)
         return md
+
+    def getLibVersion(self):
+        return self._libvirt_version
 
     def __init__(self, _domains=None, *args, **kwargs):
         self._domains = _domains or []

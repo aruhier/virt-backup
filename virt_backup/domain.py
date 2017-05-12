@@ -471,12 +471,20 @@ class DomBackup(_BaseDomBackup):
         :param src: new disk path
         """
         dom_xml = defusedxml.lxml.fromstring(self.dom.XMLDesc())
-        elem = get_xml_block_of_disk(dom_xml, disk)
-        elem.xpath("source")[0].set("file", src)
-        # TODO: use update from domain instead of redefining it
-        return self.conn.defineXML(
-            defusedxml.lxml.tostring(dom_xml)
-        )
+
+        disk_xml = get_xml_block_of_disk(dom_xml, disk)
+        disk_xml.xpath("source")[0].set("file", src)
+
+        if self.conn.getLibVersion() >= 3000000:
+            # update a disk is broken in libvirt < 3.0
+            return self.dom.updateDeviceFlags(
+                defusedxml.lxml.tostring(disk_xml).decode(),
+                libvirt.VIR_DOMAIN_AFFECT_CONFIG
+            )
+        else:
+            return self.conn.defineXML(
+                defusedxml.lxml.tostring(dom_xml).decode()
+            )
 
     def _dump_json_definition(self, definition):
         """

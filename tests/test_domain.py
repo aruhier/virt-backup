@@ -267,9 +267,19 @@ class TestDomBackup():
         dombkup = DomBackup(dom=build_mock_domain, conn=conn)
 
         dombkup._manually_pivot_disk("vda", "/testvda")
-
-        dom_xml = conn.listAllDomains()[0].dom_xml
+        dom_xml = dombkup.dom.XMLDesc()
         assert self.get_src_for_disk(dom_xml, "vda") == "/testvda"
+
+    def test_manually_pivot_disk_libvirt_2(self, build_mock_domain,
+                                           build_mock_libvirtconn):
+        """
+        Test manual pivot with libvirt < 3.0
+        """
+        conn = build_mock_libvirtconn
+        conn._libvirt_version = 2000000
+        conn._domains.append(build_mock_domain)
+
+        return self.test_manually_pivot_disk(build_mock_domain, conn)
 
     def test_manually_pivot_unexistant_disk(self, build_mock_domain,
                                             build_mock_libvirtconn):
