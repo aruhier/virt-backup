@@ -2,11 +2,12 @@
 import os
 import pytest
 
-from virt_backup.group import (
-    BackupGroup, pattern_matching_domains_in_libvirt,
-    matching_libvirt_domains_from_config, groups_from_dict
+from virt_backup.groups import BackupGroup, groups_from_dict
+from virt_backup.groups.pattern import (
+    pattern_matching_domains_in_libvirt,
+    matching_libvirt_domains_from_config
 )
-from virt_backup.domain import DomBackup
+from virt_backup.backups import DomBackup
 
 from helper.virt_backup import MockDomain
 

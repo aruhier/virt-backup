@@ -6,7 +6,7 @@ import logging
 import sys
 import threading
 
-from .group import groups_from_dict, BackupGroup, complete_groups_from_dict
+from .groups import groups_from_dict, BackupGroup, complete_groups_from_dict
 from .config import get_config, Config
 from . import APP_NAME, VERSION
 

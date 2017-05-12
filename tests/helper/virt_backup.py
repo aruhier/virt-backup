@@ -5,7 +5,7 @@ import libvirt
 import lxml
 import os
 
-from virt_backup.domain import DomBackup
+from virt_backup.backups import DomBackup
 
 
 CUR_PATH = os.path.dirname(os.path.realpath(__file__))

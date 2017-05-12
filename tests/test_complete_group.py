@@ -1,10 +1,13 @@
 
 import arrow
+import json
 import os
 import pytest
 
-from virt_backup.group import CompleteBackupGroup, complete_groups_from_dict
-from virt_backup.domain import list_backups_by_domain
+from virt_backup.groups import (
+    CompleteBackupGroup, complete_groups_from_dict
+)
+from virt_backup.groups.complete import list_backups_by_domain
 
 
 class TestCompleteBackupGroup():
@@ -107,3 +110,30 @@ def test_complete_groups_from_dict_multiple_groups(
     group0, group1 = groups
 
     assert sorted((group0.name, group1.name)) == ["test0", "test1"]
+
+
+def test_list_backups_by_domain(build_backup_directory):
+    backup_dir = str(build_backup_directory["backup_dir"])
+    backup_dates = tuple(build_backup_directory["backup_dates"])
+    domain_names = build_backup_directory["domain_names"]
+
+    backups = list_backups_by_domain(str(backup_dir))
+    assert sorted(backups.keys()) == sorted(domain_names)
+
+    def expected_backups(domain_id, domain_name):
+        for backup_date in backup_dates:
+            str_backup_date = backup_date.strftime("%Y%m%d-%H%M%S")
+            json_filename = "{}_{}_{}.json".format(
+                str_backup_date, domain_id, domain_name
+            )
+            json_path = os.path.join(backup_dir, domain_name, json_filename)
+
+            assert os.path.isfile(json_path)
+            with open(json_path, "r") as json_file:
+                yield (json_path, json.load(json_file))
+
+    for domain_id, domain_name in enumerate(domain_names):
+        assert (
+            sorted(expected_backups(domain_id, domain_name)) ==
+            sorted(backups[domain_name])
+        )

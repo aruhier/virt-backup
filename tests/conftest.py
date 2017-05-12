@@ -1,5 +1,6 @@
 
 import pytest
+from virt_backup.backups import DomBackup
 from helper.virt_backup import MockDomain, MockConn, build_completed_backups
 
 
@@ -36,3 +37,18 @@ def build_backup_directory(tmpdir):
         "domain_names": domain_names, "backup_dates": backup_dates,
         "backup_dir": tmpdir
     }
+
+
+@pytest.fixture
+def get_uncompressed_dombackup(build_mock_domain):
+    return DomBackup(
+        dom=build_mock_domain, dev_disks=("vda", ), compression=None,
+    )
+
+
+@pytest.fixture
+def get_compressed_dombackup(build_mock_domain):
+    return DomBackup(
+        dom=build_mock_domain, dev_disks=("vda", ), compression="xz",
+        compression_lvl=4,
+    )
