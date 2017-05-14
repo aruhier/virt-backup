@@ -179,11 +179,5 @@ class DomCompleteBackup(_BaseDomBackup):
                 self.get_complete_path_of(self.definition_filename)
             )
 
-    def _delete_with_error_printing(self, file_to_remove):
-        try:
-            os.remove(self.get_complete_path_of(file_to_remove))
-        except Exception as e:
-            logger.error("Error removing {}: {}".format(file_to_remove, e))
-
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)

@@ -249,7 +249,7 @@ class DomBackup(_BaseDomBackup):
             )
         )
         if os.path.exists(complete_path):
-            raise FileExistsError()
+            raise FileExistsError
         return tarfile.open(complete_path, mode)
 
     def _backup_disk(self, disk, disk_properties, backup_target, definition):
@@ -270,6 +270,13 @@ class DomBackup(_BaseDomBackup):
             self._disk_backup_name_format(snapshot_date, disk),
             disk_properties["type"]
         )
+        self._pending_info["disks"][disk]["target"] = target_img
+        self._dump_pending_info()
+
+        if definition.get("disks", None) is None:
+            definition["disks"] = {}
+        definition["disks"][disk] = target_img
+
         backup_path = self.backup_img(
             disk_properties["src"], backup_target, target_img
         )
@@ -278,10 +285,6 @@ class DomBackup(_BaseDomBackup):
                 # all disks will be compacted in the same tar, so already
                 # store it in definition if it was not set before
                 definition["tar"] = os.path.basename(backup_path)
-
-        if definition.get("disks", None) is None:
-            definition["disks"] = {}
-        definition["disks"][disk] = target_img
 
     def _disk_backup_name_format(self, snapdate, disk_name, *args, **kwargs):
         """
@@ -313,13 +316,16 @@ class DomBackup(_BaseDomBackup):
                 "ncols": 0, "mininterval": 0.5
             }
             logger.debug("Copy {}…".format(disk))
-            with tqdm(**tqdm_kwargs) as pbar:
-                target.fileobject = get_progress_bar_tar(pbar)
-                target.add(disk, arcname=target_filename)
             if self.compression == "xz":
                 backup_path = target.fileobj._fp.name
             else:
                 backup_path = target.fileobj.name
+            self._pending_info["tar"] = os.path.basename(backup_path)
+            self._dump_pending_info()
+
+            with tqdm(**tqdm_kwargs) as pbar:
+                target.fileobject = get_progress_bar_tar(pbar)
+                target.add(disk, arcname=target_filename)
         else:
             # target is a directory if target_filename is set, or an existing
             # directory or a destination file
@@ -465,6 +471,38 @@ class DomBackup(_BaseDomBackup):
         str_snapdate = snapdate.strftime("%Y%m%d-%H%M%S")
         return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
+    def clean_aborted(self):
+        for disk, prop in self._pending_info.get("disks", {}).items():
+            try:
+                self.post_backup_cleaning_snapshot(
+                    disk, prop["src"], prop["snapshot"]
+                )
+            except Exception as e:
+                logger.critical(
+                    (
+                        "Failed to clean temp files of disk {} "
+                        "for domain {}: {}"
+                    ).format(disk, self.dom.name(), e)
+                )
+                raise
+
+        if self._pending_info.get("tar", None):
+            self._clean_aborted_tar()
+        else:
+            self._clean_aborted_non_tar_img()
+
+    def _clean_aborted_tar(self):
+        tar_path = self.get_complete_path_of(self._pending_info["tar"])
+        if os.path.exists(tar_path):
+            self._delete_with_error_printing(tar_path)
+
+    def _clean_aborted_non_tar_img(self):
+        for disk in self._pending_info.get("disks", {}).values():
+            if disk.get("target", None) and os.path.exists(disk["target"]):
+                self._delete_with_error_printing(
+                    self.get_complete_path_of(disk["target"])
+                )
+
     def compatible_with(self, dombackup):
         """
         Is compatible with dombackup ?
@@ -490,3 +528,6 @@ class DomBackup(_BaseDomBackup):
         self.add_disks(*dombackup.disks.keys())
         timeout = self.timeout or dombackup.timeout
         self.timeout = timeout
+
+    def get_complete_path_of(self, filename):
+        return os.path.join(self.target_dir, filename)
