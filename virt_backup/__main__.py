@@ -72,7 +72,11 @@ def start_backups(parsed_args, *args, **kwargs):
     if config.get("groups", None):
         groups = build_all_or_selected_groups(config, conn, parsed_args.groups)
         main_group = build_main_backup_group(groups)
-        main_group.start()
+        try:
+            main_group.start()
+        except KeyboardInterrupt:
+            print("Cancelled…")
+            sys.exit(1)
 
 
 def vir_event_loop_native_start():

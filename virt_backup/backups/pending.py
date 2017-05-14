@@ -103,6 +103,7 @@ class DomBackup(_BaseDomBackup):
         assert self.dom and self.target_dir
 
         backup_target = None
+        callback_id = None
         self._wait_for_pivot.clear()
         logger.info("Backup started for domain {}".format(self.dom.name()))
         definition = self.get_definition()
@@ -129,12 +130,12 @@ class DomBackup(_BaseDomBackup):
                     disk, prop["src"], snapshot_path
                 )
             self._dump_json_definition(definition)
-        finally:
-            self.conn.domainEventDeregisterAny(callback_id)
-            if isinstance(backup_target, tarfile.TarFile):
-                backup_target.close()
+            self.post_backup(callback_id, backup_target)
             self._clean_pending_info()
-            # TODO: remove our broken backup if it failed
+        except:
+            self.post_backup(callback_id, backup_target)
+            self.clean_aborted()
+            raise
         logger.info("Backup finished for domain {}".format(self.dom.name()))
 
     def pivot_callback(self, conn, dom, disk, event_id, status, *args):
@@ -376,6 +377,17 @@ class DomBackup(_BaseDomBackup):
 
             os.remove(snapshot_path)
 
+    def post_backup(self, callback_id, backup_target):
+        """
+        Post backup process
+
+        Unregister callback and close backup_target if is tarfile
+        """
+        if callback_id is not None:
+            self.conn.domainEventDeregisterAny(callback_id)
+        if isinstance(backup_target, tarfile.TarFile):
+            backup_target.close()
+
     def _parse_dom_xml(self):
         """
         Parse the domain's definition
@@ -510,6 +522,11 @@ class DomBackup(_BaseDomBackup):
             self._clean_aborted_tar()
         else:
             self._clean_aborted_non_tar_img()
+        try:
+            self._clean_pending_info()
+        except KeyError:
+            # Pending info had no time to be filled, so had not be dumped
+            pass
 
     def _clean_aborted_tar(self):
         tar_path = self.get_complete_path_of(self._pending_info["tar"])
@@ -518,10 +535,11 @@ class DomBackup(_BaseDomBackup):
 
     def _clean_aborted_non_tar_img(self):
         for disk in self._pending_info.get("disks", {}).values():
-            if disk.get("target", None) and os.path.exists(disk["target"]):
-                self._delete_with_error_printing(
-                    self.get_complete_path_of(disk["target"])
-                )
+            if not disk.get("target", None):
+                continue
+            target_path = self.get_complete_path_of(disk["target"])
+            if os.path.exists(target_path):
+                self._delete_with_error_printing(target_path)
 
     def compatible_with(self, dombackup):
         """

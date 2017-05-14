@@ -280,6 +280,57 @@ class TestDomBackup():
         dombkup._clean_pending_info()
         assert len(target_dir.listdir()) == 0
 
+    def test_clean_aborted(self, build_mock_domain, tmpdir, monkeypatch):
+        target_dir = tmpdir.mkdir("clean_aborted")
+        dombkup = self.prepare_clean_aborted_dombkup(
+            build_mock_domain, target_dir, monkeypatch
+        )
+
+        target_dir.join("vda.qcow2").write("")
+        dombkup._pending_info["disks"] = {
+            "vda": {
+                "src": "vda.qcow2", "target": "vda.qcow2",
+                "snapshot": "vda.snap"
+            },
+        }
+        dombkup._dump_pending_info()
+        assert len(target_dir.listdir()) == 2
+
+        dombkup.clean_aborted()
+        assert not target_dir.listdir()
+
+    def test_clean_aborted_tar(self, build_mock_domain, tmpdir, monkeypatch):
+        target_dir = tmpdir.mkdir("clean_aborted_tar")
+        dombkup = self.prepare_clean_aborted_dombkup(
+            build_mock_domain, target_dir, monkeypatch
+        )
+        dombkup.compression = "tar"
+
+        target_dir.join("backup.tar").write("")
+        dombkup._pending_info["tar"] = "backup.tar"
+        dombkup._dump_pending_info()
+        assert len(target_dir.listdir()) == 2
+
+        dombkup.clean_aborted()
+        assert not target_dir.listdir()
+
+    def prepare_clean_aborted_dombkup(self, mock_domain, target_dir,
+                                      monkeypatch):
+        def mock_post_backup_cleaning_snapshot(*args, **kwargs):
+            return None
+
+        dombkup = DomBackup(dom=mock_domain, target_dir=str(target_dir))
+        dombkup._pending_info["date"] = 0
+
+        # TODO: will have to check if pivot is triggered, and temp snapshot
+        #       deleted
+        monkeypatch.setattr(
+            dombkup, "post_backup_cleaning_snapshot",
+            mock_post_backup_cleaning_snapshot
+        )
+
+        return dombkup
+
     def test_compatible_with(self, get_uncompressed_dombackup,
                              build_mock_domain):
         dombackup1 = get_uncompressed_dombackup
