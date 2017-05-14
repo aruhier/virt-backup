@@ -92,6 +92,14 @@ class MockDomain():
         self.set_name(name)
 
 
+class MockSnapshot():
+    def getName(self):
+        return self._name
+
+    def __init__(self, name):
+        self._name = name
+
+
 class MockConn():
     """
     Simulate a libvirt connection

@@ -1,4 +1,5 @@
 
+import arrow
 import datetime
 import json
 import pytest
@@ -8,6 +9,7 @@ import virt_backup
 from virt_backup.backups import DomBackup
 from virt_backup.domains import get_xml_block_of_disk
 from virt_backup.exceptions import DiskNotFoundError
+from helper.virt_backup import MockSnapshot
 
 
 class TestDomBackup():
@@ -87,6 +89,51 @@ class TestDomBackup():
         dombkup = DomBackup(dom=build_mock_domain)
         with pytest.raises(KeyError):
             dombkup.add_disks("vdc")
+
+    def test_snapshot_and_save_date_logic_date(self, build_mock_domain,
+                                               monkeypatch, tmpdir):
+        """
+        Create a DomBackup and test to add vdc
+        """
+        target_dir = tmpdir.mkdir("snapshot_and_save_date")
+
+        pre_snap_date = arrow.now()
+        snapshot_date, definition = self.take_snapshot_and_return_date(
+            build_mock_domain, str(target_dir), monkeypatch
+        )
+        post_snap_date = arrow.now()
+
+        assert snapshot_date >= pre_snap_date
+        assert snapshot_date <= post_snap_date
+
+    def test_snapshot_and_save_date_test_pending_info(self, build_mock_domain,
+                                                      monkeypatch, tmpdir):
+        """
+        Create a DomBackup and test to add vdc
+        """
+        target_dir = tmpdir.mkdir("snapshot_and_save_date")
+        snapshot_date, definition = self.take_snapshot_and_return_date(
+            build_mock_domain, str(target_dir), monkeypatch
+        )
+
+        pending_info_path = target_dir.listdir()[0]
+        pending_info = json.loads(pending_info_path.read())
+
+        assert definition.items() <= pending_info.items()
+        assert "snapshot" in pending_info["disks"]["vda"]
+        assert "src" in pending_info["disks"]["vda"]
+
+    def take_snapshot_and_return_date(self, mock_domain, target_dir,
+                                      monkeypatch):
+        dombkup = DomBackup(
+            dom=mock_domain, dev_disks=("vda", ), target_dir=target_dir
+        )
+        monkeypatch.setattr(
+            dombkup, "external_snapshot", lambda: MockSnapshot(name="test")
+        )
+
+        definition = dombkup.get_definition()
+        return dombkup._snapshot_and_save_date(definition)
 
     def test_get_libvirt_snapshot_xml(self, build_mock_domain):
         dombkup = DomBackup(dom=build_mock_domain)
@@ -222,6 +269,16 @@ class TestDomBackup():
         dombkup._dump_json_definition(definition)
         assert len(target_dir.listdir()) == 1
         assert json.loads(target_dir.listdir()[0].read()) == definition
+
+    def test_clean_pending_info(self, build_mock_domain, tmpdir):
+        target_dir = tmpdir.mkdir("clean_pending_info")
+        dombkup = DomBackup(dom=build_mock_domain, target_dir=str(target_dir))
+        dombkup._pending_info["date"] = 0
+
+        dombkup._dump_pending_info()
+        assert len(target_dir.listdir()) == 1
+        dombkup._clean_pending_info()
+        assert len(target_dir.listdir()) == 0
 
     def test_compatible_with(self, get_uncompressed_dombackup,
                              build_mock_domain):

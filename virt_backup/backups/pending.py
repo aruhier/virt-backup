@@ -68,6 +68,10 @@ class DomBackup(_BaseDomBackup):
         #: used to trigger when block pivot ends
         self._wait_for_pivot = threading.Event()
 
+        #: useful info collected during a pending backup, allowing to clean
+        #  the backup if anything goes wrong
+        self._pending_info = {}
+
     def add_disks(self, *dev_disks):
         """
         Add disk by dev name
@@ -85,7 +89,7 @@ class DomBackup(_BaseDomBackup):
                          will add all disks.
         """
         dom_all_disks = self._get_self_domain_disks()
-        if len(dev_disks) == 0:
+        if not dev_disks:
             self.disks = dom_all_disks
         for dev in dev_disks:
             if dev in self.disks:
@@ -96,6 +100,8 @@ class DomBackup(_BaseDomBackup):
         """
         Start the entire backup process for all disks in self.disks
         """
+        assert self.dom and self.target_dir
+
         backup_target = None
         self._wait_for_pivot.clear()
         logger.info("Backup started for domain {}".format(self.dom.name()))
@@ -106,11 +112,10 @@ class DomBackup(_BaseDomBackup):
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
                 self.pivot_callback, None
             )
-            snapshot = self.external_snapshot()
 
-            # all of our disks are frozen, so the backup date is right now
-            snapshot_date = arrow.now()
-            definition["date"] = snapshot_date.timestamp
+            snapshot_date, definition = self._snapshot_and_save_date(
+                definition
+            )
 
             backup_target = (
                 self.target_dir if self.compression is None
@@ -119,7 +124,7 @@ class DomBackup(_BaseDomBackup):
             # TODO: handle backingStore cases
             for disk, prop in self.disks.items():
                 self._backup_disk(disk, prop, backup_target, definition)
-                snapshot_path = self._get_snapshot_path(prop["src"], snapshot)
+                snapshot_path = self._pending_info["disks"][disk]["snapshot"]
                 self.post_backup_cleaning_snapshot(
                     disk, prop["src"], snapshot_path
                 )
@@ -128,6 +133,7 @@ class DomBackup(_BaseDomBackup):
             self.conn.domainEventDeregisterAny(callback_id)
             if isinstance(backup_target, tarfile.TarFile):
                 backup_target.close()
+            self._clean_pending_info()
             # TODO: remove our broken backup if it failed
         logger.info("Backup finished for domain {}".format(self.dom.name()))
 
@@ -143,6 +149,33 @@ class DomBackup(_BaseDomBackup):
             dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
             os.remove(disk)
             self._wait_for_pivot.set()
+
+    def _snapshot_and_save_date(self, definition):
+        """
+        Take a snapshot of all disks to backup and mark date into definition
+
+        All disks are frozen when external snapshots have been taken, so we
+        consider this step to be the backup date.
+
+        :return snapshot_date, definition: return snapshot_date as `arrow`
+            type, and the updated definition
+        """
+        snapshot = self.external_snapshot()
+
+        # all of our disks are frozen, so the backup date is right now
+        snapshot_date = arrow.now()
+        definition["date"] = snapshot_date.timestamp
+
+        self._pending_info = definition.copy()
+        self._pending_info["disks"] = {
+            disk: {
+                "src": prop["src"],
+                "snapshot": self._get_snapshot_path(prop["src"], snapshot)
+            } for disk, prop in self.disks.items()
+        }
+        self._dump_pending_info()
+
+        return snapshot_date, definition
 
     def external_snapshot(self):
         """
@@ -396,6 +429,30 @@ class DomBackup(_BaseDomBackup):
         )
         with open(definition_path, "w") as json_definition:
             json.dump(definition, json_definition, indent=4)
+
+    def _dump_pending_info(self):
+        """
+        Dump the temporary changes done, as json
+
+        Useful
+        """
+        json_path = self._get_pending_info_json_path()
+        with open(json_path, "w") as json_pending_info:
+            json.dump(self._pending_info, json_pending_info, indent=4)
+
+    def _clean_pending_info(self):
+        os.remove(self._get_pending_info_json_path())
+        self._pending_info = {}
+
+    def _get_pending_info_json_path(self):
+        backup_date = arrow.get(self._pending_info["date"]).to("local")
+        json_path = os.path.join(
+            self.target_dir,
+            "{}.{}.pending".format(
+                self._main_backup_name_format(backup_date), "json"
+            )
+        )
+        return json_path
 
     def _main_backup_name_format(self, snapdate, *args, **kwargs):
         """
