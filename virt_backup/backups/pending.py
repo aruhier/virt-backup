@@ -302,43 +302,63 @@ class DomBackup(_BaseDomBackup):
         Backup a disk image
 
         :param disk: path of the image to backup
-        :param target: dir or filename to copy into/as
+        :param target: dir or filename to copy into/as. If self.compress,
+                       target has to be a tarfile.TarFile
         :param target_filename: destination file will have this name, or keep
                                 the original one. target has to be a dir
                                 (if not exists, will be created)
         :returns backup_path: complete path of our backup
         """
         if self.compression:
-            # target is a tarfile.TarFile
-            total_size = os.path.getsize(disk)
-            tqdm_kwargs = {
-                "total": total_size, "unit": "B", "unit_scale": True,
-                "ncols": 0, "mininterval": 0.5
-            }
-            logger.debug("Copy {}…".format(disk))
-            if self.compression == "xz":
-                backup_path = target.fileobj._fp.name
-            else:
-                backup_path = target.fileobj.name
-            self._pending_info["tar"] = os.path.basename(backup_path)
-            self._dump_pending_info()
-
-            with tqdm(**tqdm_kwargs) as pbar:
-                target.fileobject = get_progress_bar_tar(pbar)
-                target.add(disk, arcname=target_filename)
+            backup_path = self._add_img_to_tarfile(
+                disk, target, target_filename
+            )
         else:
-            # target is a directory if target_filename is set, or an existing
-            # directory or a destination file
-            if target_filename is not None:
-                if not os.path.isdir(target):
-                    os.makedirs(target)
-            target = os.path.join(target, target_filename or disk)
-            logger.debug("Copy {} as {}".format(disk, target))
-            copy_file_progress(disk, target, buffersize=10*1024*1024)
-            backup_path = target
+            backup_path = self._copy_img_to_file(disk, target, target_filename)
 
         logger.debug("{} successfully copied".format(disk))
         return os.path.abspath(backup_path)
+
+    def _add_img_to_tarfile(self, img, target, target_filename):
+        """
+        :param img: source img path
+        :param target: tarfile.TarFile where img will be added
+        :param target_filename: img name in the tarfile
+        """
+        total_size = os.path.getsize(img)
+        tqdm_kwargs = {
+            "total": total_size, "unit": "B", "unit_scale": True,
+            "ncols": 0, "mininterval": 0.5
+        }
+        logger.debug("Copy {}…".format(img))
+        if self.compression == "xz":
+            backup_path = target.fileobj._fp.name
+        else:
+            backup_path = target.fileobj.name
+        self._pending_info["tar"] = os.path.basename(backup_path)
+        self._dump_pending_info()
+
+        with tqdm(**tqdm_kwargs) as pbar:
+            target.fileobject = get_progress_bar_tar(pbar)
+            target.add(img, arcname=target_filename)
+
+        return backup_path
+
+    def _copy_img_to_file(self, img, target, target_filename=None):
+        """
+        :param img: source img path
+        :param target: target is a directory if target_filename is set, or an
+                       existing directory or a destination file
+        :param target_filename: name of the img copy
+        """
+        if target_filename is not None:
+            if not os.path.isdir(target):
+                os.makedirs(target)
+        target = os.path.join(target, target_filename or img)
+        logger.debug("Copy {} as {}".format(img, target))
+        copy_file_progress(img, target, buffersize=10*1024*1024)
+
+        return target
 
     def post_backup_cleaning_snapshot(self, disk, disk_path, snapshot_path):
         snapshot_path = os.path.abspath(snapshot_path)
