@@ -9,20 +9,6 @@ from tqdm import tqdm
 DEFAULT_BUFFERSIZE = 512*1024
 
 
-def search_domains_regex(pattern, conn):
-    """
-    Yield all domains matching with a regex
-
-    :param pattern: regex to match on all domain names listed by libvirt
-    :param conn: connection with libvirt
-    """
-    c_pattern = re.compile(pattern)
-    for domain in conn.listAllDomains():
-        domain_name = domain.name()
-        if c_pattern.match(domain_name):
-            yield domain_name
-
-
 def copy_file_progress(src, dst, buffersize=DEFAULT_BUFFERSIZE):
     total_size = os.path.getsize(src)
     if not os.path.exists(dst) and dst.endswith("/"):
