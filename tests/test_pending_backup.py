@@ -273,7 +273,7 @@ class TestDomBackup():
     def test_clean_pending_info(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("clean_pending_info")
         dombkup = DomBackup(dom=build_mock_domain, target_dir=str(target_dir))
-        dombkup._pending_info["date"] = 0
+        dombkup.pending_info["date"] = 0
 
         dombkup._dump_pending_info()
         assert len(target_dir.listdir()) == 1
@@ -287,7 +287,7 @@ class TestDomBackup():
         )
 
         target_dir.join("vda.qcow2").write("")
-        dombkup._pending_info["disks"] = {
+        dombkup.pending_info["disks"] = {
             "vda": {
                 "src": "vda.qcow2", "target": "vda.qcow2",
                 "snapshot": "vda.snap"
@@ -307,7 +307,7 @@ class TestDomBackup():
         dombkup.compression = "tar"
 
         target_dir.join("backup.tar").write("")
-        dombkup._pending_info["tar"] = "backup.tar"
+        dombkup.pending_info["tar"] = "backup.tar"
         dombkup._dump_pending_info()
         assert len(target_dir.listdir()) == 2
 
@@ -320,7 +320,7 @@ class TestDomBackup():
             return None
 
         dombkup = DomBackup(dom=mock_domain, target_dir=str(target_dir))
-        dombkup._pending_info["date"] = 0
+        dombkup.pending_info["date"] = 0
 
         # TODO: will have to check if pivot is triggered, and temp snapshot
         #       deleted

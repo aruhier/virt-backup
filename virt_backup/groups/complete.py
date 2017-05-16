@@ -5,7 +5,9 @@ import json
 import logging
 import os
 
-from virt_backup.backups import build_dom_complete_backup_from_def
+from virt_backup.backups import (
+    build_dom_complete_backup_from_def, build_dom_backup_from_pending_info
+)
 from .pattern import domains_matching_with_patterns
 
 
@@ -21,29 +23,48 @@ def list_backups_by_domain(backup_dir):
     :returns: {domain_name: [(definition_path, definition_dict), …], …}
     :rtype: dict
     """
+    return _list_json_following_pattern_by_domain(backup_dir, "*/*.json")
+
+
+def list_broken_backups_by_domain(backup_dir):
+    """
+    Group all broken backups by domain, in a dict
+
+    Backups have to respect the structure: backup_dir/domain_name/*backups*
+
+    :returns: {domain_name: [(backup_dir, pending_info_dict), …], …}
+    :rtype: dict
+    """
+    return _list_json_following_pattern_by_domain(
+        backup_dir, "*/*.json.pending"
+    )
+
+
+def _list_json_following_pattern_by_domain(directory, glob_pattern):
     backups = {}
-    for json_file in glob.glob(os.path.join(backup_dir, "*/*.json")):
+    for json_file in glob.glob(os.path.join(directory, glob_pattern)):
         logger.debug("{} detected".format(json_file))
         with open(json_file, "r") as definition_file:
             try:
-                definition = json.load(definition_file)
+                metadata = json.load(definition_file)
             except Exception as e:
                 logger.debug("Error for file {}: {}".format(json_file, e))
                 continue
-        domain_name = definition["domain_name"]
+        domain_name = metadata["domain_name"]
         if domain_name not in backups:
             backups[domain_name] = []
-        backups[domain_name].append((json_file, definition))
+        backups[domain_name].append((json_file, metadata))
     return backups
 
 
-def complete_groups_from_dict(groups_dict):
+def complete_groups_from_dict(groups_dict, conn=None):
     """
     Construct and yield CompleteBackupGroups from a dict (typically as stored
     in config)
 
     :param groups_dict: dict of groups properties (take a look at the
                         config syntax for more info)
+    :param conn: libvirt connection
     """
     def build(name, properties):
         attrs = {}
@@ -64,7 +85,9 @@ def complete_groups_from_dict(groups_dict):
         if properties.get("target", None):
             attrs["backup_dir"] = properties["target"]
 
-        complete_backup_group = CompleteBackupGroup(name=name, **attrs)
+        complete_backup_group = CompleteBackupGroup(
+            name=name, **attrs, conn=conn
+        )
         return complete_backup_group
 
     for group_name, group_properties in groups_dict.items():
@@ -76,27 +99,44 @@ class CompleteBackupGroup():
     Group of complete libvirt domain backups
     """
     def __init__(
-        self, name="unnamed", backup_dir=None, hosts=None, backups=None
+        self, name="unnamed", backup_dir=None, hosts=None, conn=None,
+        backups=None, broken_backups=None
     ):
         #: dict of domains and their backups (CompleteDomBackup)
         self.backups = backups or dict()
+
+        #: dict of domains and their broken/aborted backups (DomBackup)
+        self.broken_backups = broken_backups or dict()
 
         #: hosts_patterns
         self.hosts = hosts or []
 
         self.name = name
 
-        #: Base backup directory
+        #: base backup directory
         self.backup_dir = backup_dir
+
+        #: connection to libvirt
+        self.conn = conn
 
     def scan_backup_dir(self):
         if not self.backup_dir:
             raise NotADirectoryError("backup_dir not defined")
 
-        backups_def = list_backups_by_domain(self.backup_dir)
+        self._build_backups()
+        if self.conn:
+            self._build_broken_backups()
+        else:
+            logger.debug(
+                "No libvirt connection for group {}, does not scan for "
+                "possible broken backups.".format(self.conn)
+            )
+
+    def _build_backups(self):
         backups = {}
+        backups_by_domain = list_backups_by_domain(self.backup_dir)
         domains_to_include = domains_matching_with_patterns(
-            backups_def.keys(), self.hosts
+            backups_by_domain.keys(), self.hosts
         )
         for dom_name in domains_to_include:
             backups[dom_name] = [
@@ -105,10 +145,32 @@ class CompleteBackupGroup():
                     backup_dir=os.path.dirname(definition_filename),
                     definition_filename=definition_filename
                 )
-                for definition_filename, definition in backups_def[dom_name]
+                for definition_filename, definition
+                in backups_by_domain[dom_name]
             ]
 
         self.backups = backups
+
+    def _build_broken_backups(self):
+        broken_backups = {}
+        broken_backups_by_domain = list_broken_backups_by_domain(
+            self.backup_dir
+        )
+        domains_to_include = domains_matching_with_patterns(
+            broken_backups_by_domain.keys(), self.hosts
+        )
+        for dom_name in domains_to_include:
+            broken_backups[dom_name] = [
+                build_dom_backup_from_pending_info(
+                    pending_info,
+                    backup_dir=os.path.dirname(pending_info_json),
+                    conn=self.conn
+                )
+                for pending_info_json, pending_info
+                in broken_backups_by_domain[dom_name]
+            ]
+
+        self.broken_backups = broken_backups
 
     def clean(self, hourly="*", daily="*", weekly="*", monthly="*",
               yearly="*"):
@@ -136,6 +198,16 @@ class CompleteBackupGroup():
                 b.delete()
                 self.backups[domain].remove(b)
                 backups_removed.add(b)
+
+        return backups_removed
+
+    def clean_broken_backups(self):
+        backups_removed = set()
+        for domain, backups in self.broken_backups.items():
+            for backup in backups:
+                backup.clean_aborted()
+                self.broken_backups[domain].remove(backup)
+                backups_removed.add(backup)
 
         return backups_removed
 

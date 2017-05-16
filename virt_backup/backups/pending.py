@@ -22,6 +22,19 @@ from . import _BaseDomBackup
 logger = logging.getLogger("virt_backup")
 
 
+def build_dom_backup_from_pending_info(pending_info, backup_dir, conn):
+    backup = DomBackup(
+        dom=conn.lookupByName(pending_info["domain_name"]),
+        target_dir=backup_dir,
+        dev_disks=pending_info.get("disks", {}).items(),
+        compression=pending_info.get("compression", "tar"),
+        compression_lvl=pending_info.get("compression_lvl", None)
+    )
+    backup.pending_info = pending_info
+
+    return backup
+
+
 class DomBackup(_BaseDomBackup):
     """
     Libvirt domain backup
@@ -70,7 +83,7 @@ class DomBackup(_BaseDomBackup):
 
         #: useful info collected during a pending backup, allowing to clean
         #  the backup if anything goes wrong
-        self._pending_info = {}
+        self.pending_info = {}
 
     def add_disks(self, *dev_disks):
         """
@@ -125,7 +138,7 @@ class DomBackup(_BaseDomBackup):
             # TODO: handle backingStore cases
             for disk, prop in self.disks.items():
                 self._backup_disk(disk, prop, backup_target, definition)
-                snapshot_path = self._pending_info["disks"][disk]["snapshot"]
+                snapshot_path = self.pending_info["disks"][disk]["snapshot"]
                 self.post_backup_cleaning_snapshot(
                     disk, prop["src"], snapshot_path
                 )
@@ -167,8 +180,8 @@ class DomBackup(_BaseDomBackup):
         snapshot_date = arrow.now()
         definition["date"] = snapshot_date.timestamp
 
-        self._pending_info = definition.copy()
-        self._pending_info["disks"] = {
+        self.pending_info = definition.copy()
+        self.pending_info["disks"] = {
             disk: {
                 "src": prop["src"],
                 "snapshot": self._get_snapshot_path(prop["src"], snapshot)
@@ -271,7 +284,7 @@ class DomBackup(_BaseDomBackup):
             self._disk_backup_name_format(snapshot_date, disk),
             disk_properties["type"]
         )
-        self._pending_info["disks"][disk]["target"] = target_img
+        self.pending_info["disks"][disk]["target"] = target_img
         self._dump_pending_info()
 
         if definition.get("disks", None) is None:
@@ -336,7 +349,7 @@ class DomBackup(_BaseDomBackup):
             backup_path = target.fileobj._fp.name
         else:
             backup_path = target.fileobj.name
-        self._pending_info["tar"] = os.path.basename(backup_path)
+        self.pending_info["tar"] = os.path.basename(backup_path)
         self._dump_pending_info()
 
         with tqdm(**tqdm_kwargs) as pbar:
@@ -476,14 +489,14 @@ class DomBackup(_BaseDomBackup):
         """
         json_path = self._get_pending_info_json_path()
         with open(json_path, "w") as json_pending_info:
-            json.dump(self._pending_info, json_pending_info, indent=4)
+            json.dump(self.pending_info, json_pending_info, indent=4)
 
     def _clean_pending_info(self):
         os.remove(self._get_pending_info_json_path())
-        self._pending_info = {}
+        self.pending_info = {}
 
     def _get_pending_info_json_path(self):
-        backup_date = arrow.get(self._pending_info["date"]).to("local")
+        backup_date = arrow.get(self.pending_info["date"]).to("local")
         json_path = os.path.join(
             self.target_dir,
             "{}.{}.pending".format(
@@ -504,7 +517,7 @@ class DomBackup(_BaseDomBackup):
         return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
     def clean_aborted(self):
-        for disk, prop in self._pending_info.get("disks", {}).items():
+        for disk, prop in self.pending_info.get("disks", {}).items():
             try:
                 self.post_backup_cleaning_snapshot(
                     disk, prop["src"], prop["snapshot"]
@@ -518,7 +531,7 @@ class DomBackup(_BaseDomBackup):
                 )
                 raise
 
-        if self._pending_info.get("tar", None):
+        if self.pending_info.get("tar", None):
             self._clean_aborted_tar()
         else:
             self._clean_aborted_non_tar_img()
@@ -529,12 +542,12 @@ class DomBackup(_BaseDomBackup):
             pass
 
     def _clean_aborted_tar(self):
-        tar_path = self.get_complete_path_of(self._pending_info["tar"])
+        tar_path = self.get_complete_path_of(self.pending_info["tar"])
         if os.path.exists(tar_path):
             self._delete_with_error_printing(tar_path)
 
     def _clean_aborted_non_tar_img(self):
-        for disk in self._pending_info.get("disks", {}).values():
+        for disk in self.pending_info.get("disks", {}).values():
             if not disk.get("target", None):
                 continue
             target_path = self.get_complete_path_of(disk["target"])

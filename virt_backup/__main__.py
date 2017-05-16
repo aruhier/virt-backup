@@ -102,8 +102,11 @@ def build_main_backup_group(groups):
 
 
 def clean_backups(parsed_args, *args, **kwargs):
+    vir_event_loop_native_start()
+
     config = get_setup_config()
-    groups = get_usable_complete_groups(config, parsed_args.groups)
+    conn = get_setup_conn(config)
+    groups = get_usable_complete_groups(config, parsed_args.groups, conn)
     for g in groups:
         g.scan_backup_dir()
         current_group_config = config.get_groups()[g.name]
@@ -154,8 +157,8 @@ def get_setup_conn(config):
     return conn
 
 
-def get_usable_complete_groups(config, only_groups_in=None):
-    groups = complete_groups_from_dict(config.get_groups())
+def get_usable_complete_groups(config, only_groups_in=None, conn=None):
+    groups = complete_groups_from_dict(config.get_groups(), conn=conn)
     for g in groups:
         if not g.backup_dir:
             continue

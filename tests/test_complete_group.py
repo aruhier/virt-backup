@@ -8,6 +8,7 @@ from virt_backup.groups import (
     CompleteBackupGroup, complete_groups_from_dict
 )
 from virt_backup.groups.complete import list_backups_by_domain
+from virt_backup.backups import DomBackup
 
 
 class TestCompleteBackupGroup():
@@ -62,6 +63,34 @@ class TestCompleteBackupGroup():
 
         nb_remaining_backups = sum(len(b) for b in group.backups.values())
         assert len(cleaned) == nb_initial_backups - nb_remaining_backups
+
+    def test_clean_broken(self, build_backup_directory, build_mock_domain,
+                          build_mock_libvirtconn, mocker):
+        build_mock_libvirtconn._domains.append(build_mock_domain)
+        backup_dir = build_backup_directory["backup_dir"]
+        group = CompleteBackupGroup(
+            name="test", backup_dir=str(backup_dir), hosts=["r:.*"],
+            conn=build_mock_libvirtconn
+        )
+
+        dombkup = DomBackup(
+            dom=build_mock_domain,
+            target_dir=backup_dir.mkdir(build_mock_domain.name())
+        )
+        dombkup.pending_info["domain_name"] = build_mock_domain.name()
+        dombkup.pending_info["date"] = 0
+        dombkup._dump_pending_info()
+
+        group.scan_backup_dir()
+        nb_initial_backups = sum(len(b) for b in group.broken_backups.values())
+        assert nb_initial_backups == 1
+
+        broken_backup = group.broken_backups[build_mock_domain.name()][0]
+        mocker.spy(broken_backup, "clean_aborted")
+
+        group.clean_broken_backups()
+        assert not group.broken_backups[build_mock_domain.name()]
+        assert broken_backup.clean_aborted.called
 
 
 def test_complete_groups_from_dict(build_mock_libvirtconn_filled):
