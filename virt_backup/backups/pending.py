@@ -26,7 +26,7 @@ def build_dom_backup_from_pending_info(pending_info, backup_dir, conn):
     backup = DomBackup(
         dom=conn.lookupByName(pending_info["domain_name"]),
         target_dir=backup_dir,
-        dev_disks=pending_info.get("disks", {}).items(),
+        dev_disks=tuple(pending_info.get("disks", {}).keys()),
         compression=pending_info.get("compression", "tar"),
         compression_lvl=pending_info.get("compression_lvl", None)
     )
