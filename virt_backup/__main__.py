@@ -30,6 +30,13 @@ def parse_args():
     sp_clean = sp_action.add_parser("clean", help=("clean groups"))
     sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
                           help="domain group to clean")
+    sp_clean_broken_opts = sp_clean.add_mutually_exclusive_group()
+    sp_clean_broken_opts.add_argument("-b", "--broken-only",
+                                      help="only clean broken backups",
+                                      dest="broken_only", action="store_true")
+    sp_clean_broken_opts.add_argument("-B", "--no-broken",
+                                      help="do not clean broken backups",
+                                      dest="no_broken", action="store_true")
     sp_clean.set_defaults(func=clean_backups)
 
     sp_list = sp_action.add_parser("list", help=("list groups"))
@@ -117,12 +124,14 @@ def clean_backups(parsed_args, *args, **kwargs):
             "monthly": current_group_config.get("monthly", "*"),
             "yearly": current_group_config.get("yearly", "*"),
         }
-        print("Backups removed for group {}: {}".format(
-            g.name or "Undefined", len(g.clean(**clean_params))
-        ))
-        print("Broken backups removed for group {}: {}".format(
-            g.name or "Undefined", len(g.clean_broken_backups())
-        ))
+        if not parsed_args.broken_only:
+            print("Backups removed for group {}: {}".format(
+                g.name or "Undefined", len(g.clean(**clean_params))
+            ))
+        if not parsed_args.no_broken:
+            print("Broken backups removed for group {}: {}".format(
+                g.name or "Undefined", len(g.clean_broken_backups())
+            ))
 
 
 def list_groups(parsed_args, *args, **kwargs):
