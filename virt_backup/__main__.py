@@ -32,13 +32,13 @@ def parse_args():
                           help="domain group to clean")
     sp_clean.set_defaults(func=clean_backups)
 
-    sp_clean = sp_action.add_parser("list", help=("list groups"))
-    sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
-                          help="domain group to clean")
-    sp_clean.add_argument("-s", "--short",
-                          help="short version, do not print details",
-                          dest="short", action="store_true")
-    sp_clean.set_defaults(func=list_groups)
+    sp_list = sp_action.add_parser("list", help=("list groups"))
+    sp_list.add_argument("groups", metavar="group", type=str, nargs="*",
+                         help="domain group to clean")
+    sp_list.add_argument("-s", "--short",
+                         help="short version, do not print details",
+                         dest="short", action="store_true")
+    sp_list.set_defaults(func=list_groups)
 
     # Debug option
     parser.add_argument("-d", "--debug", help="set the debug level",
