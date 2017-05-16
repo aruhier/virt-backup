@@ -86,7 +86,7 @@ def complete_groups_from_dict(groups_dict, conn=None):
             attrs["backup_dir"] = properties["target"]
 
         complete_backup_group = CompleteBackupGroup(
-            name=name, **attrs, conn=conn
+            name=name, conn=conn, **attrs
         )
         return complete_backup_group
 
