@@ -120,6 +120,9 @@ def clean_backups(parsed_args, *args, **kwargs):
         print("Backups removed for group {}: {}".format(
             g.name or "Undefined", len(g.clean(**clean_params))
         ))
+        print("Broken backups removed for group {}: {}".format(
+            g.name or "Undefined", len(g.clean_broken_backups())
+        ))
 
 
 def list_groups(parsed_args, *args, **kwargs):
