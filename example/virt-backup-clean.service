@@ -1,0 +1,12 @@
+[Unit]
+Description=Clean broken backups done by virt-backup
+Wants=libvirtd.service
+After=network.target
+After=libvirtd.service
+
+[Service]
+ExecStart=/usr/bin/virt-backup clean -b
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
