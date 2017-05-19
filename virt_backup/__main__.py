@@ -42,6 +42,9 @@ def parse_args():
     sp_list = sp_action.add_parser("list", help=("list groups"))
     sp_list.add_argument("groups", metavar="group", type=str, nargs="*",
                          help="domain group to clean")
+    sp_list.add_argument("-D", "--domain", metavar="domain_name",
+                         dest="domains_names", action="append", default=[],
+                         help="show list of backups for specific domain")
     sp_list.add_argument("-s", "--short",
                          help="short version, do not print details",
                          dest="short", action="store_true")
@@ -138,6 +141,10 @@ def list_groups(parsed_args, *args, **kwargs):
     config = get_setup_config()
     groups = get_usable_complete_groups(config, parsed_args.groups)
     for g in groups:
+        if parsed_args.domains_names:
+            return list_detailed_backups_for_domain(
+                g, parsed_args.domains_names, short=parsed_args.short
+            )
         g.scan_backup_dir()
         print(" {}\n{}\n".format(g.name, (2 + len(g.name))*"="))
         print("Total backups: {} hosts, {} backups".format(
@@ -149,6 +156,22 @@ def list_groups(parsed_args, *args, **kwargs):
             # yet
             for dom, backups in g.backups.items():
                 print("\t{}: {} backup(s)".format(dom, len(backups)))
+
+
+def list_detailed_backups_for_domain(group, domains_names, short=False):
+    group.hosts = domains_names
+    group.scan_backup_dir()
+    if not group.backups:
+        return
+
+    print(" {}\n{}\n".format(group.name, (2 + len(group.name))*"="))
+    for d, backups in group.backups.items():
+        print("{}: {} backup(s)".format(d, len(backups)))
+        if not short:
+            for b in reversed(sorted(backups, key=lambda x: x.date)):
+                print("\t{}: {}".format(
+                    b.date, b.get_complete_path_of(b.definition_filename)
+                ))
 
 
 def get_setup_config():
