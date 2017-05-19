@@ -172,6 +172,14 @@ class CompleteBackupGroup():
 
         self.broken_backups = broken_backups
 
+    def get_n_nearest_backup(self, domain_name, date, n):
+        backups = self.backups[domain_name]
+        diff_list = sorted(
+            backups, key=lambda b: abs(b.date - date)
+        )
+
+        return diff_list[:n] if diff_list else None
+
     def clean(self, hourly="*", daily="*", weekly="*", monthly="*",
               yearly="*"):
         backups_removed = set()

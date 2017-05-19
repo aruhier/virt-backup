@@ -142,16 +142,6 @@ class TestDomCompleteBackup():
 
         assert filecmp.cmp(src_img, dst_img)
 
-    def test_restore_disk_to_dir(self, get_uncompressed_complete_backup,
-                                 tmpdir):
-        backup = get_uncompressed_complete_backup
-        src_img = backup.get_complete_path_of(backup.disks["vda"])
-        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
-
-        backup.restore_disk_to("vda", str(tmpdir))
-
-        assert filecmp.cmp(src_img, dst_img)
-
     def test_restore_replace_domain(
             self, get_uncompressed_complete_backup, build_mock_libvirtconn,
             monkeypatch):

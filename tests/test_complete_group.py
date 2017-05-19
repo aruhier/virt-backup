@@ -36,6 +36,24 @@ class TestCompleteBackupGroup():
 
         assert not group.backups.keys()
 
+    def test_get_nearest_backup_of(self, build_backup_directory):
+        backup_dir = str(build_backup_directory["backup_dir"])
+        group = CompleteBackupGroup(
+            name="test", backup_dir=backup_dir, hosts=["r:.*"]
+        )
+        group.scan_backup_dir()
+
+        domain_name = next(iter(group.backups.keys()))
+        testing_date = arrow.get("2015")
+        nearest_backup = group.get_n_nearest_backup(
+            domain_name, testing_date, 1
+        )[0]
+
+        difference = abs(testing_date - nearest_backup.date)
+        for b in group.backups[domain_name]:
+            if abs(testing_date - b.date) < difference:
+                assert False
+
     def test_clean(self, build_backup_directory):
         backup_dir = str(build_backup_directory["backup_dir"])
         group = CompleteBackupGroup(
