@@ -95,6 +95,41 @@ class TestDomCompleteBackup():
         with pytest.raises(DomainRunningError):
             backup.restore_and_replace_disk_of("vda", domain, "vda")
 
+    def test_restore_to(self, get_uncompressed_complete_backup, tmpdir):
+        """
+        Test with a not compressed backup
+        """
+        backup = get_uncompressed_complete_backup
+        target_dir = tmpdir.mkdir("extract")
+
+        return self.restore_to(backup, target_dir)
+
+    def test_restore_to_with_tar(self, get_compressed_complete_backup,
+                                 tmpdir):
+        """
+        Test with a not compressed backup
+        """
+        backup = get_compressed_complete_backup
+        target_dir = tmpdir.mkdir("extract")
+
+        return self.restore_to(backup, target_dir)
+
+    def restore_to(self, complete_backup, target):
+        complete_backup.restore_to(str(target))
+
+        # there should be 1 .xml file + all disks
+        assert len(target.listdir()) == 1 + len(complete_backup.disks)
+
+    def test_restore_disk_to_dir(self, get_uncompressed_complete_backup,
+                                 tmpdir):
+        backup = get_uncompressed_complete_backup
+        src_img = backup.get_complete_path_of(backup.disks["vda"])
+        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+
+        backup.restore_disk_to("vda", str(tmpdir))
+
+        assert filecmp.cmp(src_img, dst_img)
+
     def test_restore_disk_to(self, get_uncompressed_complete_backup, tmpdir):
         """
         Test with a not compressed backup
@@ -117,13 +152,13 @@ class TestDomCompleteBackup():
 
         assert filecmp.cmp(src_img, dst_img)
 
-    def test_restore_domain(
+    def test_restore_replace_domain(
             self, get_uncompressed_complete_backup, build_mock_libvirtconn,
             monkeypatch):
         conn = build_mock_libvirtconn
         backup = get_uncompressed_complete_backup
 
-        backup.restore_domain(conn)
+        backup.restore_replace_domain(conn)
 
     def test_restore_domain_to(
             self, get_uncompressed_complete_backup, build_mock_libvirtconn,
@@ -135,7 +170,7 @@ class TestDomCompleteBackup():
         backup = get_uncompressed_complete_backup
 
         # TODO: check if id of the new domain matches
-        backup.restore_domain(conn, id=13)
+        backup.restore_replace_domain(conn, id=13)
 
     def test_restore_compressed_disk_to(
             self, get_compressed_complete_backup, tmpdir):

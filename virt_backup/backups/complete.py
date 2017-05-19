@@ -67,7 +67,7 @@ class DomCompleteBackup(_BaseDomBackup):
                 disk_tarinfo = tar_f.getmember(self.disks[disk])
                 return disk_tarinfo.size
 
-    def restore_domain(self, conn, id=None):
+    def restore_replace_domain(self, conn, id=None):
         """
         :param conn: libvirt connection to the hypervisor
         :param id: new id for the restored domain
@@ -132,6 +132,16 @@ class DomCompleteBackup(_BaseDomBackup):
                         return elem
             except IndexError:
                 continue
+
+    def restore_to(self, target):
+        if not os.path.exists(target):
+            os.makedirs(target)
+
+        for d in self.disks:
+            self.restore_disk_to(d, target)
+        xml_path = "{}.xml".format(os.path.join(target, self.dom_name))
+        with open(xml_path, "w") as xml_file:
+            xml_file.write(self.dom_xml)
 
     def restore_disk_to(self, disk, target):
         """
