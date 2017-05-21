@@ -140,15 +140,17 @@ class CompleteBackupGroup():
             backups_by_domain.keys(), self.hosts
         )
         for dom_name in domains_to_include:
-            backups[dom_name] = [
-                build_dom_complete_backup_from_def(
-                    definition,
-                    backup_dir=os.path.dirname(definition_filename),
-                    definition_filename=definition_filename
-                )
-                for definition_filename, definition
-                in backups_by_domain[dom_name]
-            ]
+            backups[dom_name] = sorted(
+                (
+                    build_dom_complete_backup_from_def(
+                        definition,
+                        backup_dir=os.path.dirname(definition_filename),
+                        definition_filename=definition_filename
+                    )
+                    for definition_filename, definition
+                    in backups_by_domain[dom_name]
+                ), key=lambda b: b.date
+            )
 
         self.backups = backups
 
@@ -161,15 +163,17 @@ class CompleteBackupGroup():
             broken_backups_by_domain.keys(), self.hosts
         )
         for dom_name in domains_to_include:
-            broken_backups[dom_name] = [
-                build_dom_backup_from_pending_info(
-                    pending_info,
-                    backup_dir=os.path.dirname(pending_info_json),
-                    conn=self.conn
-                )
-                for pending_info_json, pending_info
-                in broken_backups_by_domain[dom_name]
-            ]
+            broken_backups[dom_name] = sorted(
+                (
+                    build_dom_backup_from_pending_info(
+                        pending_info,
+                        backup_dir=os.path.dirname(pending_info_json),
+                        conn=self.conn
+                    )
+                    for pending_info_json, pending_info
+                    in broken_backups_by_domain[dom_name]
+                ), key=lambda b: b.pending_info.get("date", None)
+            )
 
         self.broken_backups = broken_backups
 

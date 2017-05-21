@@ -137,8 +137,11 @@ class DomCompleteBackup(_BaseDomBackup):
         if not os.path.exists(target):
             os.makedirs(target)
 
+        # TODO: store the original images names in the definition file
+        disks_src = get_domain_disks_of(self.dom_xml)
         for d in self.disks:
-            self.restore_disk_to(d, target)
+            original_img_name = os.path.basename(disks_src[d]["src"])
+            self.restore_disk_to(d, os.path.join(target, original_img_name))
         xml_path = "{}.xml".format(os.path.join(target, self.dom_name))
         with open(xml_path, "w") as xml_file:
             xml_file.write(self.dom_xml)

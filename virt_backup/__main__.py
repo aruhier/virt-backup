@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
+import arrow
 import libvirt
 import logging
 import sys
 import threading
 
+from .exceptions import BackupNotFoundError
 from .groups import groups_from_dict, BackupGroup, complete_groups_from_dict
 from .config import get_config, Config
 from . import APP_NAME, VERSION
 
 
-logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("virt_backup")
 
 
 def parse_args():
@@ -26,6 +28,17 @@ def parse_args():
     sp_backup.add_argument("groups", metavar="group", type=str, nargs="*",
                            help="domain group to backup")
     sp_backup.set_defaults(func=start_backups)
+
+    sp_restore = sp_action.add_parser("restore", help=("restore backup"))
+    sp_restore.add_argument("group", metavar="group",
+                            help="domain group")
+    sp_restore.add_argument("domain_name", metavar="domain",
+                            help="domain name")
+    sp_restore.add_argument("--date", metavar="date",
+                            help="backup date (default: last backup)")
+    sp_restore.add_argument("target_dir", metavar="target_dir",
+                            help="backup date")
+    sp_restore.set_defaults(func=restore_backup)
 
     sp_clean = sp_action.add_parser("clean", help=("clean groups"))
     sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
@@ -109,6 +122,34 @@ def build_main_backup_group(groups):
         for d in g.backups:
             main_group.add_dombackup(d)
     return main_group
+
+
+def restore_backup(parsed_args, *args, **kwargs):
+    vir_event_loop_native_start()
+
+    config = get_setup_config()
+    conn = get_setup_conn(config)
+    try:
+        group = next(
+            get_usable_complete_groups(config, [parsed_args.group], conn)
+        )
+    except StopIteration:
+        logger.critical("Group {} not found".format(parsed_args.group))
+        sys.exit(1)
+    group.scan_backup_dir()
+
+    domain_name = parsed_args.domain_name
+    target_dir = parsed_args.target_dir
+    target_date = arrow.get(parsed_args.date) if parsed_args.date else None
+
+    if target_date:
+        backup = group.get_backup_at_date(domain_name, target_date)
+    else:
+        try:
+            backup = group.backups[domain_name][-1]
+        except KeyError:
+            raise BackupNotFoundError
+    backup.restore_to(target_dir)
 
 
 def clean_backups(parsed_args, *args, **kwargs):
