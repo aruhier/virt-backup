@@ -9,6 +9,7 @@ from virt_backup.groups import (
 )
 from virt_backup.groups.complete import list_backups_by_domain
 from virt_backup.backups import DomBackup
+from virt_backup.exceptions import BackupNotFoundError
 
 
 class TestCompleteBackupGroup():
@@ -36,6 +37,33 @@ class TestCompleteBackupGroup():
 
         assert not group.backups.keys()
 
+    def test_get_backup_at_date(self, build_backup_directory):
+        group = self.prepare_get_backup_at_date(build_backup_directory)
+
+        domain_name = next(iter(group.backups.keys()))
+        testing_date = arrow.get("2016-07-08 17:40:02")
+
+        backup = group.get_backup_at_date(domain_name, testing_date)
+        assert backup.date == testing_date
+
+    def test_get_backup_at_date_unexisting(self, build_backup_directory):
+        group = self.prepare_get_backup_at_date(build_backup_directory)
+
+        domain_name = next(iter(group.backups.keys()))
+        testing_date = arrow.get("2016-07-09 17:40:02")
+
+        with pytest.raises(BackupNotFoundError):
+            backup = group.get_backup_at_date(domain_name, testing_date)
+
+    def prepare_get_backup_at_date(self, build_backup_directory):
+        backup_dir = str(build_backup_directory["backup_dir"])
+        group = CompleteBackupGroup(
+            name="test", backup_dir=backup_dir, hosts=["r:.*"]
+        )
+        group.scan_backup_dir()
+
+        return group
+
     def test_get_nearest_backup_of(self, build_backup_directory):
         backup_dir = str(build_backup_directory["backup_dir"])
         group = CompleteBackupGroup(
@@ -51,8 +79,7 @@ class TestCompleteBackupGroup():
 
         difference = abs(testing_date - nearest_backup.date)
         for b in group.backups[domain_name]:
-            if abs(testing_date - b.date) < difference:
-                assert False
+            assert abs(testing_date - b.date) >= difference
 
     def test_clean(self, build_backup_directory):
         backup_dir = str(build_backup_directory["backup_dir"])

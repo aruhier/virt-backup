@@ -8,6 +8,7 @@ import os
 from virt_backup.backups import (
     build_dom_complete_backup_from_def, build_dom_backup_from_pending_info
 )
+from virt_backup.exceptions import BackupNotFoundError, DomainNotFoundError
 from .pattern import domains_matching_with_patterns
 
 
@@ -172,8 +173,24 @@ class CompleteBackupGroup():
 
         self.broken_backups = broken_backups
 
+    def get_backup_at_date(self, domain_name, date):
+        try:
+            backups = self.backups[domain_name]
+        except KeyError:
+            raise DomainNotFoundError(domain_name)
+
+        for b in backups:
+            if b.date == date:
+                return b
+
+        raise BackupNotFoundError
+
     def get_n_nearest_backup(self, domain_name, date, n):
-        backups = self.backups[domain_name]
+        try:
+            backups = self.backups[domain_name]
+        except KeyError:
+            raise DomainNotFoundError(domain_name)
+
         diff_list = sorted(
             backups, key=lambda b: abs(b.date - date)
         )
