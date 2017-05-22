@@ -24,7 +24,6 @@ groups:
       - domainname2
       - "r:.*"
       - "!domainname3"
-      - "!g:stable"
       - "r:^dom.*"
 
 # vim: set ts=2 sw=2:
