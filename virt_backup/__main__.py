@@ -24,7 +24,8 @@ def parse_args():
     # Start/Stop/Show command
     sp_action = parser.add_subparsers()
 
-    sp_backup = sp_action.add_parser("backup", help=("backup groups"))
+    sp_backup = sp_action.add_parser("backup", aliases=["bak"],
+                                     help=("backup groups"))
     sp_backup.add_argument("groups", metavar="group", type=str, nargs="*",
                            help="domain group to backup")
     sp_backup.set_defaults(func=start_backups)
@@ -40,7 +41,8 @@ def parse_args():
                             help="backup date")
     sp_restore.set_defaults(func=restore_backup)
 
-    sp_clean = sp_action.add_parser("clean", help=("clean groups"))
+    sp_clean = sp_action.add_parser("clean", aliases=["cl"],
+                                    help=("clean groups"))
     sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
                           help="domain group to clean")
     sp_clean_broken_opts = sp_clean.add_mutually_exclusive_group()
@@ -52,7 +54,8 @@ def parse_args():
                                       dest="no_broken", action="store_true")
     sp_clean.set_defaults(func=clean_backups)
 
-    sp_list = sp_action.add_parser("list", help=("list groups"))
+    sp_list = sp_action.add_parser("list", aliases=["ls"],
+                                   help=("list groups"))
     sp_list.add_argument("groups", metavar="group", type=str, nargs="*",
                          help="domain group to clean")
     sp_list.add_argument("-D", "--domain", metavar="domain_name",
