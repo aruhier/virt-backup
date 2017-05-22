@@ -228,12 +228,31 @@ def get_setup_config():
 
 
 def get_setup_conn(config):
-    conn = libvirt.open(config["uri"])
+    if config.get("username"):
+        conn = _get_auth_conn(config)
+    else:
+        conn = libvirt.open(config["uri"])
     if conn is None:
         print('Failed to open connection to the hypervisor')
         sys.exit(1)
     conn.setKeepAlive(5, 3)
     return conn
+
+
+def _get_auth_conn(config):
+    def request_cred(credentials, user_data):
+        for credential in credentials:
+            if credential[0] == libvirt.VIR_CRED_AUTHNAME:
+                credential[4] = config.get("username")
+            elif credential[0] == libvirt.VIR_CRED_PASSPHRASE:
+                credential[4] = config.get("password")
+        return 0
+
+    auth = [
+        [libvirt.VIR_CRED_AUTHNAME, libvirt.VIR_CRED_PASSPHRASE],
+        request_cred, None
+    ]
+    return libvirt.openAuth(config["uri"], auth, 0)
 
 
 def get_usable_complete_groups(config, only_groups_in=None, conn=None):
