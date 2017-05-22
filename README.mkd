@@ -1,15 +1,154 @@
-virt-backup [WORK IN PROGRESS]
-===============================
+virt-backup
+===========
 
 [![Build Status](https://travis-ci.org/Anthony25/virt-backup.svg?branch=master)](https://travis-ci.org/Anthony25/virt-backup)  [![Coverage Status](https://coveralls.io/repos/github/Anthony25/virt-backup/badge.svg?branch=master)](https://coveralls.io/github/Anthony25/virt-backup?branch=master)
 
-Backup your kvm guests (using the blockcommit feature) managed by libvirt. The
-main goal is to do a modest alternative to the Proxmox VE backup system
-(without their vma system), to automatically backup your disks (with optional
-compression) and easily restore one.
+Do external backup of your KVM guests, managed by libvirt, using the
+BlockCommit feature. The main goal is to do a modest alternative to the Proxmox
+VE backup system (without their vma system) to automatically backup your disks
+(with optional compression) and easily restore ones. Guests are configured by
+groups, and can be matched via regex.
 
-**For the moment, the mainfile is really specific to my testing setup.**
 
+Installation
+------------
+
+Run:
+
+```
+pip3 install virt-backup
+```
+
+If you are running on ArchLinux, virt-backup is available through the AUR
+package `virt-backup`.
+virt-backup is tested under Python 3.4, 3.5 and 3.6.
+
+virt-backup should have access to every disk image desired to be backup. It
+should also be able to run `qemu-img` (normally installed with libvirt), as it
+is used to backup inactive domains.
+
+
+Configuration
+-------------
+
+The configuration file is looked up into the following paths, in this specific
+order: `~/.config/virt-backup/config.yml`, `/etc/virt-backup/config.yml`, and,
+if you cloned this repository, in the project's root.
+
+A self-documented example is available in `example/config.yml`.
+
+
+Usage
+-----
+
+Run the application by calling `virt-backup`:
+
+```
+$ virt-backup -h
+usage: virt-backup [-h] [-d] [--version]
+                   {backup,bak,restore,clean,cl,list,ls} ...
+
+Backup and restore your kvm libvirt domains
+
+positional arguments:
+  {backup,bak,restore,clean,cl,list,ls}
+    backup (bak)        backup groups
+    restore             restore backup
+    clean (cl)          clean groups
+    list (ls)           list groups
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -d, --debug           set the debug level
+  --version             show program's version number and exit
+```
+
+### Backup
+
+Subcommand allowing to start the backup for all (except those with the
+`autostart` option disabled) or only the specified groups.
+
+```
+$ virt-backup backup -h
+usage: virt-backup backup [-h] [group [group ...]]
+
+positional arguments:
+  group       domain group to backup
+```
+
+For each domain matching a group, the following process is followed:
+  1. An external snapshot is created for all disks concerned by the backup, in
+     order to freeze the images. For the same domain, all snapshots are created
+     are the same time, so there is no inconsistency between disks.
+  2. A temporary file is created in the backup directory, containing all info
+     to revert the backup if virt-backup crashed during the process (resulting
+     in a broken backup and external snapshots that have not been removed).
+     These backups can be cleaned by using the `clean` subcommand.
+  3. Images are copied.
+  4. BlockCommit is used to merge temporary external snapshots with their base
+     disk, and to pivot to the original disk. If the domain is inactive,
+     libvirt cannot achieve this step, so qemu-img is used.
+  5. Remove all temporary file.
+
+
+### List
+
+List a short summary of multiple or all groups. If a domain name is specified,
+it will list all its backups, sorted by date.
+
+```
+$ virt-backup list -h
+usage: virt-backup list [-h] [-D domain_name] [-s] [group [group ...]]
+
+positional arguments:
+  group                 domain group to clean
+
+optional arguments:
+  -D domain_name, --domain domain_name
+                        show list of backups for specific domain
+  -s, --short           short version, do not print details
+```
+
+### Restore
+
+Restore a backup. If no date is specified, it will restore the last backup
+found for the specified group and domain.
+
+```
+$ virt-backup restore -h
+usage: virt-backup restore [-h] [--date date] group domain target_dir
+
+positional arguments:
+  group        domain group
+  domain       domain name
+  target_dir   backup date
+
+optional arguments:
+  --date date  backup date (default: last backup)
+```
+
+### Clean
+
+Clean complete backups, depending on the retention policy (as defined for each
+group in the configuration), and broken backups.
+
+A systemd service is available in `example/virt-backup-clean.service` to
+trigger a cleaning of all broken backups at start. This way, if the hypervisor
+crashed during a backup, the service will clean all temporary files and pivot
+all disks on their original images (instead of running on a temporary
+external snapshot).
+
+```
+$ virt-backup clean -h
+usage: virt-backup clean [-h] [-b | -B] [group [group ...]]
+
+positional arguments:
+  group              domain group to clean
+
+optional arguments:
+  -b, --broken-only  only clean broken backups
+  -B, --no-broken    do not clean broken backups
+```
 
 License
 -------

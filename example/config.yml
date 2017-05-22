@@ -1,29 +1,85 @@
 ---
 
-debug: true
-uri: "qemu:///system"
-# username:
-# passphrase:
+########################
+#### Global options ####
+########################
 
+## Be more verbose ##
+debug: False
+
+
+############################
+#### Libvirt connection ####
+############################
+
+## Libvirt URI ##
+uri: "qemu:///system"
+
+## Libvirt authentication, if needed ##
+username:
+passphrase:
+
+
+#######################
+#### Backup groups ####
+#######################
+
+## Groups are here to share the same backup options between multiple domains.
+## That way, it is possible, for example, to have a different policy retention
+## for a pool of guests in testing than for the one in production.
+
+## Define default options for all groups. ##
+default:
+  daily: 4
+  weekly: 2
+  monthly: 5
+  yearly: 1
+
+## Groups definition ##
 groups:
+  ## Group name ##
   test:
+    ## Backup directory ##
     target: /mnt/kvm/backups
+
+    ## Compression to use for each backup:
+    ##   None: images will be copied as they are
+    ##   tar: images will be packaged in a tar file
+    ##   xz: images will be packaged in a tar file with xz compression
+    ##   gz: images will be packaged in a tar file with gzip compression
+    ##   bz2: images will be packaged in a tar file with bz2 compression
     compression: xz
 
+    ## When doing `virt-backup backup` without specifying any group, only
+    ## groups with the autostart option enabled will be backup.
     autostart: True
+
+    ## Retention policy: the first backup of the day is considered as the
+    ## "daily" backup, first of the week "weekly", etc. The following options
+    ## detail how many backups of each type has to be kept. Set `None` for an
+    ## infinite retention.
+    hourly: 1
     daily: 3
     weekly: 2
     monthly: 5
     yearly: 1
 
+    ## Hosts definition ##
     hosts:
+      ## This policy will match the domain "domainname" in libvirt, and will
+      ## backup the disks "vba" and "vdb" only.
       - host: domainname
         disks:
           - vda
           - vdb
+      ## Will backup all disks of "domainname2" ##
       - domainname2
-      - "r:.*"
+      ## Regex that will match for all domains starting with "prod". The regex
+      ## syntax is the same as the python one
+      - "r:^prod.*"
+      ## Exclude the domain domainname3 (useful with regex, for example)
       - "!domainname3"
-      - "r:^dom.*"
+      ## Exclude all domains starting with "test"
+      - "!r:^test.*"
 
 # vim: set ts=2 sw=2:
