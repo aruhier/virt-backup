@@ -74,9 +74,8 @@ class TestConfig():
     def test_get_groups(self, get_testing_config):
         conf = Config()
 
-        conf["default"] = {"directory_by_domain": True, "daily": 4}
+        conf["default"] = {"daily": 4}
         conf["groups"] = {"test_group": {"daily": 3, }, }
 
         groups = conf.get_groups()
         assert groups["test_group"]["daily"] == 3
-        assert groups["test_group"]["directory_by_domain"]

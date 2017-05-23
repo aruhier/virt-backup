@@ -83,8 +83,7 @@ class TestBackupGroup():
 
     def test_start_with_dir_by_domain(self, build_mock_domain, mocker):
         backup_group = BackupGroup(
-            domlst=(build_mock_domain, ), directory_by_domain=True,
-            target_dir="/tmp"
+            domlst=(build_mock_domain, ), target_dir="/tmp"
         )
         dombackup = backup_group.backups[0]
         dombackup.start = mocker.stub()

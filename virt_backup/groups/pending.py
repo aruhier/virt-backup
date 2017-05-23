@@ -58,7 +58,7 @@ class BackupGroup():
     Group of libvirt domain backups
     """
     def __init__(self, name="unnamed", domlst=None, autostart=True,
-                 directory_by_domain=False, **default_bak_param):
+                 **default_bak_param):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value

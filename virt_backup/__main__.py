@@ -228,7 +228,7 @@ def get_setup_config():
 
 
 def get_setup_conn(config):
-    if config.get("username"):
+    if config.get("username", None):
         conn = _get_auth_conn(config)
     else:
         conn = libvirt.open(config["uri"])

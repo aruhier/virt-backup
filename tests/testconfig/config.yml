@@ -6,8 +6,6 @@ uri: "qemu:///system"
 # passphrase:
 
 default:
-  directory_by_domain: True
-
   daily: 4
   weekly: 2
   monthly: 5
