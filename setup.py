@@ -30,7 +30,7 @@ setup(
     ],
 
     keywords="libvirt",
-    packages=["virt_backup", ],
+    packages=["virt_backup", "virt_backup.groups", "virt_backup.backups"],
     install_requires=[
         "appdirs", "argparse", "arrow", "defusedxml", "libvirt-python", "lxml",
         "tqdm", "PyYAML"

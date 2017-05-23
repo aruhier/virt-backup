@@ -7,10 +7,12 @@ import logging
 import sys
 import threading
 
-from .exceptions import BackupNotFoundError
-from .groups import groups_from_dict, BackupGroup, complete_groups_from_dict
-from .config import get_config, Config
-from . import APP_NAME, VERSION
+from virt_backup.exceptions import BackupNotFoundError
+from virt_backup.groups import (
+    groups_from_dict, BackupGroup, complete_groups_from_dict
+)
+from virt_backup.config import get_config, Config
+from virt_backup import APP_NAME, VERSION
 
 
 logger = logging.getLogger("virt_backup")
