@@ -2,8 +2,8 @@
 
 
 class BackupNotFoundError(Exception):
-    def __str__(self):
-        return "BackupNotFoundError: backup not found"
+    def __init__(self):
+        super().__init__("backup not found")
 
 
 class DiskNotFoundError(Exception):
@@ -11,18 +11,12 @@ class DiskNotFoundError(Exception):
     Disk not found in a domain
     """
     def __init__(self, disk):
-        self.disk = disk
-
-    def __str__(self):
-        return "DiskNotFoundError: disk {} not found".format(self.disk)
+        super().__init__("disk {} not found".format(disk))
 
 
 class DomainNotFoundError(Exception):
     def __init__(self, domain):
-        self.domain = domain
-
-    def __str__(self):
-        return "DomainNotFoundError: domain {} not found".format(self.domain)
+        super().__init__("domain {} not found".format(domain))
 
 
 class DomainRunningError(Exception):
@@ -30,10 +24,8 @@ class DomainRunningError(Exception):
     Domain is running when a task would need it to be shutdown
     """
     def __init__(self, domain):
-        self.domain = domain
-
-    def __str__(self):
-        return (
+        message = (
             "DomainRunningError: domain {} need to be shutdown to perform the "
             "task"
-        ).format(self.domain)
+        ).format(domain)
+        super().__init__(message)
