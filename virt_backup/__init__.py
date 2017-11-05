@@ -1,2 +1,2 @@
 APP_NAME = "virt-backup"
-VERSION = "0.1.3"
+VERSION = "0.1.4"
