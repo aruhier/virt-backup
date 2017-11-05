@@ -19,6 +19,7 @@ before_install:
   - sudo apt-get install -y libvirt-dev
 
 install:
+  - pip install -U --force-reinstall setuptools
   - pip install -U tox
 
 script:
