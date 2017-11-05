@@ -121,6 +121,9 @@ class DomBackup(_BaseDomBackup):
         logger.info("Backup started for domain {}".format(self.dom.name()))
         definition = self.get_definition()
         definition["disks"] = {}
+
+        logger.debug("Create dir {}".format(self.target_dir))
+        os.mkdir(self.target_dir)
         try:
             callback_id = self.conn.domainEventRegisterAny(
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
@@ -146,7 +149,8 @@ class DomBackup(_BaseDomBackup):
             self.post_backup(callback_id, backup_target)
             self._clean_pending_info()
         except:
-            self.post_backup(callback_id, backup_target)
+            if callback_id:
+                self.post_backup(callback_id, backup_target)
             self.clean_aborted()
             raise
         logger.info("Backup finished for domain {}".format(self.dom.name()))
