@@ -122,8 +122,9 @@ class DomBackup(_BaseDomBackup):
         definition = self.get_definition()
         definition["disks"] = {}
 
-        logger.debug("Create dir {}".format(self.target_dir))
-        os.mkdir(self.target_dir)
+        if not os.path.exists(self.target_dir):
+            logger.debug("Create dir {}".format(self.target_dir))
+            os.mkdir(self.target_dir)
         try:
             callback_id = self.conn.domainEventRegisterAny(
                 None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
