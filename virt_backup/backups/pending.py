@@ -380,19 +380,30 @@ class DomBackup(_BaseDomBackup):
 
     def post_backup_cleaning_snapshot(self, disk, disk_path, snapshot_path):
         snapshot_path = os.path.abspath(snapshot_path)
+
+        # Do not commit and pivot if our snapshot is not the current top disk
+        current_disk_path = get_xml_block_of_disk(
+            self.dom.XMLDesc(), disk
+        ).xpath("source")[0].get("file")
+        if os.path.abspath(current_disk_path) != snapshot_path:
+            logger.warning(
+                "It seems that the domain configuration (and specifically the "
+                "one related to its disks) has been changed. The current disk "
+                "will not be committed nor pivoted with the external "
+                "snapshot, to not break the backing chain.\n\n"
+
+                "You might want to manually check, where your domain image is "
+                "stored, if no temporary file is remaining ({}).".format(
+                    os.path.dirname(current_disk_path)
+                )
+            )
+            return
+
         if self.dom.isActive():
             self._blockcommit_disk(disk)
         else:
             self._qemu_img_commit(disk_path, snapshot_path)
-
-            # Only pivot disk if our snapshot is the current top disk
-            current_disk_path = get_xml_block_of_disk(
-                self.dom.XMLDesc(), disk
-            ).xpath("source")[0].get("file")
-            if os.path.abspath(current_disk_path) == snapshot_path:
-                self._manually_pivot_disk(disk, disk_path)
-
-            os.remove(snapshot_path)
+            self._manually_pivot_disk(disk, disk_path)
 
     def post_backup(self, callback_id, backup_target):
         """
