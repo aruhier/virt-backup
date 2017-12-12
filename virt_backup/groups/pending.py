@@ -36,9 +36,7 @@ def groups_from_dict(groups_dict, conn):
         logger.debug("Include domains: {}".format(include))
         logger.debug("Exclude domains: {}".format(exclude))
 
-        # replace some properties by the correct ones
-        if properties.get("target", None):
-            properties["target_dir"] = properties.pop("target")
+        sanitize_properties(properties)
 
         backup_group = BackupGroup(name=name, conn=conn, **properties)
         for i in include:
@@ -49,6 +47,20 @@ def groups_from_dict(groups_dict, conn):
 
         return backup_group
 
+    def sanitize_properties(properties):
+        # replace some properties by the correct ones
+        if properties.get("target", None):
+            properties["target_dir"] = properties.pop("target")
+
+        # pop params related to complete groups only
+        for prop in ("hourly", "daily", "weekly", "monthly", "yearly"):
+            try:
+                properties.pop(prop)
+            except KeyError:
+                continue
+
+        return properties
+
     for group_name, group_properties in groups_dict.items():
         yield build(group_name, group_properties)
 
@@ -58,8 +70,7 @@ class BackupGroup():
     Group of libvirt domain backups
     """
     def __init__(self, name="unnamed", domlst=None, autostart=True,
-                 hourly="*", daily="*", weekly="*", monthly="*",
-                 yearly="*", **default_bak_param):
+                 **default_bak_param):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -74,12 +85,6 @@ class BackupGroup():
 
         #: does this group have to be autostarted from the main function or not
         self.autostart = autostart
-
-        self.hourly = hourly
-        self.daily = daily
-        self.weekly = weekly
-        self.monthly = monthly
-        self.yearly = yearly
 
         #: default attributes for new created domain backups. Keys and values
         #  correspond to what a DomBackup object expect as attributes

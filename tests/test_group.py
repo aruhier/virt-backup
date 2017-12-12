@@ -121,25 +121,6 @@ class TestBackupGroup():
         for b in backup_group.backups:
             assert b.target_dir is "/test"
 
-    def test_start_all_attributes(self, build_mock_domain, mocker):
-        """
-        Test with the example config, containing every possible attribute
-
-        Related to issue #13
-        """
-        backup_group = BackupGroup(
-            domlst=(build_mock_domain, ),
-            compression="xz",
-            autostart=True,
-            hourly=1,
-            daily=3,
-            weekly=2,
-            monthly=5,
-            yearly=1,
-        )
-        backup_group.backups[0].start = mocker.stub()
-        backup_group.start()
-
 
 def test_pattern_matching_domains_in_libvirt_regex(
     build_mock_libvirtconn_filled
@@ -262,6 +243,36 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
     matching_backup = dombackups[0]
     assert matching_backup.dom.name() == "matching"
     assert tuple(sorted(matching_backup.disks.keys())) == ("vda", "vdb")
+
+
+def test_groups_from_sanitize_dict_all_config_group_param(
+        build_mock_libvirtconn_filled):
+    """
+    Test with the example config, containing every possible parameter
+
+    Related to issue #13
+    """
+    conn = build_mock_libvirtconn_filled
+    groups_config = {
+        "test": {
+            "target": "/mnt/test",
+            "compression": "tar",
+            "autostart": True,
+            "hourly": 1,
+            "daily": 3,
+            "weekly": 2,
+            "monthly": 5,
+            "yearly": 1,
+            "hosts": [
+                {"host": "r:^matching\d?$", "disks": ["vda", "vdb"]},
+                "!matching2", "nonexisting"
+            ],
+        },
+    }
+    group = next(iter(groups_from_dict(groups_config, conn)))
+
+    for prop in ("hourly", "daily", "weekly", "monthly", "yearly"):
+        assert prop not in group.default_bak_param
 
 
 def test_groups_from_dict_multiple_groups(
