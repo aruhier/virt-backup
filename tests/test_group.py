@@ -121,6 +121,25 @@ class TestBackupGroup():
         for b in backup_group.backups:
             assert b.target_dir is "/test"
 
+    def test_start_all_attributes(self, build_mock_domain, mocker):
+        """
+        Test with the example config, containing every possible attribute
+
+        Related to issue #13
+        """
+        backup_group = BackupGroup(
+            domlst=(build_mock_domain, ),
+            compression="xz",
+            autostart=True,
+            hourly=1,
+            daily=3,
+            weekly=2,
+            monthly=5,
+            yearly=1,
+        )
+        backup_group.backups[0].start = mocker.stub()
+        backup_group.start()
+
 
 def test_pattern_matching_domains_in_libvirt_regex(
     build_mock_libvirtconn_filled
