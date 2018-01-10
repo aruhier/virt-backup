@@ -17,7 +17,7 @@ groups:
     target: /mnt/kvm/backups
     compression: xz
 
-    autostart: True
+    autostart: true
     daily: 3
     weekly: 2
     monthly: 5
@@ -28,9 +28,9 @@ groups:
           - vda
           - vdb
       - domainname2
-      - r:".*"
+      - "r:.*"
       - "!domainname3"
       - "!g:stable"
-      - r:"^dom.*"
+      - "r:^dom.*"
 
 # vim: set ts=2 sw=2:

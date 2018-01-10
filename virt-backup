@@ -7,4 +7,4 @@ Libvirt Backup
 from virt_backup import __main__
 
 if __name__ == "__main__":
-    __main__.parse_args()
+    __main__.parse_args_and_run(__main__.build_parser())
