@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-
-
 class BackupNotFoundError(Exception):
     def __init__(self):
         super().__init__("backup not found")
