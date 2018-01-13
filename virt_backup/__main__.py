@@ -69,7 +69,7 @@ def build_parser():
     sp_list.set_defaults(func=list_groups)
 
     # Debug option
-    parser.add_argument("-d", "--debug", help="set the debug level",
+    parser.add_argument("-d", "--debug", help="enable debug, verbose output",
                         dest="debug", action="store_true")
     parser.add_argument(
         "--version", action="version",
