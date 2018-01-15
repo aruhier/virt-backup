@@ -100,7 +100,7 @@ def is_domain_matching_with(domain_name, pattern):
         matches = re.match(pattern, domain_name)
     elif pattern.startswith("g:"):
         # TODO: to implement
-        pass
+        matches = False
     else:
         matches = pattern == domain_name
 

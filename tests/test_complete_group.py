@@ -18,24 +18,40 @@ class TestCompleteBackupGroup():
         backups_def = list_backups_by_domain(str(backup_dir))
 
         group = CompleteBackupGroup(
-            name="test", backup_dir=backup_dir, hosts=["r:.*"]
+            name="test", backup_dir=backup_dir, hosts=("r:.*",)
         )
         group.scan_backup_dir()
 
         assert sorted(group.backups.keys()) == sorted(backups_def.keys())
         for dom in group.backups:
-            len(group.backups[dom]) == len(backups_def[dom])
+            assert len(group.backups[dom]) == len(backups_def[dom])
 
     def test_scan_backup_dir_without_host(self, build_backup_directory):
         backup_dir = str(build_backup_directory["backup_dir"])
-        backups_def = list_backups_by_domain(str(backup_dir))
 
         group = CompleteBackupGroup(
-            name="test", backup_dir=backup_dir, hosts=[]
+            name="test", backup_dir=backup_dir, hosts=tuple()
         )
         group.scan_backup_dir()
 
         assert not group.backups.keys()
+
+    def test_scan_backup_dir_several_patterns(self,
+                                              build_backup_directory):
+        backup_dir = str(build_backup_directory["backup_dir"])
+        backups_def = list_backups_by_domain(str(backup_dir))
+
+        # g: should do nothing for now, but test if passing
+        group = CompleteBackupGroup(
+            name="test", backup_dir=backup_dir,
+            hosts=("a", "r:^[b-z].*", "g:all")
+        )
+        group.scan_backup_dir()
+
+        assert group.backups
+        assert sorted(group.backups.keys()) == sorted(backups_def.keys())
+        for dom in group.backups:
+            assert len(group.backups[dom]) == len(backups_def[dom])
 
     def test_get_backup_at_date(self, build_backup_directory):
         group = self.prepare_get_backup_at_date(build_backup_directory)
@@ -53,7 +69,7 @@ class TestCompleteBackupGroup():
         testing_date = arrow.get("2016-07-09 17:40:02")
 
         with pytest.raises(BackupNotFoundError):
-            backup = group.get_backup_at_date(domain_name, testing_date)
+            group.get_backup_at_date(domain_name, testing_date)
 
     def prepare_get_backup_at_date(self, build_backup_directory):
         backup_dir = str(build_backup_directory["backup_dir"])

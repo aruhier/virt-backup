@@ -143,16 +143,14 @@ class TestDomCompleteBackup():
         assert filecmp.cmp(src_img, dst_img)
 
     def test_restore_replace_domain(
-            self, get_uncompressed_complete_backup, build_mock_libvirtconn,
-            monkeypatch):
+            self, get_uncompressed_complete_backup, build_mock_libvirtconn):
         conn = build_mock_libvirtconn
         backup = get_uncompressed_complete_backup
 
         backup.restore_replace_domain(conn)
 
     def test_restore_domain_to(
-            self, get_uncompressed_complete_backup, build_mock_libvirtconn,
-            monkeypatch):
+            self, get_uncompressed_complete_backup, build_mock_libvirtconn):
         """
         Test to restore the domain to a specific id
         """

@@ -18,7 +18,7 @@ from virt_backup import APP_NAME, VERSION
 logger = logging.getLogger("virt_backup")
 
 
-def parse_args():
+def build_parser():
     parser = argparse.ArgumentParser(
         description="Backup and restore your kvm libvirt domains"
     )
@@ -69,25 +69,32 @@ def parse_args():
     sp_list.set_defaults(func=list_groups)
 
     # Debug option
-    parser.add_argument("-d", "--debug", help="set the debug level",
+    parser.add_argument("-d", "--debug", help="enable debug, verbose output",
                         dest="debug", action="store_true")
     parser.add_argument(
         "--version", action="version",
         version="{} {}".format(APP_NAME, VERSION)
     )
-    arg_parser = parser
 
+    return parser
+
+
+def parse_args_and_run(parser):
     # Parse argument
-    args = arg_parser.parse_args()
+    args = parser.parse_args()
 
     if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(
+            level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s"
+        )
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     # Execute correct function, or print usage
     if hasattr(args, "func"):
         args.func(parsed_args=args)
     else:
-        arg_parser.print_help()
+        parser.print_help()
         sys.exit(1)
 
 
@@ -200,7 +207,7 @@ def list_groups(parsed_args, *args, **kwargs):
             print("Hosts:")
             # TODO: Should also print hosts matching in libvirt but not backup
             # yet
-            for dom, backups in g.backups.items():
+            for dom, backups in sorted(g.backups.items()):
                 print("\t{}: {} backup(s)".format(dom, len(backups)))
 
 
@@ -278,4 +285,4 @@ def build_all_or_selected_groups(config, conn, groups=None):
 
 
 if __name__ == "__main__":
-    parse_args()
+    parse_args_and_run(build_parser())
