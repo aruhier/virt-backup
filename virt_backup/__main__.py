@@ -83,7 +83,12 @@ def parse_args_and_run(parser):
     # Parse argument
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    if args.debug:
+        logging.basicConfig(
+            level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s"
+        )
+    else:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     # Execute correct function, or print usage
     if hasattr(args, "func"):
