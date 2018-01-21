@@ -1,6 +1,7 @@
 import os
-import pytest
 import re
+import arrow
+import pytest
 
 import virt_backup.__main__
 from virt_backup.__main__ import (
@@ -18,9 +19,7 @@ def args_parser():
     return build_parser()
 
 
-class TestList():
-    default_parser_args = ("list", )
-
+class AbstractTestList():
     @pytest.fixture
     def mocked_config(self, monkeypatch, build_backup_directory):
         config = mock_get_config(monkeypatch)
@@ -30,6 +29,13 @@ class TestList():
         self.backups = build_backup_directory
 
         return config
+
+    def extract_groups(self, list_output):
+        raise NotImplementedError()
+
+
+class TestList(AbstractTestList):
+    default_parser_args = ("list", )
 
     def test_list_basic(self, args_parser, mocked_config, capsys):
         args = args_parser.parse_args(self.default_parser_args)
@@ -45,7 +51,10 @@ class TestList():
         Extract groups from listing output
         """
         lines = list_output.splitlines()
-        lines.remove("")
+        try:
+            lines.remove("")
+        except ValueError:
+            pass
         groups = {}
 
         while lines:
@@ -131,6 +140,106 @@ class TestListShort(TestList):
 
             assert parsed_nb_backups == sum(
                 len(dom_baks) for dom_baks in group.backups.values()
+            )
+
+
+class TestListDetailed(AbstractTestList):
+    default_parser_args = ("list",)
+
+    def test_list_detailed(self, args_parser, mocked_config, capsys):
+        args = args_parser.parse_args(
+            self.default_parser_args + ("-D", "matching", )
+        )
+        return self.list_and_compare(args, mocked_config, capsys)
+
+    def list_and_compare(self, args, mocked_config, capsys):
+        list_groups(args)
+        captured = capsys.readouterr()
+        parsed_groups = self.extract_groups(captured.out)
+        assert parsed_groups
+        self.compare_parsed_groups_with_complete(parsed_groups, mocked_config)
+
+    def extract_groups(self, list_output):
+        """
+        Extract groups from listing output
+        """
+        lines = list_output.splitlines()
+        try:
+            lines.remove("")
+        except ValueError:
+            pass
+        groups = {}
+
+        while lines:
+            group_name = lines[0].lstrip().rstrip()
+            groups[group_name] = {}
+            lines = lines[2:]
+
+            while lines:
+                host_matching = re.match(
+                    r"(?P<host>.*): (?P<backups>\d*) backup\(s\)$", lines[0]
+                )
+                if not host_matching:
+                    break
+
+                host, nb_backups = (
+                    host_matching.group("host"),
+                    int(host_matching.group("backups"))
+                )
+                groups[group_name][host] = self.extract_backups_for_host(
+                    lines[1:1 + nb_backups]
+                )
+                lines = lines[1 + nb_backups:]
+
+            lines = lines[3:]
+
+        return groups
+
+    def extract_backups_for_host(self, output):
+        backups = {}
+        for l in output:
+            date_str, def_file = re.match(
+                r"(?P<date>.*): (?P<def_file>.*)$", l.lstrip().rstrip()
+            ).groups()
+            backups[arrow.get(date_str)] = def_file
+
+        return backups
+
+    def compare_parsed_groups_with_complete(self, parsed_groups, config):
+        groups = {g.name: g for g in get_usable_complete_groups(config)}
+        for g in groups.values():
+            g.scan_backup_dir()
+
+        for parsed_group, group_hosts in parsed_groups.items():
+            for h, backups in group_hosts.items():
+                self.compare_parsed_host_with_complete(
+                    h, parsed_group, backups, groups[parsed_group]
+                )
+
+    def compare_parsed_host_with_complete(self, host, group, backups,
+                                          complete_group):
+        scanned_backups = complete_group.backups[host]
+        assert len(scanned_backups) == len(backups)
+
+        for scanned_backup in scanned_backups:
+            backup_date = scanned_backup.date
+            assert backup_date in backups
+
+            assert backups[backup_date] == scanned_backup.get_complete_path_of(
+                scanned_backup.definition_filename
+            )
+
+    def test_list_detailed_multiple_hosts(self, args_parser, mocked_config,
+                                          capsys):
+        args = args_parser.parse_args(
+            self.default_parser_args + ("-D", "matching", "-D", "vm-10")
+        )
+        return self.list_and_compare(args, mocked_config, capsys)
+
+    def test_list_detailed_empty(self, args_parser, mocked_config, capsys):
+        with pytest.raises(SystemExit):
+            args_parser.parse_args(
+                self.default_parser_args + ("-D",)
             )
 
 
