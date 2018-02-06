@@ -60,7 +60,7 @@ def groups_from_dict(groups_dict, conn):
         return properties
 
     for group_name, group_properties in groups_dict.items():
-        yield build(group_name, group_properties)
+        yield build(group_name, group_properties.copy())
 
 
 class BackupGroup():
