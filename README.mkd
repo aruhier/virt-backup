@@ -106,8 +106,13 @@ positional arguments:
 optional arguments:
   -D domain_name, --domain domain_name
                         show list of backups for specific domain
+  -a, --all             show all domains matching, even without backup
   -s, --short           short version, do not print details
 ```
+
+By default, only domains with at least one backup will be listed, but all
+domains matching with the group rules can be printed by using the `-a/--all`
+option.
 
 ### Restore
 

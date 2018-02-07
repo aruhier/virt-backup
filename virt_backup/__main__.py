@@ -64,12 +64,12 @@ def build_parser():
     sp_list.add_argument("-D", "--domain", metavar="domain_name",
                          dest="domains_names", action="append", default=[],
                          help="show list of backups for specific domain")
-    sp_list.add_argument("-s", "--short",
-                         help="short version, do not print details",
-                         dest="short", action="store_true")
     sp_list.add_argument("-a", "--all",
                          help="show all domains matching, even without backup",
                          dest="list_all", action="store_true")
+    sp_list.add_argument("-s", "--short",
+                         help="short version, do not print details",
+                         dest="short", action="store_true")
     sp_list.set_defaults(func=list_groups)
 
     # Debug option
