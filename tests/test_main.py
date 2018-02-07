@@ -5,10 +5,12 @@ import pytest
 
 import virt_backup.__main__
 from virt_backup.__main__ import (
-    build_parser, list_groups, get_usable_complete_groups
+    build_parser, list_groups, get_usable_complete_groups,
+    build_all_or_selected_groups
 )
 from virt_backup.config import get_config, Config
 from virt_backup.groups import CompleteBackupGroup
+from helper.virt_backup import MockConn, MockDomain
 
 CUR_PATH = os.path.dirname(os.path.realpath(__file__))
 TESTCONF_PATH = os.path.join(CUR_PATH, "testconfig", "config.yml")
@@ -243,6 +245,43 @@ class TestListDetailed(AbstractTestList):
             )
 
 
+class TestListAll(TestList):
+    default_parser_args = ("list", "-a")
+    conn = None
+
+    @pytest.fixture(autouse=True)
+    def mock_conn(self, monkeypatch):
+        self.conn = MockConn()
+        self.conn._domains.append(MockDomain(self.conn, name="mocked_domain"))
+        mock_get_conn(monkeypatch, self.conn)
+
+    def compare_parsed_groups_with_complete(self, parsed_groups, config):
+        """
+        :param additional_domains: domains without backup, by group, needed to
+                                   be printed in the listing
+        """
+        complete_groups = {
+            g.name: g for g in get_usable_complete_groups(config)
+        }
+        pending_groups = {
+            g.name: g for g in build_all_or_selected_groups(config, self.conn)
+        }
+
+        for parsed_group, parsed_values in parsed_groups.items():
+            cgroup = complete_groups[parsed_group]
+            cgroup.scan_backup_dir()
+            pgroup = pending_groups[parsed_group]
+
+            expected_domains = set(cgroup.backups.keys())
+            expected_domains.update(set(b.dom.name() for b in pgroup.backups))
+            assert sorted(parsed_values.keys()) == sorted(expected_domains)
+
+            for parsed_domain, parsed_backups in parsed_values.items():
+                assert parsed_backups == len(
+                    cgroup.backups.get(parsed_domain, [])
+                )
+
+
 def mock_get_config(monkeypatch):
     config = Config(defaults={"debug": False, })
     config.from_dict(get_config(TESTCONF_PATH))
@@ -252,6 +291,12 @@ def mock_get_config(monkeypatch):
     )
 
     return config
+
+
+def mock_get_conn(monkeypatch, conn):
+    monkeypatch.setattr(
+        virt_backup.__main__, "get_setup_conn", lambda x: conn
+    )
 
 
 def change_config_to_testing_bak_dir(config, backup_directory):

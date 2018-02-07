@@ -6,6 +6,7 @@ import libvirt
 import logging
 import sys
 import threading
+from collections import defaultdict
 
 from virt_backup.exceptions import BackupNotFoundError
 from virt_backup.groups import (
@@ -63,6 +64,9 @@ def build_parser():
     sp_list.add_argument("-D", "--domain", metavar="domain_name",
                          dest="domains_names", action="append", default=[],
                          help="show list of backups for specific domain")
+    sp_list.add_argument("-a", "--all",
+                         help="show all domains matching, even without backup",
+                         dest="list_all", action="store_true")
     sp_list.add_argument("-s", "--short",
                          help="short version, do not print details",
                          dest="short", action="store_true")
@@ -191,24 +195,53 @@ def clean_backups(parsed_args, *args, **kwargs):
 
 
 def list_groups(parsed_args, *args, **kwargs):
+    vir_event_loop_native_start()
     config = get_setup_config()
-    groups = get_usable_complete_groups(config, parsed_args.groups)
-    for g in groups:
+    complete_groups = {g.name: g for g in get_usable_complete_groups(config)}
+    if parsed_args.list_all:
+        backups_by_group = _get_all_hosts_and_bak_by_groups(
+            parsed_args.groups, config
+        )
+    else:
+        backups_by_group = {}
+        for cmplgroup in complete_groups.values():
+            cmplgroup.scan_backup_dir()
+            backups_by_group[cmplgroup.name] = cmplgroup.backups.copy()
+    for group_name, dom_backups in backups_by_group.items():
         if parsed_args.domains_names:
             return list_detailed_backups_for_domain(
-                g, parsed_args.domains_names, short=parsed_args.short
+                complete_groups[group_name], parsed_args.domains_names,
+                short=parsed_args.short
             )
-        g.scan_backup_dir()
-        print(" {}\n{}\n".format(g.name, (2 + len(g.name))*"="))
+        print(" {}\n{}\n".format(group_name, (2 + len(group_name))*"="))
         print("Total backups: {} hosts, {} backups".format(
-            len(g.backups), sum(len(backups) for backups in g.backups.values())
+            len(dom_backups),
+            sum(len(backups) for backups in dom_backups.values())
         ))
         if not parsed_args.short:
             print("Hosts:")
             # TODO: Should also print hosts matching in libvirt but not backup
             # yet
-            for dom, backups in sorted(g.backups.items()):
+            for dom, backups in sorted(dom_backups.items()):
                 print("\t{}: {} backup(s)".format(dom, len(backups)))
+
+
+def _get_all_hosts_and_bak_by_groups(group_names, config):
+    conn = get_setup_conn(config)
+    complete_groups = get_usable_complete_groups(config)
+    pending_groups = build_all_or_selected_groups(config, conn)
+
+    backups_by_group = {}
+    for pgroup in pending_groups:
+        backups_by_group[pgroup.name] = {
+            b.dom.name(): tuple() for b in pgroup.backups
+        }
+
+    for cgroup in complete_groups:
+        cgroup.scan_backup_dir()
+        backups_by_group[cgroup.name].update(cgroup.backups)
+
+    return backups_by_group
 
 
 def list_detailed_backups_for_domain(group, domains_names, short=False):
