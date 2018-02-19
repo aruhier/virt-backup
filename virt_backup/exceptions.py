@@ -26,3 +26,13 @@ class DomainRunningError(Exception):
             "task"
         ).format(domain)
         super().__init__(message)
+
+
+class SnapshotNotStarted(Exception):
+    def __init__(self):
+        super().__init__("snapshot not started")
+
+
+class DiskNotSnapshot(Exception):
+    def __init__(self, disk):
+        super().__init__("disk {} not snapshot".format(disk))

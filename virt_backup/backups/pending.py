@@ -1,4 +1,3 @@
-
 import arrow
 import defusedxml.lxml
 import json
@@ -8,7 +7,6 @@ import lxml.etree
 import os
 import subprocess
 import tarfile
-import threading
 from tqdm import tqdm
 
 import virt_backup
@@ -17,6 +15,7 @@ from virt_backup.tools import (
     copy_file_progress, get_progress_bar_tar
 )
 from . import _BaseDomBackup
+from .snapshot import DomExtSnapshot
 
 
 logger = logging.getLogger("virt_backup")
@@ -40,7 +39,8 @@ class DomBackup(_BaseDomBackup):
     Libvirt domain backup
     """
     def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
-                 compression_lvl=None, conn=None, timeout=None, _disks=None):
+                 compression_lvl=None, conn=None, timeout=None, _disks=None,
+                 _ext_snapshot_helper=None):
         """
         :param dev_disks: list of disks dev names to backup. Disks will be
                           searched in the domain to pull more informations, and
@@ -78,8 +78,10 @@ class DomBackup(_BaseDomBackup):
         #  timeout is None
         self.timeout = timeout
 
-        #: used to trigger when block pivot ends
-        self._wait_for_pivot = threading.Event()
+        #: droppable helper to take and clean external snapshots. Can be
+        #  construct with an ext_snapshot_helper to clean the snapshots of an
+        #  aborted backup. Starting a backup will erase this helper.
+        self._ext_snapshot_helper = _ext_snapshot_helper
 
         #: useful info collected during a pending backup, allowing to clean
         #  the backup if anything goes wrong
@@ -116,8 +118,6 @@ class DomBackup(_BaseDomBackup):
         assert self.dom and self.target_dir
 
         backup_target = None
-        callback_id = None
-        self._wait_for_pivot.clear()
         logger.info("Backup started for domain {}".format(self.dom.name()))
         definition = self.get_definition()
         definition["disks"] = {}
@@ -126,48 +126,31 @@ class DomBackup(_BaseDomBackup):
             logger.debug("Create dir {}".format(self.target_dir))
             os.mkdir(self.target_dir)
         try:
-            callback_id = self.conn.domainEventRegisterAny(
-                None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
-                self.pivot_callback, None
+            self._ext_snapshot_helper = DomExtSnapshot(
+                self.dom, self.disks, self.conn, self.timeout
             )
 
-            snapshot_date, definition = self._snapshot_and_save_date(
-                definition
+            snapshot_date, definition = (
+                self._snapshot_and_save_date(definition)
             )
 
             backup_target = (
                 self.target_dir if self.compression is None
                 else self.get_new_tar(self.target_dir, snapshot_date)
             )
+
             # TODO: handle backingStore cases
             for disk, prop in self.disks.items():
                 self._backup_disk(disk, prop, backup_target, definition)
-                snapshot_path = self.pending_info["disks"][disk]["snapshot"]
-                self.post_backup_cleaning_snapshot(
-                    disk, prop["src"], snapshot_path
-                )
+                self._ext_snapshot_helper.clean_for_disk(disk)
+
             self._dump_json_definition(definition)
-            self.post_backup(callback_id, backup_target)
+            self.post_backup(backup_target)
             self._clean_pending_info()
         except:
-            if callback_id:
-                self.post_backup(callback_id, backup_target)
             self.clean_aborted()
             raise
         logger.info("Backup finished for domain {}".format(self.dom.name()))
-
-    def pivot_callback(self, conn, dom, disk, event_id, status, *args):
-        """
-        Pivot the snapshot
-
-        If the received domain matches with the one associated to this backup,
-        abort the blockjob and pivot it.
-        """
-        domain_matches = dom.ID() == self.dom.ID()
-        if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
-            dom.blockJobAbort(disk, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
-            os.remove(disk)
-            self._wait_for_pivot.set()
 
     def _snapshot_and_save_date(self, definition):
         """
@@ -179,57 +162,21 @@ class DomBackup(_BaseDomBackup):
         :return snapshot_date, definition: return snapshot_date as `arrow`
             type, and the updated definition
         """
-        snapshot = self.external_snapshot()
+        snapshot_metadatas = self._ext_snapshot_helper.start()
 
-        # all of our disks are frozen, so the backup date is right now
-        snapshot_date = arrow.now()
-        definition["date"] = snapshot_date.timestamp
+        # all of our disks are snapshot, so the backup date is right now
+        definition["date"] = snapshot_metadatas["date"].timestamp
 
         self.pending_info = definition.copy()
         self.pending_info["disks"] = {
             disk: {
                 "src": prop["src"],
-                "snapshot": self._get_snapshot_path(prop["src"], snapshot)
+                "snapshot": snapshot_metadatas["disks"][disk]["snapshot"]
             } for disk, prop in self.disks.items()
         }
         self._dump_pending_info()
 
-        return snapshot_date, definition
-
-    def external_snapshot(self):
-        """
-        Create an external snapshot in order to freeze the base image
-        """
-        snap_xml = self.gen_libvirt_snapshot_xml()
-        return self.dom.snapshotCreateXML(
-            snap_xml,
-            (
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY +
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC +
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
-            )
-        )
-
-    def gen_libvirt_snapshot_xml(self):
-        """
-        Generate a xml defining the snapshot
-        """
-        root_el = lxml.etree.Element("domainsnapshot")
-        xml_tree = root_el.getroottree()
-
-        descr_el = lxml.etree.Element("description")
-        root_el.append(descr_el)
-        descr_el.text = "Pre-backup external snapshot"
-
-        disks_el = lxml.etree.Element("disks")
-        root_el.append(disks_el)
-        for d in sorted(self.disks.keys()):
-            disk_el = lxml.etree.Element("disk")
-            disk_el.attrib["name"] = d
-            disk_el.attrib["snapshot"] = "external"
-            disks_el.append(disk_el)
-
-        return lxml.etree.tostring(xml_tree, pretty_print=True).decode()
+        return snapshot_metadatas["date"], definition
 
     def get_definition(self):
         """
@@ -268,7 +215,7 @@ class DomBackup(_BaseDomBackup):
             )
         )
         if os.path.exists(complete_path):
-            raise FileExistsError
+            raise FileExistsError()
         return tarfile.open(complete_path, mode)
 
     def _backup_disk(self, disk, disk_properties, backup_target, definition):
@@ -379,41 +326,15 @@ class DomBackup(_BaseDomBackup):
 
         return target
 
-    def post_backup_cleaning_snapshot(self, disk, disk_path, snapshot_path):
-        snapshot_path = os.path.abspath(snapshot_path)
-
-        # Do not commit and pivot if our snapshot is not the current top disk
-        current_disk_path = get_xml_block_of_disk(
-            self.dom.XMLDesc(), disk
-        ).xpath("source")[0].get("file")
-        if os.path.abspath(current_disk_path) != snapshot_path:
-            logger.warning(
-                "It seems that the domain configuration (and specifically the "
-                "one related to its disks) has been changed. The current disk "
-                "will not be committed nor pivoted with the external "
-                "snapshot, to not break the backing chain.\n\n"
-
-                "You might want to manually check, where your domain image is "
-                "stored, if no temporary file is remaining ({}).".format(
-                    os.path.dirname(current_disk_path)
-                )
-            )
-            return
-
-        if self.dom.isActive():
-            self._blockcommit_disk(disk)
-        else:
-            self._qemu_img_commit(disk_path, snapshot_path)
-            self._manually_pivot_disk(disk, disk_path)
-
-    def post_backup(self, callback_id, backup_target):
+    def post_backup(self, backup_target):
         """
         Post backup process
 
         Unregister callback and close backup_target if is tarfile
         """
-        if callback_id is not None:
-            self.conn.domainEventDeregisterAny(callback_id)
+        if self._ext_snapshot_helper is not None:
+            self._ext_snapshot_helper.clean()
+            self._ext_snapshot_helper = None
         if isinstance(backup_target, tarfile.TarFile):
             backup_target.close()
 
@@ -422,65 +343,6 @@ class DomBackup(_BaseDomBackup):
         Parse the domain's definition
         """
         return defusedxml.lxml.fromstring(self.dom.XMLDesc())
-
-    def _blockcommit_disk(self, disk):
-        """
-        Block commit
-
-        Will allow to merge the external snapshot previously created with the
-        disk main image
-        Wait for the pivot to be triggered in case of active blockcommit.
-
-        :param disk: diskname to blockcommit
-        """
-        logger.info("Starts to blockcommit {} to pivot snapshot".format(disk))
-        self.dom.blockCommit(
-            disk, None, None, 0,
-            (
-                libvirt.VIR_DOMAIN_BLOCK_COMMIT_ACTIVE +
-                libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
-            )
-        )
-        self._wait_for_pivot.wait(timeout=self.timeout)
-
-    def _get_snapshot_path(self, parent_disk_path, snapshot):
-        return "{}.{}".format(
-            os.path.splitext(parent_disk_path)[0], snapshot.getName()
-        )
-
-    def _qemu_img_commit(self, parent_disk_path, snapshot_path):
-        """
-        Use qemu-img to BlockCommit
-
-        Libvirt does not allow to blockcommit a inactive domain, so have to use
-        qemu-img instead.
-        """
-        return subprocess.check_call(
-            ("qemu-img", "commit", "-b", parent_disk_path, snapshot_path)
-        )
-
-    def _manually_pivot_disk(self, disk, src):
-        """
-        Replace the disk src
-
-        :param disk: disk name
-        :param src: new disk path
-        """
-        dom_xml = defusedxml.lxml.fromstring(self.dom.XMLDesc())
-
-        disk_xml = get_xml_block_of_disk(dom_xml, disk)
-        disk_xml.xpath("source")[0].set("file", src)
-
-        if self.conn.getLibVersion() >= 3000000:
-            # update a disk is broken in libvirt < 3.0
-            return self.dom.updateDeviceFlags(
-                defusedxml.lxml.tostring(disk_xml).decode(),
-                libvirt.VIR_DOMAIN_AFFECT_CONFIG
-            )
-        else:
-            return self.conn.defineXML(
-                defusedxml.lxml.tostring(dom_xml).decode()
-            )
 
     def _dump_json_definition(self, definition):
         """
@@ -533,19 +395,23 @@ class DomBackup(_BaseDomBackup):
         return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
     def clean_aborted(self):
-        for disk, prop in self.pending_info.get("disks", {}).items():
-            try:
-                self.post_backup_cleaning_snapshot(
-                    disk, prop["src"], prop["snapshot"]
-                )
-            except Exception as e:
-                logger.critical(
-                    (
-                        "Failed to clean temp files of disk {} "
-                        "for domain {}: {}"
-                    ).format(disk, self.dom.name(), e)
-                )
-                raise
+        is_ext_snap_helper_needed = (
+            not self._ext_snapshot_helper and
+            self.pending_info.get("disks", None)
+        )
+        if is_ext_snap_helper_needed:
+            self._ext_snapshot_helper = DomExtSnapshot(
+                self.dom, self.disks, self.conn, self.timeout
+            )
+            self._ext_snapshot_helper.metadatas = {
+                "disks": {
+                    disk: {"src": val["src"], "snapshot": val["snapshot"]}
+                    for disk, val in self.pending_info["disks"].items()
+                }
+            }
+
+        if self._ext_snapshot_helper:
+            self._ext_snapshot_helper.clean()
 
         if self.pending_info.get("tar", None):
             self._clean_aborted_tar()
