@@ -1,4 +1,3 @@
-
 import arrow
 import datetime
 import json
@@ -7,6 +6,7 @@ import tarfile
 
 import virt_backup
 from virt_backup.backups import DomBackup
+from virt_backup.backups.snapshot import DomExtSnapshot
 from virt_backup.domains import get_xml_block_of_disk
 from virt_backup.exceptions import DiskNotFoundError
 from helper.virt_backup import MockSnapshot
@@ -90,26 +90,11 @@ class TestDomBackup():
         with pytest.raises(KeyError):
             dombkup.add_disks("vdc")
 
-    def test_snapshot_and_save_date_logic_date(self, build_mock_domain,
-                                               monkeypatch, tmpdir):
-        """
-        Create a DomBackup and test to add vdc
-        """
-        target_dir = tmpdir.mkdir("snapshot_and_save_date")
-
-        pre_snap_date = arrow.now()
-        snapshot_date, definition = self.take_snapshot_and_return_date(
-            build_mock_domain, str(target_dir), monkeypatch
-        )
-        post_snap_date = arrow.now()
-
-        assert snapshot_date >= pre_snap_date
-        assert snapshot_date <= post_snap_date
-
     def test_snapshot_and_save_date_test_pending_info(self, build_mock_domain,
                                                       monkeypatch, tmpdir):
         """
-        Create a DomBackup and test to add vdc
+        Create a DomBackup, snapshot, then tests if dumped pending info are
+        correct
         """
         target_dir = tmpdir.mkdir("snapshot_and_save_date")
         snapshot_date, definition = self.take_snapshot_and_return_date(
@@ -128,25 +113,18 @@ class TestDomBackup():
         dombkup = DomBackup(
             dom=mock_domain, dev_disks=("vda", ), target_dir=target_dir
         )
-        monkeypatch.setattr(
-            dombkup, "external_snapshot", lambda: MockSnapshot(name="test")
+
+        snapshot_helper = DomExtSnapshot(
+            dombkup.dom, dombkup.disks, dombkup.conn, dombkup.timeout
         )
+        monkeypatch.setattr(
+            snapshot_helper, "external_snapshot",
+            lambda: MockSnapshot(name="test")
+        )
+        dombkup._ext_snapshot_helper = snapshot_helper
 
         definition = dombkup.get_definition()
         return dombkup._snapshot_and_save_date(definition)
-
-    def test_get_libvirt_snapshot_xml(self, build_mock_domain):
-        dombkup = DomBackup(dom=build_mock_domain)
-        expected_xml = (
-            "<domainsnapshot>\n"
-            "  <description>Pre-backup external snapshot</description>\n"
-            "  <disks>\n"
-            "    <disk name=\"vda\" snapshot=\"external\"/>\n"
-            "    <disk name=\"vdb\" snapshot=\"external\"/>\n"
-            "  </disks>\n"
-            "</domainsnapshot>\n"
-        )
-        assert dombkup.gen_libvirt_snapshot_xml() == expected_xml
 
     def test_main_backup_name_format(self, build_mock_domain):
         dombkup = DomBackup(dom=build_mock_domain)
@@ -223,38 +201,6 @@ class TestDomBackup():
         }
         assert dombkup.get_definition() == expected_def
 
-    def test_manually_pivot_disk(self, build_mock_domain,
-                                 build_mock_libvirtconn):
-        conn = build_mock_libvirtconn
-        dombkup = DomBackup(dom=build_mock_domain, conn=conn)
-
-        dombkup._manually_pivot_disk("vda", "/testvda")
-        dom_xml = dombkup.dom.XMLDesc()
-        assert self.get_src_for_disk(dom_xml, "vda") == "/testvda"
-
-    def test_manually_pivot_disk_libvirt_2(self, build_mock_domain,
-                                           build_mock_libvirtconn):
-        """
-        Test manual pivot with libvirt < 3.0
-        """
-        conn = build_mock_libvirtconn
-        conn._libvirt_version = 2000000
-        conn._domains.append(build_mock_domain)
-
-        return self.test_manually_pivot_disk(build_mock_domain, conn)
-
-    def test_manually_pivot_unexistant_disk(self, build_mock_domain,
-                                            build_mock_libvirtconn):
-        conn = build_mock_libvirtconn
-        dombkup = DomBackup(dom=build_mock_domain, conn=conn)
-
-        with pytest.raises(DiskNotFoundError):
-            dombkup._manually_pivot_disk("sda", "/testvda")
-
-    def get_src_for_disk(self, dom_xml, disk):
-        elem = get_xml_block_of_disk(dom_xml, disk)
-        return elem.xpath("source")[0].get("file")
-
     def test_dump_json_definition(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("json_dump")
         dombkup = DomBackup(
@@ -280,10 +226,10 @@ class TestDomBackup():
         dombkup._clean_pending_info()
         assert len(target_dir.listdir()) == 0
 
-    def test_clean_aborted(self, build_mock_domain, tmpdir, monkeypatch):
+    def test_clean_aborted(self, build_mock_domain, tmpdir, mocker):
         target_dir = tmpdir.mkdir("clean_aborted")
         dombkup = self.prepare_clean_aborted_dombkup(
-            build_mock_domain, target_dir, monkeypatch
+            build_mock_domain, target_dir, mocker
         )
 
         target_dir.join("vda.qcow2").write("")
@@ -299,10 +245,41 @@ class TestDomBackup():
         dombkup.clean_aborted()
         assert not target_dir.listdir()
 
-    def test_clean_aborted_tar(self, build_mock_domain, tmpdir, monkeypatch):
+    def test_clean_aborted_test_ext_snapshot(self, build_mock_domain, tmpdir,
+                                             mocker):
+        """
+        Ensure that the external snapshot helper is correctly declared
+
+        Needs to be declared to clean the external snapshots
+        """
+        target_dir = tmpdir.mkdir("clean_aborted")
+        dombkup = self.prepare_clean_aborted_dombkup(
+            build_mock_domain, target_dir, mocker
+        )
+
+        target_dir.join("vda.qcow2").write("")
+        disk_infos = {
+            "vda": {
+                "src": "vda.qcow2", "target": "vda.qcow2",
+                "snapshot": "vda.snap"
+            },
+        }
+        dombkup.pending_info["disks"] = disk_infos.copy()
+        dombkup._dump_pending_info()
+
+        dombkup.clean_aborted()
+        DomExtSnapshot.clean.assert_called_once_with()
+        assert dombkup._ext_snapshot_helper.metadatas["disks"] == {
+            "vda": {
+                "src": disk_infos["vda"]["src"],
+                "snapshot": disk_infos["vda"]["snapshot"]
+            }
+        }
+
+    def test_clean_aborted_tar(self, build_mock_domain, tmpdir, mocker):
         target_dir = tmpdir.mkdir("clean_aborted_tar")
         dombkup = self.prepare_clean_aborted_dombkup(
-            build_mock_domain, target_dir, monkeypatch
+            build_mock_domain, target_dir, mocker
         )
         dombkup.compression = "tar"
 
@@ -315,19 +292,12 @@ class TestDomBackup():
         assert not target_dir.listdir()
 
     def prepare_clean_aborted_dombkup(self, mock_domain, target_dir,
-                                      monkeypatch):
-        def mock_post_backup_cleaning_snapshot(*args, **kwargs):
-            return None
+                                      mocker):
 
         dombkup = DomBackup(dom=mock_domain, target_dir=str(target_dir))
         dombkup.pending_info["date"] = 0
 
-        # TODO: will have to check if pivot is triggered, and temp snapshot
-        #       deleted
-        monkeypatch.setattr(
-            dombkup, "post_backup_cleaning_snapshot",
-            mock_post_backup_cleaning_snapshot
-        )
+        mocker.patch("virt_backup.backups.snapshot.DomExtSnapshot.clean")
 
         return dombkup
 
