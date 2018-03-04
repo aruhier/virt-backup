@@ -107,17 +107,21 @@ class DomExtSnapshot():
             raise SnapshotNotStarted()
 
         disks = tuple(self.metadatas["disks"].keys())
-        for disk in disks:
-            try:
-                self.clean_for_disk(disk)
-            except Exception as e:
-                logger.critical(
-                    (
-                        "Failed to clean temp files of disk {} "
-                        "for domain {}: {}"
-                    ).format(disk, self.dom.name(), e)
-                )
-                raise
+        try:
+            for disk in disks:
+                try:
+                    self.clean_for_disk(disk)
+                except Exception as e:
+                    logger.critical(
+                        (
+                            "Failed to clean temp files of disk {} "
+                            "for domain {}: {}"
+                        ).format(disk, self.dom.name(), e)
+                    )
+                    raise
+        finally:
+            if self._callback_id is not None:
+                self._deregister_callback()
 
     def clean_for_disk(self, disk):
         if not self.metadatas:
@@ -156,7 +160,7 @@ class DomExtSnapshot():
             os.remove(snapshot_path)
 
         self.metadatas["disks"].pop(disk)
-        if not self.metadatas["disks"] and self._callback_id:
+        if not self.metadatas["disks"] and self._callback_id is not None:
             self._deregister_callback()
 
     def blockcommit_disk(self, disk):
@@ -169,7 +173,7 @@ class DomExtSnapshot():
 
         :param disk: diskname to blockcommit
         """
-        if not self._callback_id:
+        if self._callback_id is None:
             self._register_callback()
 
         logger.info("Starts to blockcommit {} to pivot snapshot".format(disk))
