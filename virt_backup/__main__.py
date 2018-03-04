@@ -19,6 +19,10 @@ from virt_backup import APP_NAME, VERSION
 logger = logging.getLogger("virt_backup")
 
 
+def cli_run():
+    return parse_args_and_run(build_parser())
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Backup and restore your kvm libvirt domains"
@@ -318,4 +322,4 @@ def build_all_or_selected_groups(config, conn, groups=None):
 
 
 if __name__ == "__main__":
-    parse_args_and_run(build_parser())
+    cli_run()

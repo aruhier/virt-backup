@@ -13,7 +13,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(
     name="virt-backup",
-    version="0.2.0",
+    version="0.2.0.1",
 
     description="Automatic backups for libvirt",
 
@@ -39,7 +39,7 @@ setup(
     tests_require=['pytest', 'pytest-cov', "pytest-mock"],
     entry_points={
         'console_scripts': [
-            'virt-backup = virt_backup.__main__:parse_args',
+            'virt-backup = virt_backup.__main__:cli_run',
         ],
     }
 )
