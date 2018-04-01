@@ -87,6 +87,8 @@ class DomBackup(_BaseDomBackup):
         #  the backup if anything goes wrong
         self.pending_info = {}
 
+        self.running = False
+
     def add_disks(self, *dev_disks):
         """
         Add disk by dev name
@@ -126,6 +128,8 @@ class DomBackup(_BaseDomBackup):
             logger.debug("Create dir {}".format(self.target_dir))
             os.mkdir(self.target_dir)
         try:
+            assert not self.running
+            self.running = True
             self._ext_snapshot_helper = DomExtSnapshot(
                 self.dom, self.disks, self.conn, self.timeout
             )
@@ -149,6 +153,7 @@ class DomBackup(_BaseDomBackup):
             self._clean_pending_info()
         except:
             self.clean_aborted()
+            self.running = False
             raise
         logger.info("Backup finished for domain {}".format(self.dom.name()))
 
@@ -342,6 +347,7 @@ class DomBackup(_BaseDomBackup):
             self._ext_snapshot_helper = None
         if isinstance(backup_target, tarfile.TarFile):
             backup_target.close()
+        self.running = False
 
     def _parse_dom_xml(self):
         """

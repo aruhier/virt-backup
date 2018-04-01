@@ -1,4 +1,7 @@
+from collections import defaultdict
+import concurrent.futures
 import logging
+import multiprocessing
 import os
 
 from virt_backup.backups import DomBackup, build_dom_complete_backup_from_def
@@ -164,10 +167,9 @@ class BackupGroup():
         error_backups = {}
 
         for b in self.backups:
-            self._ensure_backup_is_set_in_domain_dir(b)
             dom_name = b.dom.name()
             try:
-                completed_backups[dom_name] = b.start()
+                completed_backups[dom_name] = self._start_backup(b)
             except KeyboardInterrupt:
                 raise
             except Exception as e:
@@ -179,6 +181,54 @@ class BackupGroup():
             raise BackupsFailureInGroupError(completed_backups, error_backups)
         else:
             return completed_backups
+
+    def start_multithread(self, nb_threads=None):
+        nb_threads = nb_threads or multiprocessing.cpu_count()
+
+        backups_by_domain = self._group_backups_by_domain()
+
+        completed_doms = []
+        futures = []
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            for backups_for_domain in backups_by_domain.values():
+                backup = backups_for_domain.pop()
+                futures.append(self._submit_backup_future(
+                    executor, backup, completed_doms
+                ))
+
+            while len(futures) < len(self.backups):
+                next(concurrent.futures.as_completed(futures))
+                dom = completed_doms.pop()
+                if backups_by_domain.get(dom):
+                    backup = backups_by_domain[dom].pop()
+                    futures.append(self._submit_backup_future(
+                        executor, backup, completed_doms
+                    ))
+
+            return concurrent.futures.wait(futures)
+
+    def _group_backups_by_domain(self):
+        backups_by_domain = defaultdict(list)
+        for b in self.backups:
+            backups_by_domain[b.dom].append(b)
+
+        return backups_by_domain
+
+    def _submit_backup_future(self, executor, backup, completed_doms: list):
+        """
+        :param completed_doms: list where a completed backup will append its
+            domain.
+        """
+        future = executor.submit(self._start_backup, backup)
+        future.add_done_callback(
+            lambda: completed_doms.append(backup.dom)
+        )
+
+        return future
+
+    def _start_backup(self, backup):
+        self._ensure_backup_is_set_in_domain_dir(backup)
+        return backup.start()
 
     def _ensure_backup_is_set_in_domain_dir(self, dombackup):
         """
