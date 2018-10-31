@@ -163,7 +163,7 @@ def test_complete_groups_from_dict(build_mock_libvirtconn_filled):
             "target": "/mnt/test",
             "compression": "tar",
             "hosts": [
-                {"host": "r:^matching\d?$", "disks": ["vda", "vdb"]},
+                {"host": r"r:^matching\d?$", "disks": ["vda", "vdb"]},
                 "!matching2", "nonexisting"
             ],
         },
@@ -175,7 +175,9 @@ def test_complete_groups_from_dict(build_mock_libvirtconn_filled):
 
     assert test_group.name == "test"
     assert test_group.backup_dir == "/mnt/test"
-    assert test_group.hosts == ["r:^matching\d?$", "!matching2", "nonexisting"]
+    assert test_group.hosts == [
+        r"r:^matching\d?$", r"!matching2", r"nonexisting"
+    ]
 
 
 def test_complete_groups_from_dict_multiple_groups(
