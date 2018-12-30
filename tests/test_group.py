@@ -102,11 +102,13 @@ class TestBackupGroup():
         def error_start(*args, **kwargs):
             raise Exception()
 
-        backup_group.backups[0].start = mocker.stub()
-        backup_group.backups[1].start = error_start
+        backup_group.backups[0].start = error_start
+        backup_group.backups[1].start = mocker.stub()
 
         with pytest.raises(BackupsFailureInGroupError):
             backup_group.start()
+
+        assert backup_group.backups[1].start.called
 
     def test_propagate_attr(self, build_mock_domain):
         backup_group = BackupGroup(
