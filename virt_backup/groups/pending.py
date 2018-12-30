@@ -3,6 +3,7 @@ import os
 
 from virt_backup.backups import DomBackup, build_dom_complete_backup_from_def
 from virt_backup.domains import search_domains_regex
+from virt_backup.exceptions import BackupsFailureInGroupError
 from .pattern import matching_libvirt_domains_from_config
 
 
@@ -156,10 +157,28 @@ class BackupGroup():
     def start(self):
         """
         Start to backup all DomBackup objects attached
+
+        :returns results: dictionary of domain names and their backup
         """
+        completed_backups = {}
+        error_backups = {}
+
         for b in self.backups:
             self._ensure_backup_is_set_in_domain_dir(b)
-            b.start()
+            dom_name = b.dom.name()
+            try:
+                completed_backups[dom_name] = b.start()
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                error_backups[dom_name] = e
+                logger.error("Error with domain %s: %s", dom_name, e)
+                logger.exception(e)
+
+        if error_backups:
+            raise BackupsFailureInGroupError(completed_backups, error_backups)
+        else:
+            return completed_backups
 
     def _ensure_backup_is_set_in_domain_dir(self, dombackup):
         """

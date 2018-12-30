@@ -8,7 +8,9 @@ import sys
 import threading
 from collections import defaultdict
 
-from virt_backup.exceptions import BackupNotFoundError
+from virt_backup.exceptions import (
+    BackupNotFoundError, BackupsFailureInGroupError
+)
 from virt_backup.groups import (
     groups_from_dict, BackupGroup, complete_groups_from_dict
 )
@@ -116,7 +118,11 @@ def start_backups(parsed_args, *args, **kwargs):
         groups = build_all_or_selected_groups(config, conn, parsed_args.groups)
         main_group = build_main_backup_group(groups)
         try:
-            main_group.start()
+            try:
+                main_group.start()
+            except BackupsFailureInGroupError as e:
+                logger.error(e)
+                sys.exit(2)
         except KeyboardInterrupt:
             print("Cancelled…")
             sys.exit(1)

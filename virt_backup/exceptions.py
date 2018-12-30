@@ -3,6 +3,22 @@ class BackupNotFoundError(Exception):
         super().__init__("backup not found")
 
 
+class BackupsFailureInGroupError(Exception):
+    def __init__(self, completed_backups, exceptions):
+        """
+        :param completed_backups: dictionary of completed backups.
+                                  {dom_name: completed_backup}
+        :param exceptions: dictionary of exceptions. {dom_name: exception}
+        """
+        super().__init__(
+            "backups failed for domains: {}".format(
+                ", ".join(sorted(exceptions.keys()))
+            )
+        )
+        self.completed_backups = completed_backups
+        self.exceptions = exceptions
+
+
 class DiskNotFoundError(Exception):
     """
     Disk not found in a domain

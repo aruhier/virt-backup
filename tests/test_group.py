@@ -8,6 +8,7 @@ from virt_backup.groups.pattern import (
     matching_libvirt_domains_from_config
 )
 from virt_backup.backups import DomBackup
+from virt_backup.exceptions import BackupsFailureInGroupError
 
 from helper.virt_backup import MockDomain
 
@@ -91,6 +92,21 @@ class TestBackupGroup():
         expected_target_dir = os.path.join("/tmp", dombackup.dom.name())
         backup_group.start()
         assert dombackup.target_dir == expected_target_dir
+
+    def test_start_with_err(self, build_mock_domain, mocker):
+        backup_group = BackupGroup(domlst=(
+            MockDomain(_conn=mocker.stub()),
+            MockDomain(_conn=mocker.stub(), name="test_error")
+        ))
+
+        def error_start(*args, **kwargs):
+            raise Exception()
+
+        backup_group.backups[0].start = mocker.stub()
+        backup_group.backups[1].start = error_start
+
+        with pytest.raises(BackupsFailureInGroupError):
+            backup_group.start()
 
     def test_propagate_attr(self, build_mock_domain):
         backup_group = BackupGroup(
