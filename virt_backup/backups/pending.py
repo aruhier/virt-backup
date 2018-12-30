@@ -87,7 +87,12 @@ class DomBackup(_BaseDomBackup):
         #  the backup if anything goes wrong
         self.pending_info = {}
 
-        self.running = False
+        #: Used as lock when the backup is already running
+        self._running = False
+
+    @property
+    def running(self):
+        return self._running
 
     def add_disks(self, *dev_disks):
         """
@@ -117,6 +122,7 @@ class DomBackup(_BaseDomBackup):
         """
         Start the entire backup process for all disks in self.disks
         """
+        assert not self.running
         assert self.dom and self.target_dir
 
         backup_target = None
@@ -128,8 +134,7 @@ class DomBackup(_BaseDomBackup):
             logger.debug("Create dir {}".format(self.target_dir))
             os.mkdir(self.target_dir)
         try:
-            assert not self.running
-            self.running = True
+            self._running = True
             self._ext_snapshot_helper = DomExtSnapshot(
                 self.dom, self.disks, self.conn, self.timeout
             )
@@ -153,8 +158,9 @@ class DomBackup(_BaseDomBackup):
             self._clean_pending_info()
         except:
             self.clean_aborted()
-            self.running = False
             raise
+        finally:
+            self._running = False
         logger.info("Backup finished for domain {}".format(self.dom.name()))
 
     def _snapshot_and_save_date(self, definition):
