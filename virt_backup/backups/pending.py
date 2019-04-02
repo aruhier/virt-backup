@@ -198,9 +198,14 @@ class DomBackup(_BaseDomBackup):
         :param target: directory path that will contain our tar. If not exists,
                        will be created.
         """
+        extra_args = {}
         if self.compression not in (None, "tar"):
             mode = "w:{}".format(self.compression)
             extension = "tar.{}".format(self.compression)
+            if self.compression is "xz":
+                extra_args["preset"] = self.compression_lvl
+            else:
+                extra_args["compresslevel"] = self.compression_lvl
         else:
             mode = "w"
             extension = "tar"
@@ -216,7 +221,7 @@ class DomBackup(_BaseDomBackup):
         )
         if os.path.exists(complete_path):
             raise FileExistsError()
-        return tarfile.open(complete_path, mode)
+        return tarfile.open(complete_path, mode, **extra_args)
 
     def _backup_disk(self, disk, disk_properties, backup_target, definition):
         """
