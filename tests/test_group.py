@@ -137,7 +137,7 @@ class TestBackupGroup():
 
         backup_group.propagate_default_backup_attr()
         for b in backup_group.backups:
-            assert b.target_dir is "/test"
+            assert b.target_dir == "/test"
 
 
 def test_pattern_matching_domains_in_libvirt_regex(
