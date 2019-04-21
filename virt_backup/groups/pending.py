@@ -183,6 +183,21 @@ class BackupGroup():
             return completed_backups
 
     def start_multithread(self, nb_threads=None):
+        """
+        Start all backups, multi threaded
+
+        It is wanted to avoid running multiple backups on the same domain (if
+        the target dir is different for 2 backups of the same domain, for
+        example), because of the way backups are done. An external snapshot is
+        created then removed, backups would copy the external snapshot of other
+        running backups instead of the real disk.
+
+        To avoid this issue, a callback is set for each futures in order to
+        notify when they are completed, and put the completed domain in a
+        queue.
+        If no other backup is to do for this domain, it will be dropped,
+        otherwise a backup targeting this domain will be started.
+        """
         nb_threads = nb_threads or multiprocessing.cpu_count()
 
         backups_by_domain = self._group_backups_by_domain()
