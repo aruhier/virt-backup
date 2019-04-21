@@ -117,9 +117,13 @@ def start_backups(parsed_args, *args, **kwargs):
     if config.get("groups", None):
         groups = build_all_or_selected_groups(config, conn, parsed_args.groups)
         main_group = build_main_backup_group(groups)
+        nb_threads = config.get("threads", 0)
         try:
             try:
-                main_group.start()
+                if nb_threads > 1 or nb_threads == 0:
+                    main_group.start_multithread(nb_threads=nb_threads)
+                else:
+                    main_group.start()
             except BackupsFailureInGroupError as e:
                 logger.error(e)
                 sys.exit(2)
