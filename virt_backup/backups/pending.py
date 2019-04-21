@@ -353,7 +353,7 @@ class DomBackup(_BaseDomBackup):
             self._ext_snapshot_helper = None
         if isinstance(backup_target, tarfile.TarFile):
             backup_target.close()
-        self.running = False
+        self._running = False
 
     def _parse_dom_xml(self):
         """
