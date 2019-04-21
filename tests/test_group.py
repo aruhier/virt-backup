@@ -110,6 +110,36 @@ class TestBackupGroup():
 
         assert backup_group.backups[1].start.called
 
+    def test_start_multithread(self, build_mock_domain, mocker):
+        backup_group = BackupGroup(domlst=(
+            MockDomain(_conn=mocker.stub()),
+            MockDomain(_conn=mocker.stub())
+        ))
+        for b in backup_group.backups:
+            b.start = mocker.stub()
+
+        backup_group.start_multithread(2)
+
+        for b in backup_group.backups:
+            assert b.start.called
+
+    def test_start_multithead_with_err(self, build_mock_domain, mocker):
+        backup_group = BackupGroup(domlst=(
+            MockDomain(_conn=mocker.stub()),
+            MockDomain(_conn=mocker.stub(), name="test_error")
+        ))
+
+        def error_start(*args, **kwargs):
+            raise Exception()
+
+        backup_group.backups[0].start = error_start
+        backup_group.backups[1].start = mocker.stub()
+
+        with pytest.raises(BackupsFailureInGroupError):
+            backup_group.start_multithread(2)
+
+        assert backup_group.backups[1].start.called
+
     def test_propagate_attr(self, build_mock_domain):
         backup_group = BackupGroup(
             domlst=(build_mock_domain, ), compression="xz"

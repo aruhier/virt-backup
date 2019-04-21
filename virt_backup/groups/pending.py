@@ -187,25 +187,44 @@ class BackupGroup():
 
         backups_by_domain = self._group_backups_by_domain()
 
+        completed_backups = {}
+        error_backups = {}
+
         completed_doms = []
-        futures = []
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = {}
+        with concurrent.futures.ThreadPoolExecutor(nb_threads) as executor:
             for backups_for_domain in backups_by_domain.values():
                 backup = backups_for_domain.pop()
-                futures.append(self._submit_backup_future(
+                future = self._submit_backup_future(
                     executor, backup, completed_doms
-                ))
+                )
+                futures[future] = backup.dom
 
             while len(futures) < len(self.backups):
                 next(concurrent.futures.as_completed(futures))
                 dom = completed_doms.pop()
                 if backups_by_domain.get(dom):
                     backup = backups_by_domain[dom].pop()
-                    futures.append(self._submit_backup_future(
+                    future = self._submit_backup_future(
                         executor, backup, completed_doms
-                    ))
+                    )
+                    futures[future] = backup.dom
 
-            return concurrent.futures.wait(futures)
+        for f in concurrent.futures.as_completed(futures):
+            dom_name = futures[f].name()
+            try:
+                completed_backups[dom_name] = f.result()
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                error_backups[dom_name] = e
+                logger.error("Error with domain %s: %s", dom_name, e)
+                logger.exception(e)
+
+        if error_backups:
+            raise BackupsFailureInGroupError(completed_backups, error_backups)
+        else:
+            return completed_backups
 
     def _group_backups_by_domain(self):
         backups_by_domain = defaultdict(list)
@@ -221,7 +240,7 @@ class BackupGroup():
         """
         future = executor.submit(self._start_backup, backup)
         future.add_done_callback(
-            lambda: completed_doms.append(backup.dom)
+            lambda *args: completed_doms.append(backup.dom)
         )
 
         return future
