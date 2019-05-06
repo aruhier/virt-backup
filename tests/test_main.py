@@ -8,6 +8,7 @@ from virt_backup.__main__ import (
     build_parser, list_groups, get_usable_complete_groups,
     build_all_or_selected_groups
 )
+from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
 from virt_backup.groups import CompleteBackupGroup
 from helper.virt_backup import MockConn, MockDomain
@@ -260,11 +261,14 @@ class TestListAll(TestList):
         :param additional_domains: domains without backup, by group, needed to
                                    be printed in the listing
         """
+        callbacks_registrer = DomExtSnapshotCallbackRegistrer(self.conn)
         complete_groups = {
             g.name: g for g in get_usable_complete_groups(config)
         }
         pending_groups = {
-            g.name: g for g in build_all_or_selected_groups(config, self.conn)
+            g.name: g for g in build_all_or_selected_groups(
+                config, self.conn, callbacks_registrer
+            )
         }
 
         for parsed_group, parsed_values in parsed_groups.items():

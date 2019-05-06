@@ -15,17 +15,55 @@ from virt_backup.exceptions import DiskNotSnapshot, SnapshotNotStarted
 logger = logging.getLogger("virt_backup")
 
 
+class DomExtSnapshotCallbackRegistrer():
+
+    _callback_id = None
+
+    def __init__(self, conn):
+        #: register callbacks, `{snapshot_path: callback}`
+        self.callbacks = {}
+
+        #: libvirt connection to use
+        self.conn = conn
+
+    def __enter__(self):
+        return self.open()
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def open(self):
+        self._callback_id = self.conn.domainEventRegisterAny(
+            None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB, self.event_callback,
+            None
+        )
+
+    def close(self):
+        self.conn.domainEventDeregisterAny(self._callback_id)
+
+    def event_callback(self, conn, dom, snap, *args):
+        if snap not in self.callbacks:
+            logger.error("Callback for snapshot {} called but not existing")
+            return None
+
+        return self.callbacks[snap](conn, dom, snap, *args)
+
+
 class DomExtSnapshot():
     """
     Libvirt domain backup
     """
+
     metadatas = None
 
-    def __init__(self, dom, disks, conn=None, timeout=None):
+    def __init__(self, dom, disks, callbacks_registrer, conn=None,
+                 timeout=None):
         #: domain to snapshot. Has to be a libvirt.virDomain object
         self.dom = dom
 
         self.disks = disks
+
+        self._callbacks_registrer = callbacks_registrer
 
         #: timeout when waiting for the block pivot to end. Infinite wait if
         #  timeout is None
@@ -37,9 +75,6 @@ class DomExtSnapshot():
 
         #: used to trigger when block pivot ends, by snapshot path
         self._wait_for_pivot = defaultdict(threading.Event)
-
-        #: callback id catching events triggered by libvirt
-        self._callback_id = None
 
     def start(self):
         """
@@ -107,6 +142,10 @@ class DomExtSnapshot():
             raise SnapshotNotStarted()
 
         disks = tuple(self.metadatas["disks"].keys())
+        snapshot_paths = tuple(
+            os.path.abspath(self.metadatas["disks"][disk]["snapshot"])
+            for disk in disks
+        )
         try:
             for disk in disks:
                 try:
@@ -120,8 +159,8 @@ class DomExtSnapshot():
                     )
                     raise
         finally:
-            if self._callback_id is not None:
-                self._deregister_callback()
+            for snapshot in snapshot_paths:
+                self._callbacks_registrer.callbacks.pop(snapshot, None)
 
     def clean_for_disk(self, disk):
         if not self.metadatas:
@@ -160,8 +199,7 @@ class DomExtSnapshot():
             os.remove(snapshot_path)
 
         self.metadatas["disks"].pop(disk)
-        if not self.metadatas["disks"] and self._callback_id is not None:
-            self._deregister_callback()
+        self._callbacks_registrer.callbacks.pop(snapshot_path, None)
 
     def blockcommit_disk(self, disk):
         """
@@ -173,8 +211,12 @@ class DomExtSnapshot():
 
         :param disk: diskname to blockcommit
         """
-        if self._callback_id is None:
-            self._register_callback()
+        snapshot_path = os.path.abspath(
+            self.metadatas["disks"][disk]["snapshot"]
+        )
+        self._callbacks_registrer.callbacks[snapshot_path] = (
+            self._pivot_callback
+        )
 
         logger.info("Starts to blockcommit {} to pivot snapshot".format(disk))
         self.dom.blockCommit(
@@ -185,19 +227,8 @@ class DomExtSnapshot():
             )
         )
 
-        snapshot_path = self.metadatas["disks"][disk]["snapshot"]
         self._wait_for_pivot[snapshot_path].wait(timeout=self.timeout)
         self._wait_for_pivot.pop(snapshot_path)
-
-    def _register_callback(self):
-        self._callback_id = self.conn.domainEventRegisterAny(
-            None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB,
-            self._pivot_callback, None
-        )
-
-    def _deregister_callback(self):
-        self.conn.domainEventDeregisterAny(self._callback_id)
-        self._callback_id = None
 
     def _pivot_callback(self, conn, dom, snap, event_id, status, *args):
         """

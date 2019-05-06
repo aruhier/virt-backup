@@ -1,10 +1,9 @@
-
-import arrow
 import datetime
 import filecmp
 import os
-import pytest
 import tarfile
+import arrow
+import pytest
 
 from virt_backup.backups import build_dom_complete_backup_from_def
 from virt_backup.domains import get_domain_disks_of

@@ -1,4 +1,3 @@
-
 import os
 import pytest
 
@@ -7,10 +6,10 @@ from virt_backup.groups.pattern import (
     pattern_matching_domains_in_libvirt,
     matching_libvirt_domains_from_config
 )
-from virt_backup.backups import DomBackup
+from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
 from virt_backup.exceptions import BackupsFailureInGroupError
 
-from helper.virt_backup import MockDomain
+from helper.virt_backup import MockDomain, build_backup_group, build_dombackup
 
 
 class TestBackupGroup():
@@ -19,72 +18,76 @@ class TestBackupGroup():
 
         assert len(backup_group.backups) == 0
 
-    def test_self_with_domain(self, build_mock_domain):
+    def test_self_with_domain(self, build_mock_domain, build_mock_libvirtconn):
         dom = build_mock_domain
-        backup_group = BackupGroup(domlst=((dom, None),))
+        backup_group = build_backup_group(
+            build_mock_libvirtconn, domlst=((dom, None),)
+        )
 
         assert len(backup_group.backups) == 1
         assert backup_group.backups[0].dom == dom
 
-    def test_add_domain(self, build_mock_domain):
-        backup_group = BackupGroup()
+    def test_add_domain(self, build_mock_domain, build_mock_libvirtconn):
         dom = build_mock_domain
+        backup_group = build_backup_group(build_mock_libvirtconn)
 
         backup_group.add_domain(dom)
 
         assert len(backup_group.backups) == 1
         assert backup_group.backups[0].dom == dom
 
-    def test_dedup_add_domain(self, build_mock_domain):
+    def test_dedup_add_domain(self, build_mock_domain, get_backup_group):
         """
         Test to add 2 times the same backup and check that it's not duplicated
         """
         dom = build_mock_domain
-        backup_group = BackupGroup(domlst=(dom, ))
+        backup_group = get_backup_group
 
         backup_group.add_domain(dom)
         assert len(backup_group.backups) == 1
 
-    def test_add_dombackup(self, build_mock_domain):
-        dom = build_mock_domain
-        backup_group = BackupGroup(domlst=(dom, ))
+    def test_add_dombackup(self, get_backup_group, get_dombackup):
+        backup_group = get_backup_group
 
-        backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
+        backup_group.add_dombackup(get_dombackup)
         assert len(backup_group.backups) == 1
 
-    def test_add_dombackup_dedup(self, build_mock_domain):
+    def test_add_dombackup_dedup(self, build_mock_domain, get_backup_group):
         dom = build_mock_domain
-        backup_group = BackupGroup(domlst=(dom, ))
+        backup_group = get_backup_group
 
-        backup_group.add_dombackup(DomBackup(dom, dev_disks=("vda", )))
-        backup_group.add_dombackup(DomBackup(dom, dev_disks=("vdb", )))
+        backup_group.add_dombackup(build_dombackup(dom, dev_disks=("vda", )))
+        backup_group.add_dombackup(build_dombackup(dom, dev_disks=("vdb", )))
         assert len(backup_group.backups) == 1
         assert len(backup_group.backups[0].disks.keys()) == 2
 
-    def test_search(self, build_mock_domain):
+    def test_search(self, build_mock_domain, get_backup_group):
         dom = build_mock_domain
-        backup_group = BackupGroup(domlst=(dom, ))
+        backup_group = get_backup_group
 
         dombak = next(backup_group.search(dom))
         assert dombak == backup_group.backups[0]
 
-    def test_search_not_found(self, build_mock_domain):
+    def test_search_not_found(self, build_mock_domain, build_mock_libvirtconn):
         dom = build_mock_domain
-        backup_group = BackupGroup()
+        backup_group = build_backup_group(build_mock_libvirtconn)
 
         with pytest.raises(StopIteration):
             next(backup_group.search(dom))
 
-    def test_start(self, build_mock_domain, mocker):
-        backup_group = BackupGroup(domlst=(build_mock_domain, ))
+    def test_start(self, get_backup_group, mocker):
+        backup_group = get_backup_group
         backup_group.backups[0].start = mocker.stub()
 
         backup_group.start()
         assert backup_group.backups[0].start.called
 
-    def test_start_with_dir_by_domain(self, build_mock_domain, mocker):
-        backup_group = BackupGroup(
-            domlst=(build_mock_domain, ), target_dir="/tmp"
+    def test_start_with_dir_by_domain(
+            self, build_mock_libvirtconn, build_mock_domain, mocker
+    ):
+        backup_group = build_backup_group(
+            build_mock_libvirtconn, domlst=(build_mock_domain, ),
+            target_dir="/tmp"
         )
         dombackup = backup_group.backups[0]
         dombackup.start = mocker.stub()
@@ -93,11 +96,14 @@ class TestBackupGroup():
         backup_group.start()
         assert dombackup.target_dir == expected_target_dir
 
-    def test_start_with_err(self, build_mock_domain, mocker):
-        backup_group = BackupGroup(domlst=(
-            MockDomain(_conn=mocker.stub()),
-            MockDomain(_conn=mocker.stub(), name="test_error")
-        ))
+    def test_start_with_err(self, build_mock_libvirtconn, mocker):
+        conn = build_mock_libvirtconn
+        backup_group = build_backup_group(
+            conn, domlst=(
+                MockDomain(_conn=conn),
+                MockDomain(_conn=conn, name="test_error")
+            )
+        )
 
         def error_start(*args, **kwargs):
             raise Exception()
@@ -110,11 +116,14 @@ class TestBackupGroup():
 
         assert backup_group.backups[1].start.called
 
-    def test_start_multithread(self, build_mock_domain, mocker):
-        backup_group = BackupGroup(domlst=(
-            MockDomain(_conn=mocker.stub()),
-            MockDomain(_conn=mocker.stub())
-        ))
+    def test_start_multithread(self, build_mock_libvirtconn, mocker):
+        conn = build_mock_libvirtconn
+        backup_group = build_backup_group(
+            conn, domlst=(
+                MockDomain(_conn=conn),
+                MockDomain(_conn=conn),
+            )
+        )
         for b in backup_group.backups:
             b.start = mocker.stub()
 
@@ -123,11 +132,14 @@ class TestBackupGroup():
         for b in backup_group.backups:
             assert b.start.called
 
-    def test_start_multithead_with_err(self, build_mock_domain, mocker):
-        backup_group = BackupGroup(domlst=(
-            MockDomain(_conn=mocker.stub()),
-            MockDomain(_conn=mocker.stub(), name="test_error")
-        ))
+    def test_start_multithead_with_err(self, build_mock_libvirtconn, mocker):
+        conn = build_mock_libvirtconn
+        backup_group = build_backup_group(
+            conn, domlst=(
+                MockDomain(_conn=conn),
+                MockDomain(_conn=conn, name="test_error")
+            )
+        )
 
         def error_start(*args, **kwargs):
             raise Exception()
@@ -140,9 +152,10 @@ class TestBackupGroup():
 
         assert backup_group.backups[1].start.called
 
-    def test_propagate_attr(self, build_mock_domain):
-        backup_group = BackupGroup(
-            domlst=(build_mock_domain, ), compression="xz"
+    def test_propagate_attr(self, build_mock_libvirtconn, build_mock_domain):
+        backup_group = build_backup_group(
+            conn=build_mock_libvirtconn, domlst=(build_mock_domain, ),
+            compression="xz"
         )
         assert backup_group.backups[0].compression == "xz"
 
@@ -151,13 +164,17 @@ class TestBackupGroup():
         backup_group.propagate_default_backup_attr()
         assert backup_group.backups[0].target_dir == "/test"
 
-    def test_propagate_attr_multiple_domains(self, mocker):
-        backup_group = BackupGroup(
-            domlst=(
-                MockDomain(_conn=mocker.stub()),
-                MockDomain(_conn=mocker.stub())
+    def test_propagate_attr_multiple_domains(
+            self, build_mock_libvirtconn, mocker
+    ):
+        conn = build_mock_libvirtconn
+        backup_group = build_backup_group(
+            conn, domlst=(
+                MockDomain(_conn=conn),
+                MockDomain(_conn=conn),
             ), compression="xz"
         )
+
         for b in backup_group.backups:
             assert b.compression == "xz"
 
@@ -171,7 +188,7 @@ class TestBackupGroup():
 
 
 def test_pattern_matching_domains_in_libvirt_regex(
-    build_mock_libvirtconn_filled
+        build_mock_libvirtconn_filled
 ):
     conn = build_mock_libvirtconn_filled
     matches = pattern_matching_domains_in_libvirt("r:^matching.?$", conn)
@@ -183,7 +200,7 @@ def test_pattern_matching_domains_in_libvirt_regex(
 
 
 def test_pattern_matching_domains_in_libvirt_direct_name(
-    build_mock_libvirtconn_filled
+        build_mock_libvirtconn_filled
 ):
     """
     Test parse_host_pattern directly with a domain name
@@ -198,7 +215,7 @@ def test_pattern_matching_domains_in_libvirt_direct_name(
 
 
 def test_pattern_matching_domains_in_libvirt_exclude(
-    build_mock_libvirtconn_filled
+        build_mock_libvirtconn_filled
 ):
     """
     Test parse_host_pattern with a pattern excluding a domain
@@ -226,7 +243,7 @@ def test_matching_libvirt_domains_from_config(build_mock_libvirtconn_filled):
 
 
 def test_matching_libvirt_domains_from_config_unexisting(
-    build_mock_libvirtconn_filled
+        build_mock_libvirtconn_filled
 ):
     """
     Test match_domains_from_config with a non existing domain
@@ -243,7 +260,7 @@ def test_matching_libvirt_domains_from_config_unexisting(
 
 
 def test_matching_libvirt_domains_from_config_str(
-    build_mock_libvirtconn_filled
+        build_mock_libvirtconn_filled
 ):
     """
     Test match_domains_from_config with a str pattern
@@ -264,6 +281,7 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
     Test groups_from_dict with only one group
     """
     conn = build_mock_libvirtconn_filled
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     groups_config = {
         "test": {
             "target": "/mnt/test",
@@ -275,7 +293,7 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
         },
     }
 
-    groups = tuple(groups_from_dict(groups_config, conn))
+    groups = tuple(groups_from_dict(groups_config, conn, callbacks_registrer))
     assert len(groups) == 1
     test_group = groups[0]
 
@@ -294,13 +312,15 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
 
 
 def test_groups_from_sanitize_dict_all_config_group_param(
-        build_mock_libvirtconn_filled):
+        build_mock_libvirtconn_filled
+):
     """
     Test with the example config, containing every possible parameter
 
     Related to issue #13
     """
     conn = build_mock_libvirtconn_filled
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     groups_config = {
         "test": {
             "target": "/mnt/test",
@@ -317,18 +337,22 @@ def test_groups_from_sanitize_dict_all_config_group_param(
             ],
         },
     }
-    group = next(iter(groups_from_dict(groups_config, conn)))
+    group = next(iter(
+        groups_from_dict(groups_config, conn, callbacks_registrer)
+    ))
 
     for prop in ("hourly", "daily", "weekly", "monthly", "yearly"):
         assert prop not in group.default_bak_param
 
 
 def test_groups_from_dict_multiple_groups(
-        build_mock_libvirtconn_filled):
+        build_mock_libvirtconn_filled
+):
     """
     Test match_domains_from_config with a str pattern
     """
     conn = build_mock_libvirtconn_filled
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     groups_config = {
         "test0": {
             "target": "/mnt/test0",
@@ -341,7 +365,7 @@ def test_groups_from_dict_multiple_groups(
         },
     }
 
-    groups = tuple(groups_from_dict(groups_config, conn))
+    groups = tuple(groups_from_dict(groups_config, conn, callbacks_registrer))
     assert len(groups) == 2
     group0, group1 = groups
 

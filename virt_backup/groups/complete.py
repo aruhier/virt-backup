@@ -58,7 +58,9 @@ def _list_json_following_pattern_by_domain(directory, glob_pattern):
     return backups
 
 
-def complete_groups_from_dict(groups_dict, conn=None):
+def complete_groups_from_dict(
+        groups_dict, conn=None, callbacks_registrer=None
+):
     """
     Construct and yield CompleteBackupGroups from a dict (typically as stored
     in config)
@@ -66,6 +68,7 @@ def complete_groups_from_dict(groups_dict, conn=None):
     :param groups_dict: dict of groups properties (take a look at the
                         config syntax for more info)
     :param conn: libvirt connection
+    :param callbacks_registrer: handle snapshot events. Required if conn is set
     """
     def build(name, properties):
         attrs = {}
@@ -87,7 +90,8 @@ def complete_groups_from_dict(groups_dict, conn=None):
             attrs["backup_dir"] = properties["target"]
 
         complete_backup_group = CompleteBackupGroup(
-            name=name, conn=conn, **attrs
+            name=name, conn=conn, callbacks_registrer=callbacks_registrer,
+            **attrs
         )
         return complete_backup_group
 
@@ -100,8 +104,8 @@ class CompleteBackupGroup():
     Group of complete libvirt domain backups
     """
     def __init__(
-        self, name="unnamed", backup_dir=None, hosts=None, conn=None,
-        backups=None, broken_backups=None
+            self, name="unnamed", backup_dir=None, hosts=None, conn=None,
+            backups=None, broken_backups=None, callbacks_registrer=None
     ):
         #: dict of domains and their backups (CompleteDomBackup)
         self.backups = backups or dict()
@@ -119,6 +123,13 @@ class CompleteBackupGroup():
 
         #: connection to libvirt
         self.conn = conn
+
+        #: callbacks registrer, used to clean broken backups. Needed if
+        #  self.conn is set.
+        self._callbacks_registrer = callbacks_registrer
+
+        if self.conn and not self._callbacks_registrer:
+            raise AttributeError("callbacks_registrer needed if conn is given")
 
     def scan_backup_dir(self):
         if not self.backup_dir:
@@ -168,7 +179,8 @@ class CompleteBackupGroup():
                     build_dom_backup_from_pending_info(
                         pending_info,
                         backup_dir=os.path.dirname(pending_info_json),
-                        conn=self.conn
+                        conn=self.conn,
+                        callbacks_registrer=self._callbacks_registrer
                     )
                     for pending_info_json, pending_info
                     in broken_backups_by_domain[dom_name]

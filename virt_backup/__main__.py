@@ -14,6 +14,7 @@ from virt_backup.exceptions import (
 from virt_backup.groups import (
     groups_from_dict, BackupGroup, complete_groups_from_dict
 )
+from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
 from virt_backup import APP_NAME, VERSION
 
@@ -113,17 +114,21 @@ def start_backups(parsed_args, *args, **kwargs):
 
     config = get_setup_config()
     conn = get_setup_conn(config)
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
 
     if config.get("groups", None):
-        groups = build_all_or_selected_groups(config, conn, parsed_args.groups)
+        groups = build_all_or_selected_groups(
+            config, conn, callbacks_registrer, parsed_args.groups
+        )
         main_group = build_main_backup_group(groups)
         nb_threads = config.get("threads", 0)
         try:
             try:
-                if nb_threads > 1 or nb_threads == 0:
-                    main_group.start_multithread(nb_threads=nb_threads)
-                else:
-                    main_group.start()
+                with callbacks_registrer:
+                    if nb_threads > 1 or nb_threads == 0:
+                        main_group.start_multithread(nb_threads=nb_threads)
+                    else:
+                        main_group.start()
             except BackupsFailureInGroupError as e:
                 logger.error(e)
                 sys.exit(2)
@@ -242,8 +247,12 @@ def list_groups(parsed_args, *args, **kwargs):
 
 def _get_all_hosts_and_bak_by_groups(group_names, config):
     conn = get_setup_conn(config)
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
+
     complete_groups = get_usable_complete_groups(config)
-    pending_groups = build_all_or_selected_groups(config, conn)
+    pending_groups = build_all_or_selected_groups(
+        config, conn, callbacks_registrer
+    )
 
     backups_by_group = {}
     for pgroup in pending_groups:
@@ -311,8 +320,12 @@ def _get_auth_conn(config):
     return libvirt.openAuth(config["uri"], auth, 0)
 
 
-def get_usable_complete_groups(config, only_groups_in=None, conn=None):
-    groups = complete_groups_from_dict(config.get_groups(), conn=conn)
+def get_usable_complete_groups(
+        config, only_groups_in=None, conn=None, callbacks_registrer=None
+):
+    groups = complete_groups_from_dict(
+        config.get_groups(), conn=conn, callbacks_registrer=callbacks_registrer
+    )
     for g in groups:
         if not g.backup_dir:
             continue
@@ -321,13 +334,20 @@ def get_usable_complete_groups(config, only_groups_in=None, conn=None):
         yield g
 
 
-def build_all_or_selected_groups(config, conn, groups=None):
+def build_all_or_selected_groups(config, conn, callbacks_registrer,
+                                 groups=None):
     if not groups:
-        groups = [g for g in groups_from_dict(config["groups"], conn)
-                  if g.autostart]
+        groups = [
+            g for g in groups_from_dict(
+                config["groups"], conn, callbacks_registrer
+            ) if g.autostart
+        ]
     else:
-        groups = [g for g in groups_from_dict(config["groups"], conn)
-                  if g.name in groups]
+        groups = [
+            g for g in groups_from_dict(
+                config["groups"], conn, callbacks_registrer
+            ) if g.name in groups
+        ]
     return groups
 
 

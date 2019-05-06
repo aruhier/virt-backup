@@ -13,7 +13,7 @@ from .pattern import matching_libvirt_domains_from_config
 logger = logging.getLogger("virt_backup")
 
 
-def groups_from_dict(groups_dict, conn):
+def groups_from_dict(groups_dict, conn, callbacks_registrer):
     """
     Construct and yield BackupGroups from a dict (typically as stored in
     config)
@@ -40,7 +40,10 @@ def groups_from_dict(groups_dict, conn):
 
         sanitize_properties(properties)
 
-        backup_group = BackupGroup(name=name, conn=conn, **properties)
+        backup_group = BackupGroup(
+            name=name, conn=conn, callbacks_registrer=callbacks_registrer,
+            **properties
+        )
         for i in include:
             for domain_name in i["domains"]:
                 if domain_name not in exclude:

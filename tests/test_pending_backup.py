@@ -1,20 +1,19 @@
-import arrow
+import tarfile
 import datetime
 import json
 import pytest
-import tarfile
 
 import virt_backup
 from virt_backup.backups import DomBackup
-from virt_backup.backups.snapshot import DomExtSnapshot
-from virt_backup.domains import get_xml_block_of_disk
-from virt_backup.exceptions import DiskNotFoundError
-from helper.virt_backup import MockSnapshot
+from virt_backup.backups.snapshot import (
+    DomExtSnapshot, DomExtSnapshotCallbackRegistrer
+)
+from helper.virt_backup import MockSnapshot, build_dombackup
 
 
 class TestDomBackup():
-    def test_get_self_domain_disks(self, build_mock_domain):
-        dombkup = DomBackup(dom=build_mock_domain)
+    def test_get_self_domain_disks(self, get_dombackup):
+        dombkup = get_dombackup
         expected_disks = {
             "vda": {
                 "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
@@ -28,8 +27,8 @@ class TestDomBackup():
 
         assert dombkup._get_self_domain_disks() == expected_disks
 
-    def test_get_disks_with_filter(self, build_mock_domain):
-        dombkup = DomBackup(dom=build_mock_domain)
+    def test_get_disks_with_filter(self, get_dombackup):
+        dombkup = get_dombackup
         expected_disks = {
             "vda": {
                 "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
@@ -40,7 +39,7 @@ class TestDomBackup():
         assert dombkup._get_self_domain_disks("vda") == expected_disks
 
     def test_init_with_disk(self, build_mock_domain):
-        dombkup = DomBackup(dom=build_mock_domain, dev_disks=("vda", ))
+        dombkup = build_dombackup(build_mock_domain, dev_disks=("vda", ))
 
         expected_disks = {
             "vda": {
@@ -60,7 +59,7 @@ class TestDomBackup():
                 "type": "qcow2",
             },
         }
-        dombkup = DomBackup(dom=build_mock_domain, _disks=disks)
+        dombkup = build_dombackup(build_mock_domain, disks=("vda", ))
         expected_disks = {
             "vda": {
                 "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
@@ -82,11 +81,11 @@ class TestDomBackup():
         }
         assert dombkup.disks == expected_disks
 
-    def test_add_not_existing_disk(self, build_mock_domain):
+    def test_add_not_existing_disk(self, get_dombackup):
         """
         Create a DomBackup and test to add vdc
         """
-        dombkup = DomBackup(dom=build_mock_domain)
+        dombkup = get_dombackup
         with pytest.raises(KeyError):
             dombkup.add_disks("vdc")
 
@@ -110,12 +109,15 @@ class TestDomBackup():
 
     def take_snapshot_and_return_date(self, mock_domain, target_dir,
                                       monkeypatch):
-        dombkup = DomBackup(
+        dombkup = build_dombackup(
             dom=mock_domain, dev_disks=("vda", ), target_dir=target_dir
         )
 
         snapshot_helper = DomExtSnapshot(
-            dombkup.dom, dombkup.disks, dombkup.conn, dombkup.timeout
+            dombkup.dom, dombkup.disks,
+            DomExtSnapshotCallbackRegistrer(dombkup.conn), dombkup.conn,
+            dombkup.timeout,
+
         )
         monkeypatch.setattr(
             snapshot_helper, "external_snapshot",
@@ -126,15 +128,15 @@ class TestDomBackup():
         definition = dombkup.get_definition()
         return dombkup._snapshot_and_save_date(definition)
 
-    def test_main_backup_name_format(self, build_mock_domain):
-        dombkup = DomBackup(dom=build_mock_domain)
+    def test_main_backup_name_format(self, get_dombackup):
+        dombkup = get_dombackup
         snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
 
         expected_name = "20160815-171013_1_test"
         assert dombkup._main_backup_name_format(snapdate) == expected_name
 
-    def test_disk_backup_name_format(self, build_mock_domain):
-        dombkup = DomBackup(dom=build_mock_domain)
+    def test_disk_backup_name_format(self, get_dombackup):
+        dombkup = get_dombackup
         snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
 
         backup_name = dombkup._disk_backup_name_format(snapdate, "vda")
@@ -142,7 +144,7 @@ class TestDomBackup():
         assert backup_name == expected_name
 
     def test_get_new_tar(self, build_mock_domain, tmpdir, compression="tar"):
-        dombkup = DomBackup(
+        dombkup = build_dombackup(
             dom=build_mock_domain, compression=compression
         )
         snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
@@ -167,9 +169,7 @@ class TestDomBackup():
         )
 
     def test_get_new_tar_already_exists(self, build_mock_domain, tmpdir):
-        dombkup = DomBackup(
-            dom=build_mock_domain, compression="tar"
-        )
+        dombkup = build_dombackup(dom=build_mock_domain, compression="tar")
 
         snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
         tar_path = tmpdir.join(
@@ -187,7 +187,7 @@ class TestDomBackup():
             )
 
     def test_get_definition(self, build_mock_domain):
-        dombkup = DomBackup(
+        dombkup = build_dombackup(
             dom=build_mock_domain, dev_disks=("vda", ),
             compression="xz", compression_lvl=4
         )
@@ -203,7 +203,7 @@ class TestDomBackup():
 
     def test_dump_json_definition(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("json_dump")
-        dombkup = DomBackup(
+        dombkup = build_dombackup(
             dom=build_mock_domain, dev_disks=("vda", ),
             compression="xz", compression_lvl=4, target_dir=str(target_dir),
         )
@@ -218,7 +218,9 @@ class TestDomBackup():
 
     def test_clean_pending_info(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("clean_pending_info")
-        dombkup = DomBackup(dom=build_mock_domain, target_dir=str(target_dir))
+        dombkup = build_dombackup(
+            dom=build_mock_domain, target_dir=str(target_dir)
+        )
         dombkup.pending_info["date"] = 0
 
         dombkup._dump_pending_info()
@@ -294,7 +296,7 @@ class TestDomBackup():
     def prepare_clean_aborted_dombkup(self, mock_domain, target_dir,
                                       mocker):
 
-        dombkup = DomBackup(dom=mock_domain, target_dir=str(target_dir))
+        dombkup = build_dombackup(dom=mock_domain, target_dir=str(target_dir))
         dombkup.pending_info["date"] = 0
 
         mocker.patch("virt_backup.backups.snapshot.DomExtSnapshot.clean")
@@ -304,7 +306,7 @@ class TestDomBackup():
     def test_compatible_with(self, get_uncompressed_dombackup,
                              build_mock_domain):
         dombackup1 = get_uncompressed_dombackup
-        dombackup2 = DomBackup(
+        dombackup2 = build_dombackup(
             dom=build_mock_domain, dev_disks=("vdb", ), compression=None,
         )
 
@@ -314,7 +316,7 @@ class TestDomBackup():
                                  build_mock_domain):
         dombackup1 = get_uncompressed_dombackup
         dombackup1.target_dir = "/tmp/test"
-        dombackup2 = DomBackup(
+        dombackup2 = build_dombackup(
             dom=build_mock_domain, dev_disks=("vdb", ), compression=None,
         )
 
