@@ -5,8 +5,8 @@ import pytest
 
 import virt_backup.__main__
 from virt_backup.__main__ import (
+    build_all_or_selected_groups, clean_backups,
     build_parser, list_groups, get_usable_complete_groups,
-    build_all_or_selected_groups
 )
 from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
@@ -22,7 +22,9 @@ def args_parser():
     return build_parser()
 
 
-class AbstractTestList():
+class AbstractMainTest():
+    backups = None
+
     @pytest.fixture
     def mocked_config(self, monkeypatch, build_backup_directory):
         config = mock_get_config(monkeypatch)
@@ -32,6 +34,17 @@ class AbstractTestList():
         self.backups = build_backup_directory
 
         return config
+
+    @pytest.fixture(autouse=True)
+    def mocked_conn(self, monkeypatch, build_mock_libvirtconn):
+        mock_get_conn(monkeypatch, build_mock_libvirtconn)
+
+    @pytest.fixture(autouse=True)
+    def mocked_callbacks_registrer(self, monkeypatch):
+        mock_callbacks_registrer(monkeypatch)
+
+
+class AbstractTestList(AbstractMainTest):
 
     def extract_groups(self, list_output):
         raise NotImplementedError()
@@ -251,7 +264,7 @@ class TestListAll(TestList):
     conn = None
 
     @pytest.fixture(autouse=True)
-    def mock_conn(self, monkeypatch):
+    def mocked_conn(self, monkeypatch):
         self.conn = MockConn()
         self.conn._domains.append(MockDomain(self.conn, name="mocked_domain"))
         mock_get_conn(monkeypatch, self.conn)
@@ -286,6 +299,14 @@ class TestListAll(TestList):
                 )
 
 
+class TestClean(AbstractMainTest):
+    default_parser_args = ("clean", )
+
+    def test_clean_basic(self, args_parser, mocked_config, mocked_conn):
+        args = args_parser.parse_args(self.default_parser_args)
+        clean_backups(args)
+
+
 def mock_get_config(monkeypatch):
     config = Config(defaults={"debug": False, })
     config.from_dict(get_config(TESTCONF_PATH))
@@ -300,6 +321,17 @@ def mock_get_config(monkeypatch):
 def mock_get_conn(monkeypatch, conn):
     monkeypatch.setattr(
         virt_backup.__main__, "get_setup_conn", lambda x: conn
+    )
+
+
+def mock_callbacks_registrer(monkeypatch):
+    monkeypatch.setattr(
+        virt_backup.__main__.DomExtSnapshotCallbackRegistrer, "open",
+        lambda *args: None
+    )
+    monkeypatch.setattr(
+        virt_backup.__main__.DomExtSnapshotCallbackRegistrer, "close",
+        lambda *args: None
     )
 
 
