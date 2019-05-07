@@ -208,13 +208,13 @@ def build_completed_backups(backup_dir):
 def build_dombackup(dom, *dombackup_args, **dombackup_kwargs):
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(dom._conn)
     return DomBackup(
-        dom, *dombackup_args, **dombackup_kwargs,
-        callbacks_registrer=callbacks_registrer
+        dom, *dombackup_args, callbacks_registrer=callbacks_registrer,
+        **dombackup_kwargs
     )
 
 
 def build_backup_group(conn, *group_args, **group_kwargs):
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     return BackupGroup(
-        *group_args, **group_kwargs, callbacks_registrer=callbacks_registrer
+        *group_args, callbacks_registrer=callbacks_registrer, **group_kwargs
     )
