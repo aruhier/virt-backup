@@ -41,12 +41,20 @@ class DomExtSnapshotCallbackRegistrer():
     def close(self):
         self.conn.domainEventDeregisterAny(self._callback_id)
 
-    def event_callback(self, conn, dom, snap, *args):
+    def event_callback(self, conn, dom, snap, event_id, status, *args):
+        if status != libvirt.VIR_DOMAIN_BLOCK_JOB_READY:
+            if status == libvirt.VIR_DOMAIN_BLOCK_JOB_FAILED:
+                logger.error("Block job failed for snapshot %s", snap)
+
+            return
+
         if snap not in self.callbacks:
-            logger.error("Callback for snapshot {} called but not existing")
+            logger.error(
+                "Callback for snapshot %s called but not existing", snap
+            )
             return None
 
-        return self.callbacks[snap](conn, dom, snap, *args)
+        return self.callbacks[snap](conn, dom, snap, event_id, status, *args)
 
 
 class DomExtSnapshot():
