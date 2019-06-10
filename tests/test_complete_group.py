@@ -8,7 +8,7 @@ from virt_backup.groups import (
     CompleteBackupGroup, complete_groups_from_dict
 )
 from virt_backup.groups.complete import list_backups_by_domain
-from virt_backup.backups import DomBackup
+from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
 from virt_backup.exceptions import BackupNotFoundError
 
 
@@ -128,15 +128,20 @@ class TestCompleteBackupGroup():
     def test_clean_broken(self, build_backup_directory, build_mock_domain,
                           build_mock_libvirtconn, mocker):
         build_mock_libvirtconn._domains.append(build_mock_domain)
+        callbacks_registrer = DomExtSnapshotCallbackRegistrer(
+            build_mock_libvirtconn
+        )
         backup_dir = build_backup_directory["backup_dir"]
         group = CompleteBackupGroup(
             name="test", backup_dir=str(backup_dir), hosts=["r:.*"],
-            conn=build_mock_libvirtconn
+            conn=build_mock_libvirtconn,
+            callbacks_registrer=callbacks_registrer
         )
 
         dombkup = DomBackup(
             dom=build_mock_domain,
-            target_dir=str(backup_dir.mkdir(build_mock_domain.name()))
+            target_dir=str(backup_dir.mkdir(build_mock_domain.name())),
+            callbacks_registrer=callbacks_registrer
         )
         dombkup.pending_info["domain_name"] = build_mock_domain.name()
         dombkup.pending_info["date"] = 0
@@ -154,7 +159,7 @@ class TestCompleteBackupGroup():
         assert broken_backup.clean_aborted.called
 
 
-def test_complete_groups_from_dict(build_mock_libvirtconn_filled):
+def test_complete_groups_from_dict():
     """
     Test groups_from_dict with only one group
     """
@@ -180,8 +185,7 @@ def test_complete_groups_from_dict(build_mock_libvirtconn_filled):
     ]
 
 
-def test_complete_groups_from_dict_multiple_groups(
-        build_mock_libvirtconn_filled):
+def test_complete_groups_from_dict_multiple_groups():
     """
     Test match_domains_from_config with a str pattern
     """

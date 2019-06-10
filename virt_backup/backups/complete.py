@@ -4,13 +4,12 @@ import defusedxml.lxml
 import logging
 import lxml.etree
 import os
+import shutil
 import tarfile
 
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
-from virt_backup.tools import (
-    copy_file_progress, copy_stream_to_file_progress
-)
+from virt_backup.tools import copy_file
 from . import _BaseDomBackup
 
 
@@ -155,9 +154,7 @@ class DomCompleteBackup(_BaseDomBackup):
             disk_img = self.disks[disk]
             logger.debug("Restore {} in {}".format(disk, target))
             disk_img_path = self.get_complete_path_of(disk_img)
-            return copy_file_progress(
-                disk_img_path, target, buffersize=10*1024*1024
-            )
+            return copy_file(disk_img_path, target)
         else:
             return self._extract_disk_to(disk, target)
 
@@ -172,9 +169,8 @@ class DomCompleteBackup(_BaseDomBackup):
             if os.path.isdir(target):
                 target = os.path.join(target, disk_img)
 
-            copy_stream_to_file_progress(
-                tar_f.extractfile(disk_tarinfo), target, disk_tarinfo.size
-            )
+            with open(target, "wb") as ftarget:
+                shutil.copyfileobj(tar_f.extractfile(disk_tarinfo), ftarget)
 
     def delete(self):
         if not self.backup_dir:

@@ -5,7 +5,9 @@ import pytest
 
 from virt_backup.backups import DomBackup
 from virt_backup.domains import get_xml_block_of_disk
-from virt_backup.backups.snapshot import DomExtSnapshot
+from virt_backup.backups.snapshot import (
+    DomExtSnapshot, DomExtSnapshotCallbackRegistrer
+)
 from virt_backup.exceptions import DiskNotFoundError, SnapshotNotStarted
 from helper.virt_backup import MockSnapshot
 
@@ -15,8 +17,10 @@ class TestDomExtSnapshot():
 
     @pytest.fixture(autouse=True)
     def gen_snapshot_helper(self, build_mock_domain):
+        dom = build_mock_domain
+        callbacks_registrer = DomExtSnapshotCallbackRegistrer(dom._conn)
         self.snapshot_helper = DomExtSnapshot(
-            dom=build_mock_domain,
+            dom=dom, callbacks_registrer=callbacks_registrer,
             disks={
                 "vda": {
                     "src": "/vda.qcow2",
@@ -74,7 +78,7 @@ class TestDomExtSnapshot():
 
         return self.snapshot_helper.start()
 
-    def test_get_libvirt_snapshot_xml(self, build_mock_domain):
+    def test_get_libvirt_snapshot_xml(self):
         expected_xml = (
             "<domainsnapshot>\n"
             "  <description>Pre-backup external snapshot</description>\n"
@@ -116,7 +120,6 @@ class TestDomExtSnapshot():
 
     def test_clean(self, monkeypatch, tmpdir):
         snapdir = self.prepare_test_clean(monkeypatch, tmpdir)
-        # import pdb; pdb.set_trace()
         self.snapshot_helper.clean()
 
         assert len(snapdir.listdir()) == 0

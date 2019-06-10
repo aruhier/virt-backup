@@ -1,6 +1,7 @@
 
 import pytest
-from virt_backup.backups import DomBackup
+from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
+from virt_backup.groups import BackupGroup
 from helper.virt_backup import MockDomain, MockConn, build_completed_backups
 
 
@@ -40,15 +41,43 @@ def build_backup_directory(tmpdir):
 
 
 @pytest.fixture
-def get_uncompressed_dombackup(build_mock_domain):
+def get_dombackup(build_mock_domain, build_mock_libvirtconn):
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
+        build_mock_libvirtconn
+    )
     return DomBackup(
-        dom=build_mock_domain, dev_disks=("vda", ), compression=None,
+        build_mock_domain, callbacks_registrer=callbacks_registrer
     )
 
 
 @pytest.fixture
-def get_compressed_dombackup(build_mock_domain):
+def get_uncompressed_dombackup(build_mock_domain, build_mock_libvirtconn):
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
+        build_mock_libvirtconn
+    )
+    return DomBackup(
+        dom=build_mock_domain, dev_disks=("vda", ), compression=None,
+        callbacks_registrer=callbacks_registrer
+    )
+
+
+@pytest.fixture
+def get_compressed_dombackup(build_mock_domain, build_mock_libvirtconn):
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
+        build_mock_libvirtconn
+    )
     return DomBackup(
         dom=build_mock_domain, dev_disks=("vda", ), compression="xz",
-        compression_lvl=4,
+        compression_lvl=4, callbacks_registrer=callbacks_registrer
+    )
+
+
+@pytest.fixture
+def get_backup_group(build_mock_domain, build_mock_libvirtconn):
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
+        build_mock_libvirtconn
+    )
+    return BackupGroup(
+        build_mock_libvirtconn, domlst=((build_mock_domain, None),),
+        callbacks_registrer=callbacks_registrer
     )

@@ -7,13 +7,10 @@ import lxml.etree
 import os
 import subprocess
 import tarfile
-from tqdm import tqdm
 
 import virt_backup
 from virt_backup.domains import get_xml_block_of_disk
-from virt_backup.tools import (
-    copy_file_progress, get_progress_bar_tar
-)
+from virt_backup.tools import copy_file
 from . import _BaseDomBackup
 from .snapshot import DomExtSnapshot
 
@@ -21,13 +18,16 @@ from .snapshot import DomExtSnapshot
 logger = logging.getLogger("virt_backup")
 
 
-def build_dom_backup_from_pending_info(pending_info, backup_dir, conn):
+def build_dom_backup_from_pending_info(
+        pending_info, backup_dir, conn, callbacks_registrer
+):
     backup = DomBackup(
         dom=conn.lookupByName(pending_info["domain_name"]),
         target_dir=backup_dir,
         dev_disks=tuple(pending_info.get("disks", {}).keys()),
         compression=pending_info.get("compression", "tar"),
-        compression_lvl=pending_info.get("compression_lvl", None)
+        compression_lvl=pending_info.get("compression_lvl", None),
+        callbacks_registrer=callbacks_registrer
     )
     backup.pending_info = pending_info
 
@@ -39,13 +39,16 @@ class DomBackup(_BaseDomBackup):
     Libvirt domain backup
     """
     def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
-                 compression_lvl=None, conn=None, timeout=None, _disks=None,
-                 _ext_snapshot_helper=None):
+                 compression_lvl=None, conn=None, timeout=None, disks=None,
+                 ext_snapshot_helper=None, callbacks_registrer=None):
         """
         :param dev_disks: list of disks dev names to backup. Disks will be
                           searched in the domain to pull more informations, and
                           an exception will be thrown if one of them is not
                           found
+        :param disks: dictionary of disks to backup, in this form:
+                      `{"src": disk_path, "type": disk_format}`. Prefer
+                      using dev disks when possible.
         """
         #: domain to backup. Has to be a libvirt.virDomain object
         self.dom = dom
@@ -54,10 +57,13 @@ class DomBackup(_BaseDomBackup):
         self.target_dir = target_dir
 
         #: disks to backups. If None, will backup every vm disks
+        self.disks = {}
         if dev_disks:
-            _disks = self._get_self_domain_disks(*dev_disks)
-        self.disks = (self._get_self_domain_disks()
-                      if _disks is None else _disks)
+            self.disks.update(self._get_self_domain_disks(*dev_disks))
+        if disks:
+            self.disks.update(self._get_self_domain_disks(*disks))
+        if not self.disks:
+            self.disks = self._get_self_domain_disks()
 
         #: string indicating how to compress the backups:
         #    * None: no compression, backups will be only copied
@@ -81,11 +87,28 @@ class DomBackup(_BaseDomBackup):
         #: droppable helper to take and clean external snapshots. Can be
         #  construct with an ext_snapshot_helper to clean the snapshots of an
         #  aborted backup. Starting a backup will erase this helper.
-        self._ext_snapshot_helper = _ext_snapshot_helper
+        self._ext_snapshot_helper = ext_snapshot_helper
+
+        #: used to redistribute events received by libvirt, as one event cannot
+        #  be registered for multiple times. Necessary if no
+        #  `ext_snapshot_helper` is given.
+        self._callbacks_registrer = callbacks_registrer
+
+        if not (ext_snapshot_helper or callbacks_registrer):
+            raise AttributeError(
+                "callbacks_registrer needed if no ext_snapshot_helper is given"
+            )
 
         #: useful info collected during a pending backup, allowing to clean
         #  the backup if anything goes wrong
         self.pending_info = {}
+
+        #: Used as lock when the backup is already running
+        self._running = False
+
+    @property
+    def running(self):
+        return self._running
 
     def add_disks(self, *dev_disks):
         """
@@ -115,19 +138,22 @@ class DomBackup(_BaseDomBackup):
         """
         Start the entire backup process for all disks in self.disks
         """
+        assert not self.running
         assert self.dom and self.target_dir
 
         backup_target = None
-        logger.info("Backup started for domain {}".format(self.dom.name()))
+        logger.info("%s: Backup started", self.dom.name())
         definition = self.get_definition()
         definition["disks"] = {}
 
         if not os.path.exists(self.target_dir):
-            logger.debug("Create dir {}".format(self.target_dir))
+            logger.debug("%s: create dir %s", self.dom.name(), self.target_dir)
             os.mkdir(self.target_dir)
         try:
+            self._running = True
             self._ext_snapshot_helper = DomExtSnapshot(
-                self.dom, self.disks, self.conn, self.timeout
+                self.dom, self.disks, self._callbacks_registrer, self.conn,
+                self.timeout
             )
 
             snapshot_date, definition = (
@@ -150,7 +176,9 @@ class DomBackup(_BaseDomBackup):
         except:
             self.clean_aborted()
             raise
-        logger.info("Backup finished for domain {}".format(self.dom.name()))
+        finally:
+            self._running = False
+        logger.info("%s: Backup finished", self.dom.name())
 
     def _snapshot_and_save_date(self, definition):
         """
@@ -234,9 +262,7 @@ class DomBackup(_BaseDomBackup):
         :param definition: dictionary representing the domain backup
         """
         snapshot_date = arrow.get(definition["date"]).to("local")
-        logger.info(
-            "Backup disk {} of domain {}".format(disk, self.dom.name())
-        )
+        logger.info("%s: Backup disk %s", self.dom.name(), disk)
         target_img = "{}.{}".format(
             self._disk_backup_name_format(snapshot_date, disk),
             disk_properties["type"]
@@ -287,7 +313,7 @@ class DomBackup(_BaseDomBackup):
         else:
             backup_path = self._copy_img_to_file(disk, target, target_filename)
 
-        logger.debug("{} successfully copied".format(disk))
+        logger.debug("%s: %s successfully copied", self.dom.name(), disk)
         return os.path.abspath(backup_path)
 
     def _add_img_to_tarfile(self, img, target, target_filename):
@@ -296,12 +322,7 @@ class DomBackup(_BaseDomBackup):
         :param target: tarfile.TarFile where img will be added
         :param target_filename: img name in the tarfile
         """
-        total_size = os.path.getsize(img)
-        tqdm_kwargs = {
-            "total": total_size, "unit": "B", "unit_scale": True,
-            "ncols": 0, "mininterval": 0.5
-        }
-        logger.debug("Copy {}…".format(img))
+        logger.debug("%s: Copy %s", self.dom.name(), img)
         if self.compression == "xz":
             backup_path = target.fileobj._fp.name
         else:
@@ -309,9 +330,7 @@ class DomBackup(_BaseDomBackup):
         self.pending_info["tar"] = os.path.basename(backup_path)
         self._dump_pending_info()
 
-        with tqdm(**tqdm_kwargs) as pbar:
-            target.fileobject = get_progress_bar_tar(pbar)
-            target.add(img, arcname=target_filename)
+        target.add(img, arcname=target_filename)
 
         return backup_path
 
@@ -326,8 +345,8 @@ class DomBackup(_BaseDomBackup):
             if not os.path.isdir(target):
                 os.makedirs(target)
         target = os.path.join(target, target_filename or img)
-        logger.debug("Copy {} as {}".format(img, target))
-        copy_file_progress(img, target, buffersize=10*1024*1024)
+        logger.debug("%s: Copy %s as %s", self.dom.name(), img, target)
+        copy_file(img, target)
 
         return target
 
@@ -342,6 +361,7 @@ class DomBackup(_BaseDomBackup):
             self._ext_snapshot_helper = None
         if isinstance(backup_target, tarfile.TarFile):
             backup_target.close()
+        self._running = False
 
     def _parse_dom_xml(self):
         """
@@ -406,7 +426,8 @@ class DomBackup(_BaseDomBackup):
         )
         if is_ext_snap_helper_needed:
             self._ext_snapshot_helper = DomExtSnapshot(
-                self.dom, self.disks, self.conn, self.timeout
+                self.dom, self.disks, self._callbacks_registrer, self.conn,
+                self.timeout
             )
             self._ext_snapshot_helper.metadatas = {
                 "disks": {

@@ -5,7 +5,8 @@ import libvirt
 import lxml
 import os
 
-from virt_backup.backups import DomBackup
+from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
+from virt_backup.groups import BackupGroup
 
 
 CUR_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -187,7 +188,7 @@ def build_completed_backups(backup_dir):
         domain_bdir = os.path.join(backup_dir, domain_name)
         os.mkdir(domain_bdir)
         domain = MockDomain(conn, name=domain_name, id=domain_id)
-        dbackup = DomBackup(
+        dbackup = build_dombackup(
             domain, domain_bdir, dev_disks=("vda", "vdb")
         )
 
@@ -202,3 +203,18 @@ def build_completed_backups(backup_dir):
             pass
 
     return (domain_names, (bp[0] for bp in backup_properties))
+
+
+def build_dombackup(dom, *dombackup_args, **dombackup_kwargs):
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(dom._conn)
+    return DomBackup(
+        dom, *dombackup_args, callbacks_registrer=callbacks_registrer,
+        **dombackup_kwargs
+    )
+
+
+def build_backup_group(conn, *group_args, **group_kwargs):
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
+    return BackupGroup(
+        *group_args, callbacks_registrer=callbacks_registrer, **group_kwargs
+    )

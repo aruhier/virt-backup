@@ -14,6 +14,7 @@ from virt_backup.exceptions import (
 from virt_backup.groups import (
     groups_from_dict, BackupGroup, complete_groups_from_dict
 )
+from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
 from virt_backup import APP_NAME, VERSION
 
@@ -113,13 +114,21 @@ def start_backups(parsed_args, *args, **kwargs):
 
     config = get_setup_config()
     conn = get_setup_conn(config)
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
 
     if config.get("groups", None):
-        groups = build_all_or_selected_groups(config, conn, parsed_args.groups)
+        groups = build_all_or_selected_groups(
+            config, conn, callbacks_registrer, parsed_args.groups
+        )
         main_group = build_main_backup_group(groups)
+        nb_threads = config.get("threads", 0)
         try:
             try:
-                main_group.start()
+                with callbacks_registrer:
+                    if nb_threads > 1 or nb_threads == 0:
+                        main_group.start_multithread(nb_threads=nb_threads)
+                    else:
+                        main_group.start()
             except BackupsFailureInGroupError as e:
                 logger.error(e)
                 sys.exit(2)
@@ -155,9 +164,12 @@ def restore_backup(parsed_args, *args, **kwargs):
 
     config = get_setup_config()
     conn = get_setup_conn(config)
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     try:
         group = next(
-            get_usable_complete_groups(config, [parsed_args.group], conn)
+            get_usable_complete_groups(
+                config, [parsed_args.group], conn, callbacks_registrer
+            )
         )
     except StopIteration:
         logger.critical("Group {} not found".format(parsed_args.group))
@@ -175,7 +187,9 @@ def restore_backup(parsed_args, *args, **kwargs):
             backup = group.backups[domain_name][-1]
         except KeyError:
             raise BackupNotFoundError
-    backup.restore_to(target_dir)
+
+    with callbacks_registrer:
+        backup.restore_to(target_dir)
 
 
 def clean_backups(parsed_args, *args, **kwargs):
@@ -183,34 +197,42 @@ def clean_backups(parsed_args, *args, **kwargs):
 
     config = get_setup_config()
     conn = get_setup_conn(config)
-    groups = get_usable_complete_groups(config, parsed_args.groups, conn)
-    for g in groups:
-        g.scan_backup_dir()
-        current_group_config = config.get_groups()[g.name]
-        clean_params = {
-            "hourly": current_group_config.get("hourly", "*"),
-            "daily": current_group_config.get("daily", "*"),
-            "weekly": current_group_config.get("weekly", "*"),
-            "monthly": current_group_config.get("monthly", "*"),
-            "yearly": current_group_config.get("yearly", "*"),
-        }
-        if not parsed_args.broken_only:
-            print("Backups removed for group {}: {}".format(
-                g.name or "Undefined", len(g.clean(**clean_params))
-            ))
-        if not parsed_args.no_broken:
-            print("Broken backups removed for group {}: {}".format(
-                g.name or "Undefined", len(g.clean_broken_backups())
-            ))
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
+    groups = get_usable_complete_groups(
+        config, parsed_args.groups, conn, callbacks_registrer
+    )
+
+    with callbacks_registrer:
+        for g in groups:
+            g.scan_backup_dir()
+            current_group_config = config.get_groups()[g.name]
+            clean_params = {
+                "hourly": current_group_config.get("hourly", "*"),
+                "daily": current_group_config.get("daily", "*"),
+                "weekly": current_group_config.get("weekly", "*"),
+                "monthly": current_group_config.get("monthly", "*"),
+                "yearly": current_group_config.get("yearly", "*"),
+            }
+            if not parsed_args.broken_only:
+                print("Backups removed for group {}: {}".format(
+                    g.name or "Undefined", len(g.clean(**clean_params))
+                ))
+            if not parsed_args.no_broken:
+                print("Broken backups removed for group {}: {}".format(
+                    g.name or "Undefined", len(g.clean_broken_backups())
+                ))
 
 
 def list_groups(parsed_args, *args, **kwargs):
     vir_event_loop_native_start()
     config = get_setup_config()
+    conn = get_setup_conn(config)
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
+
     complete_groups = {g.name: g for g in get_usable_complete_groups(config)}
     if parsed_args.list_all:
         backups_by_group = _get_all_hosts_and_bak_by_groups(
-            parsed_args.groups, config
+            parsed_args.groups, config, conn, callbacks_registrer
         )
     else:
         backups_by_group = {}
@@ -236,10 +258,13 @@ def list_groups(parsed_args, *args, **kwargs):
                 print("\t{}: {} backup(s)".format(dom, len(backups)))
 
 
-def _get_all_hosts_and_bak_by_groups(group_names, config):
-    conn = get_setup_conn(config)
+def _get_all_hosts_and_bak_by_groups(
+        group_names, config, conn, callbacks_registrer
+):
     complete_groups = get_usable_complete_groups(config)
-    pending_groups = build_all_or_selected_groups(config, conn)
+    pending_groups = build_all_or_selected_groups(
+        config, conn, callbacks_registrer
+    )
 
     backups_by_group = {}
     for pgroup in pending_groups:
@@ -307,8 +332,12 @@ def _get_auth_conn(config):
     return libvirt.openAuth(config["uri"], auth, 0)
 
 
-def get_usable_complete_groups(config, only_groups_in=None, conn=None):
-    groups = complete_groups_from_dict(config.get_groups(), conn=conn)
+def get_usable_complete_groups(
+        config, only_groups_in=None, conn=None, callbacks_registrer=None
+):
+    groups = complete_groups_from_dict(
+        config.get_groups(), conn=conn, callbacks_registrer=callbacks_registrer
+    )
     for g in groups:
         if not g.backup_dir:
             continue
@@ -317,13 +346,20 @@ def get_usable_complete_groups(config, only_groups_in=None, conn=None):
         yield g
 
 
-def build_all_or_selected_groups(config, conn, groups=None):
+def build_all_or_selected_groups(config, conn, callbacks_registrer,
+                                 groups=None):
     if not groups:
-        groups = [g for g in groups_from_dict(config["groups"], conn)
-                  if g.autostart]
+        groups = [
+            g for g in groups_from_dict(
+                config["groups"], conn, callbacks_registrer
+            ) if g.autostart
+        ]
     else:
-        groups = [g for g in groups_from_dict(config["groups"], conn)
-                  if g.name in groups]
+        groups = [
+            g for g in groups_from_dict(
+                config["groups"], conn, callbacks_registrer
+            ) if g.name in groups
+        ]
     return groups
 
 

@@ -21,7 +21,8 @@ pip3 install virt-backup
 
 If you are running on ArchLinux, virt-backup is available through the AUR
 package `virt-backup`.
-virt-backup is tested under Python 3.4, 3.5 and 3.6.
+virt-backup is tested under Python 3.5 and 3.6, 3.7. Python < 3.5 is not
+supported anymore, due to some deprecations in the used libraries.
 
 virt-backup should have access to every disk image desired to be backup. It
 should also be able to run `qemu-img` (normally installed with libvirt), as it
