@@ -7,13 +7,10 @@ import lxml.etree
 import os
 import subprocess
 import tarfile
-from tqdm import tqdm
 
 import virt_backup
 from virt_backup.domains import get_xml_block_of_disk
-from virt_backup.tools import (
-    copy_file_progress, get_progress_bar_tar
-)
+from virt_backup.tools import copy_file
 from . import _BaseDomBackup
 from .snapshot import DomExtSnapshot
 
@@ -265,9 +262,7 @@ class DomBackup(_BaseDomBackup):
         :param definition: dictionary representing the domain backup
         """
         snapshot_date = arrow.get(definition["date"]).to("local")
-        logger.info(
-            "Backup disk {} of domain {}".format(disk, self.dom.name())
-        )
+        logger.info("%s: Backup disk %s", self.dom.name(), disk)
         target_img = "{}.{}".format(
             self._disk_backup_name_format(snapshot_date, disk),
             disk_properties["type"]
@@ -318,7 +313,7 @@ class DomBackup(_BaseDomBackup):
         else:
             backup_path = self._copy_img_to_file(disk, target, target_filename)
 
-        logger.debug("{} successfully copied".format(disk))
+        logger.debug("%s: %s successfully copied", self.dom.name(), disk)
         return os.path.abspath(backup_path)
 
     def _add_img_to_tarfile(self, img, target, target_filename):
@@ -327,12 +322,7 @@ class DomBackup(_BaseDomBackup):
         :param target: tarfile.TarFile where img will be added
         :param target_filename: img name in the tarfile
         """
-        total_size = os.path.getsize(img)
-        tqdm_kwargs = {
-            "total": total_size, "unit": "B", "unit_scale": True,
-            "ncols": 0, "mininterval": 0.5
-        }
-        logger.debug("Copy {}…".format(img))
+        logger.debug("%s: Copy %s", self.dom.name(), img)
         if self.compression == "xz":
             backup_path = target.fileobj._fp.name
         else:
@@ -340,9 +330,7 @@ class DomBackup(_BaseDomBackup):
         self.pending_info["tar"] = os.path.basename(backup_path)
         self._dump_pending_info()
 
-        with tqdm(**tqdm_kwargs) as pbar:
-            target.fileobject = get_progress_bar_tar(pbar)
-            target.add(img, arcname=target_filename)
+        target.add(img, arcname=target_filename)
 
         return backup_path
 
@@ -357,8 +345,8 @@ class DomBackup(_BaseDomBackup):
             if not os.path.isdir(target):
                 os.makedirs(target)
         target = os.path.join(target, target_filename or img)
-        logger.debug("Copy {} as {}".format(img, target))
-        copy_file_progress(img, target, buffersize=10*1024*1024)
+        logger.debug("%s: Copy %s as %s", self.dom.name(), img, target)
+        copy_file(img, target)
 
         return target
 
