@@ -226,7 +226,9 @@ class DomExtSnapshot():
             self._pivot_callback
         )
 
-        logger.info("Starts to blockcommit {} to pivot snapshot".format(disk))
+        logger.debug(
+            "%s: blockcommit %s to pivot snapshot", self.dom.name(), disk
+        )
         self.dom.blockCommit(
             disk, None, None, 0,
             (

@@ -142,12 +142,12 @@ class DomBackup(_BaseDomBackup):
         assert self.dom and self.target_dir
 
         backup_target = None
-        logger.info("Backup started for domain {}".format(self.dom.name()))
+        logger.info("%s: Backup started", self.dom.name())
         definition = self.get_definition()
         definition["disks"] = {}
 
         if not os.path.exists(self.target_dir):
-            logger.debug("Create dir {}".format(self.target_dir))
+            logger.debug("%s: create dir %s", self.dom.name(), self.target_dir)
             os.mkdir(self.target_dir)
         try:
             self._running = True
@@ -178,7 +178,7 @@ class DomBackup(_BaseDomBackup):
             raise
         finally:
             self._running = False
-        logger.info("Backup finished for domain {}".format(self.dom.name()))
+        logger.info("%s: Backup finished", self.dom.name())
 
     def _snapshot_and_save_date(self, definition):
         """
