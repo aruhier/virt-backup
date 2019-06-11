@@ -13,7 +13,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(
     name="virt-backup",
-    version="0.2.2",
+    version="0.3.0",
 
     description="Automatic backups for libvirt",
 
