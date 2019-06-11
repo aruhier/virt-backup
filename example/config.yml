@@ -8,9 +8,9 @@
 debug: False
 
 ## How many threads (simultaneos backups) to run. Use 0 to use all CPU threads
-## detected, 1to disable multitheading for backups, or the number of threads
-## wanted.
-threads: 0
+## detected, 1 to disable multitheading for backups, or the number of threads
+## wanted. Default: 1
+threads: 1
 
 
 ############################
