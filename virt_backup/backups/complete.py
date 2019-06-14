@@ -57,15 +57,6 @@ class DomCompleteBackup(_BaseDomBackup):
         #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
         self.disks = disks
 
-    def get_size_of_disk(self, disk):
-        if self.tar is None:
-            return os.path.getsize(self.get_complete_path_of(self.disks[disk]))
-        else:
-            tar_path = self.get_complete_path_of(self.tar)
-            with tarfile.open(tar_path, "r:*") as tar_f:
-                disk_tarinfo = tar_f.getmember(self.disks[disk])
-                return disk_tarinfo.size
-
     def restore_replace_domain(self, conn, id=None):
         """
         :param conn: libvirt connection to the hypervisor

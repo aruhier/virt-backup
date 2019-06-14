@@ -32,6 +32,11 @@ class DomainNotFoundError(Exception):
         super().__init__("domain {} not found".format(domain))
 
 
+class ImageNotFoundError(Exception):
+    def __init__(self, image, target):
+        super().__init__("Image {} not found in {}".format(image, target))
+
+
 class DomainRunningError(Exception):
     """
     Domain is running when a task would need it to be shutdown
@@ -52,3 +57,8 @@ class SnapshotNotStarted(Exception):
 class DiskNotSnapshot(Exception):
     def __init__(self, disk):
         super().__init__("disk {} not snapshot".format(disk))
+
+
+class BackupPackagerNotOpenedError(Exception):
+    def __init__(self, packager):
+        super().__init__("Backup packager {} not opened".format(packager.name))

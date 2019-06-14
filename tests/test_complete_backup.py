@@ -200,9 +200,3 @@ class TestDomCompleteBackup():
         expected_path = os.path.join(backup.backup_dir, backup.disks["vda"])
 
         assert complete_path_of_vda == expected_path
-
-    def test_get_size_of_disk(self, get_uncompressed_complete_backup, tmpdir):
-        backup = get_uncompressed_complete_backup
-        disk_img = backup.get_complete_path_of(backup.disks["vda"])
-
-        assert backup.get_size_of_disk("vda") == os.path.getsize(disk_img)
