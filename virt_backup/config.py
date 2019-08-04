@@ -76,7 +76,7 @@ class Config(dict):
         """
         Read configuration from string
         """
-        self.from_dict(yaml.load(conf_str))
+        self.from_dict(yaml.safe_load(conf_str))
 
     def from_yaml(self, filename, silent=False):
         """
