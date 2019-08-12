@@ -47,14 +47,6 @@ class _AbstractBackupPackager(ABC):
     def list(self):
         pass
 
-    @abstractmethod
-    def add(self, src, name=None):
-        pass
-
-    @abstractmethod
-    def restore(self, name, target):
-        pass
-
     def assert_opened(self):
         if self.closed:
             raise BackupPackagerNotOpenedError(self)
@@ -65,7 +57,21 @@ class _AbstractBackupPackager(ABC):
         logger.log(level, message, *args, **kwargs)
 
 
-class BackupPackagerDir(_AbstractBackupPackager):
+class _AbstractReadBackupPackager(_AbstractBackupPackager, ABC):
+
+    @abstractmethod
+    def restore(self, name, target):
+        pass
+
+
+class _AbstractWriteBackupPackager(_AbstractBackupPackager, ABC):
+
+    @abstractmethod
+    def add(self, src, name=None):
+        pass
+
+
+class _AbstractBackupPackagerDir(_AbstractBackupPackager):
     """
     Images are just copied in a directory
     """
@@ -89,25 +95,6 @@ class BackupPackagerDir(_AbstractBackupPackager):
     def list(self):
         return os.listdir(self.path)
 
-    @_opened_only
-    def add(self, src, name=None):
-        if not name:
-            name = os.path.basename(src)
-        target = os.path.join(self.path, name)
-        self.log(logging.DEBUG, "Copy %s as %s", src, target)
-        self._copy_file(src, target)
-
-        return target
-
-    @_opened_only
-    def restore(self, name, target):
-        src = os.path.join(self.path, name)
-        if not os.path.exists(src):
-            raise ImageNotFoundError(name, self.path)
-
-        self.log(logging.DEBUG, "Restore %s in %s", src, target)
-        return self._copy_file(src, target)
-
     def _copy_file(self, src, dst, buffersize=None):
         if not os.path.exists(dst) and dst.endswith("/"):
             os.makedirs(dst)
@@ -119,8 +106,38 @@ class BackupPackagerDir(_AbstractBackupPackager):
         return dst
 
 
-class BackupPackagerTar(_AbstractBackupPackager):
+class ReadBackupPackagerDir(
+        _AbstractReadBackupPackager, _AbstractBackupPackagerDir
+):
+
+    @_opened_only
+    def restore(self, name, target):
+        src = os.path.join(self.path, name)
+        if not os.path.exists(src):
+            raise ImageNotFoundError(name, self.path)
+
+        self.log(logging.DEBUG, "Restore %s in %s", src, target)
+        return self._copy_file(src, target)
+
+
+class WriteBackupPackagerDir(
+        _AbstractWriteBackupPackager, _AbstractBackupPackagerDir
+):
+
+    @_opened_only
+    def add(self, src, name=None):
+        if not name:
+            name = os.path.basename(src)
+        target = os.path.join(self.path, name)
+        self.log(logging.DEBUG, "Copy %s as %s", src, target)
+        self._copy_file(src, target)
+
+        return target
+
+
+class _AbstractBackupPackagerTar(_AbstractBackupPackager):
     _tarfile = None
+    _mode = ""
 
     def __init__(
             self, name, path, archive_name, compression=None,
@@ -155,7 +172,7 @@ class BackupPackagerTar(_AbstractBackupPackager):
         return complete_path
 
     def open(self):
-        self._tarfile = self._open_tar("x")
+        self._tarfile = self._open_tar(self._mode)
         self.closed = False
         return self
 
@@ -188,10 +205,11 @@ class BackupPackagerTar(_AbstractBackupPackager):
     def list(self):
         return self._tarfile.getnames()
 
-    @_opened_only
-    def add(self, src, name=None):
-        self.log(logging.DEBUG, "Add %s into %s", src, self.complete_path)
-        self._tarfile.add(src, arcname=name or os.path.basename(src))
+
+class ReadBackupPackagerTar(
+        _AbstractReadBackupPackager, _AbstractBackupPackagerTar
+):
+    _mode = "r"
 
     @_opened_only
     def restore(self, name, target):
@@ -206,15 +224,30 @@ class BackupPackagerTar(_AbstractBackupPackager):
             target = os.path.join(target, name)
 
         self._tarfile.fileobj.flush()
-        with self._open_tar("r") as rtarfile:
-            with open(target, "wb") as ftarget:
-                shutil.copyfileobj(
-                    rtarfile.extractfile(disk_tarinfo), ftarget
-                )
+        with open(target, "wb") as ftarget:
+            shutil.copyfileobj(
+                self._tarfile.extractfile(disk_tarinfo), ftarget
+            )
 
             return target
 
 
-class BackupPackagers(Enum):
-    directory = BackupPackagerDir
-    tar = BackupPackagerTar
+class WriteBackupPackagerTar(
+        _AbstractWriteBackupPackager, _AbstractBackupPackagerTar
+):
+    _mode = "x"
+
+    @_opened_only
+    def add(self, src, name=None):
+        self.log(logging.DEBUG, "Add %s into %s", src, self.complete_path)
+        self._tarfile.add(src, arcname=name or os.path.basename(src))
+
+
+class ReadBackupPackagers(Enum):
+    directory = ReadBackupPackagerDir
+    tar = ReadBackupPackagerTar
+
+
+class WriteBackupPackagers(Enum):
+    directory = WriteBackupPackagerDir
+    tar = WriteBackupPackagerTar

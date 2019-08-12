@@ -6,7 +6,8 @@ import lxml
 import os
 
 from virt_backup.backups import (
-    DomBackup, DomExtSnapshotCallbackRegistrer, BackupPackagers
+    DomBackup, DomExtSnapshotCallbackRegistrer, ReadBackupPackagers,
+    WriteBackupPackagers
 )
 from virt_backup.groups import BackupGroup
 
@@ -150,13 +151,15 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
         arrow.get(definition["date"]).to("local")
     )
     if dbackup.compression:
-        packager = BackupPackagers.tar.value(
+        packager = WriteBackupPackagers.tar.value(
             packager_name, backup_dir, packager_name,
             compression=dbackup.compression,
             compression_lvl=dbackup.compression_lvl
         )
     else:
-        packager = BackupPackagers.directory.value(packager_name, backup_dir)
+        packager = WriteBackupPackagers.directory.value(
+            packager_name, backup_dir
+        )
     with packager:
         for disk in dbackup.disks:
             # create empty files as our backup images
