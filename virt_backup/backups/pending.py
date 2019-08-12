@@ -143,6 +143,8 @@ class DomBackup(_BaseDomBackup):
         """
         assert not self.running
         assert self.dom and self.target_dir
+        if not os.path.exists(self.target_dir):
+            os.mkdir(self.target_dir)
 
         backup_target = None
         logger.info("%s: Backup started", self.dom.name())
