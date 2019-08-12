@@ -37,5 +37,6 @@ class _BaseDomBackup():
 
 
 from .complete import DomCompleteBackup, build_dom_complete_backup_from_def
+from .packager import BackupPackagers
 from .pending import DomBackup, build_dom_backup_from_pending_info
 from .snapshot import DomExtSnapshotCallbackRegistrer

@@ -155,7 +155,7 @@ class BackupPackagerTar(_AbstractBackupPackager):
         return complete_path
 
     def open(self):
-        self._tarfile = self._open_tar("a")
+        self._tarfile = self._open_tar("x")
         self.closed = False
         return self
 

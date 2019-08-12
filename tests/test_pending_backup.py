@@ -143,49 +143,6 @@ class TestDomBackup():
         expected_name = "20160815-171013_1_test_vda"
         assert backup_name == expected_name
 
-    def test_get_new_tar(self, build_mock_domain, tmpdir, compression="tar"):
-        dombkup = build_dombackup(
-            dom=build_mock_domain, compression=compression
-        )
-        snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
-
-        target_dir = tmpdir.join("get_new_tar")
-
-        if compression == "tar":
-            extension = "tar"
-        else:
-            extension = "tar.{}".format(compression)
-        tar_path = target_dir.join(
-            "{}.{}".format(
-                dombkup._main_backup_name_format(snapdate), extension
-            )
-        )
-        with dombkup.get_new_tar(str(target_dir), snapshot_date=snapdate):
-            assert tar_path.check()
-
-    def test_get_new_tar_xz(self, build_mock_domain, tmpdir):
-        return self.test_get_new_tar(
-            build_mock_domain, tmpdir, compression="xz"
-        )
-
-    def test_get_new_tar_already_exists(self, build_mock_domain, tmpdir):
-        dombkup = build_dombackup(dom=build_mock_domain, compression="tar")
-
-        snapdate = datetime.datetime(2016, 8, 15, 17, 10, 13, 0)
-        tar_path = tmpdir.join(
-            "{}.tar".format(dombkup._main_backup_name_format(snapdate))
-        )
-        tar_path.write("test")
-
-        with pytest.raises(FileExistsError):
-            dombkup.get_new_tar(str(tmpdir), snapshot_date=snapdate)
-
-    def test_get_new_tar_unvalid_compression(self, build_mock_domain, tmpdir):
-        with pytest.raises(tarfile.CompressionError):
-            return self.test_get_new_tar(
-                build_mock_domain, tmpdir, compression="test"
-            )
-
     def test_get_definition(self, build_mock_domain):
         dombkup = build_dombackup(
             dom=build_mock_domain, dev_disks=("vda", ),
