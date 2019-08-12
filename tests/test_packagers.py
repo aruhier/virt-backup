@@ -34,6 +34,7 @@ class _BaseTestBackupPackager(ABC):
         with write_packager:
             write_packager.add(str(new_image))
         with read_packager:
+            tmpdir = tmpdir.mkdir("extract")
             read_packager.restore(name, str(tmpdir))
 
             extracted_image = tmpdir.join(name)
@@ -44,6 +45,7 @@ class _BaseTestBackupPackager(ABC):
         with write_packager:
             pass
         with read_packager:
+            tmpdir = tmpdir.mkdir("extract")
             with pytest.raises(ImageNotFoundError):
                 read_packager.restore("test", str(tmpdir))
 
@@ -52,11 +54,15 @@ class TestBackupPackagerDir(_BaseTestBackupPackager):
 
     @pytest.fixture()
     def read_packager(self, tmpdir):
-        return ReadBackupPackagers.directory.value("test", str(tmpdir))
+        return ReadBackupPackagers.directory.value(
+            "test", str(tmpdir.join("packager"))
+        )
 
     @pytest.fixture()
     def write_packager(self, tmpdir):
-        return WriteBackupPackagers.directory.value("test", str(tmpdir))
+        return WriteBackupPackagers.directory.value(
+            "test", str(tmpdir.join("packager"))
+        )
 
 
 class TestBackupPackagerTar(_BaseTestBackupPackager):
@@ -64,11 +70,11 @@ class TestBackupPackagerTar(_BaseTestBackupPackager):
     @pytest.fixture()
     def read_packager(self, tmpdir):
         return ReadBackupPackagers.tar.value(
-            "test", str(tmpdir), "test_package.tar"
+            "test", str(tmpdir.join("packager")), "test_package.tar"
         )
 
     @pytest.fixture()
     def write_packager(self, tmpdir):
         return WriteBackupPackagers.tar.value(
-            "test", str(tmpdir), "test_package.tar"
+            "test", str(tmpdir.join("packager")), "test_package.tar"
         )

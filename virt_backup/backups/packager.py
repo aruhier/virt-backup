@@ -35,6 +35,10 @@ class _AbstractBackupPackager(ABC):
     def __exit__(self, *exc):
         self.close()
 
+    @property
+    def complete_path(self):
+        pass
+
     @abstractmethod
     def open(self):
         return self
@@ -80,6 +84,10 @@ class _AbstractBackupPackagerDir(_AbstractBackupPackager):
         super().__init__(name)
         self.path = path
 
+    @property
+    def complete_path(self):
+        return self.path
+
     def open(self):
         if not os.path.isdir(self.path):
             os.makedirs(self.path)
@@ -101,7 +109,7 @@ class _AbstractBackupPackagerDir(_AbstractBackupPackager):
         if os.path.isdir(dst):
             dst = os.path.join(dst, os.path.basename(src))
 
-        with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+        with open(src, "rb") as fsrc, open(dst, "xb") as fdst:
             shutil.copyfileobj(fsrc, fdst, buffersize)
         return dst
 
@@ -191,9 +199,12 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
         if not os.path.isdir(self.path):
             os.makedirs(self.path)
 
+        mode = (
+            "{}:{}".format(mode_prefix, mode_suffix) if mode_suffix
+            else mode_prefix
+        )
         return tarfile.open(
-            self.complete_path, "{}:{}".format(mode_prefix, mode_suffix),
-            **extra_args
+            self.complete_path, mode, **extra_args
         )
 
     @_opened_only
@@ -224,7 +235,7 @@ class ReadBackupPackagerTar(
             target = os.path.join(target, name)
 
         self._tarfile.fileobj.flush()
-        with open(target, "wb") as ftarget:
+        with open(target, "xb") as ftarget:
             shutil.copyfileobj(
                 self._tarfile.extractfile(disk_tarinfo), ftarget
             )
@@ -241,6 +252,7 @@ class WriteBackupPackagerTar(
     def add(self, src, name=None):
         self.log(logging.DEBUG, "Add %s into %s", src, self.complete_path)
         self._tarfile.add(src, arcname=name or os.path.basename(src))
+        return self.complete_path
 
 
 class ReadBackupPackagers(Enum):

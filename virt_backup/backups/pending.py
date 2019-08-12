@@ -167,9 +167,9 @@ class DomBackup(_BaseDomBackup):
                     self._backup_disk(disk, prop, packager, definition)
                     self._ext_snapshot_helper.clean_for_disk(disk)
 
-                self._dump_json_definition(definition)
-                self.post_backup(backup_target)
-                self._clean_pending_info()
+            self._dump_json_definition(definition)
+            self.post_backup(backup_target)
+            self._clean_pending_info()
         except:
             self.clean_aborted()
             raise
@@ -180,9 +180,9 @@ class DomBackup(_BaseDomBackup):
     def _get_packager(self, snapshot_date):
         name = self._main_backup_name_format(snapshot_date)
         if not self.compression:
-            return BackupPackagers.directory(name, self.target_dir)
+            return WriteBackupPackagers.directory.value(name, self.target_dir)
         elif self.compression in ("tar", "gz", "bz2", "xz"):
-            return BackupPackagers.tar(
+            return WriteBackupPackagers.tar.value(
                 name, self.target_dir, name,
                 compression_lvl=self.compression_lvl
             )
@@ -247,7 +247,8 @@ class DomBackup(_BaseDomBackup):
             definition["disks"] = {}
         definition["disks"][disk] = bak_img
 
-        backup_path = packager.add(disk_properties["src"], bak_img)
+        packager.add(disk_properties["src"], bak_img)
+        backup_path = packager.complete_path
         if self.compression:
             if not definition.get("tar", None):
                 # all disks will be compacted in the same tar, so already
@@ -274,8 +275,6 @@ class DomBackup(_BaseDomBackup):
         if self._ext_snapshot_helper is not None:
             self._ext_snapshot_helper.clean()
             self._ext_snapshot_helper = None
-        if isinstance(backup_target, tarfile.TarFile):
-            backup_target.close()
         self._running = False
 
     def _parse_dom_xml(self):

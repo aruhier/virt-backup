@@ -156,6 +156,7 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
             compression=dbackup.compression,
             compression_lvl=dbackup.compression_lvl
         )
+        definition["tar"] = packager.complete_path
     else:
         packager = WriteBackupPackagers.directory.value(
             packager_name, backup_dir
