@@ -9,7 +9,7 @@ import subprocess
 import tarfile
 
 import virt_backup
-from virt_backup.backups.packager import (
+from virt_backup.backups.packagers import (
     ReadBackupPackagers, WriteBackupPackagers
 )
 from virt_backup.domains import get_xml_block_of_disk

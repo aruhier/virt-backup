@@ -7,7 +7,7 @@ import os
 import shutil
 import tarfile
 
-from virt_backup.backups.packager import ReadBackupPackagers
+from virt_backup.backups.packagers import ReadBackupPackagers
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
 from virt_backup.tools import copy_file

@@ -2,7 +2,7 @@ from abc import ABC
 import pytest
 
 from virt_backup.exceptions import ImageNotFoundError
-from virt_backup.backups.packager import (
+from virt_backup.backups.packagers import (
     ReadBackupPackagers, WriteBackupPackagers
 )
 
