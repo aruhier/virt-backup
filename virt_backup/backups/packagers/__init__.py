@@ -71,13 +71,16 @@ class _AbstractWriteBackupPackager(_AbstractBackupPackager, ABC):
 
 from .directory import ReadBackupPackagerDir, WriteBackupPackagerDir
 from .tar import ReadBackupPackagerTar, WriteBackupPackagerTar
+from .zstd import ReadBackupPackagerZSTD, WriteBackupPackagerZSTD
 
 
 class ReadBackupPackagers(Enum):
     directory = ReadBackupPackagerDir
     tar = ReadBackupPackagerTar
+    zstd = ReadBackupPackagerZSTD
 
 
 class WriteBackupPackagers(Enum):
     directory = WriteBackupPackagerDir
     tar = WriteBackupPackagerTar
+    zstd = WriteBackupPackagerZSTD

@@ -78,3 +78,18 @@ class TestBackupPackagerTar(_BaseTestBackupPackager):
         return WriteBackupPackagers.tar.value(
             "test", str(tmpdir.join("packager")), "test_package.tar"
         )
+
+
+class TestBackupPackagerZSTD(_BaseTestBackupPackager):
+
+    @pytest.fixture()
+    def read_packager(self, tmpdir):
+        return ReadBackupPackagers.zstd.value(
+            "test", str(tmpdir.join("packager")), "test_package"
+        )
+
+    @pytest.fixture()
+    def write_packager(self, tmpdir):
+        return WriteBackupPackagers.zstd.value(
+            "test", str(tmpdir.join("packager")), "test_package"
+        )
