@@ -37,6 +37,7 @@ setup(
     ],
     setup_requires=['pytest-runner', ],
     tests_require=['pytest', 'pytest-cov', "pytest-mock"],
+    extras_require={"zstd": ["zstandard"], },
     entry_points={
         'console_scripts': [
             'virt-backup = virt_backup.__main__:cli_run',

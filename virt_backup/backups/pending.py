@@ -9,6 +9,9 @@ import subprocess
 import tarfile
 
 import virt_backup
+from virt_backup.backups.packagers import (
+    ReadBackupPackagers, WriteBackupPackagers
+)
 from virt_backup.domains import get_xml_block_of_disk
 from virt_backup.tools import copy_file
 from . import _BaseDomBackup
@@ -140,15 +143,14 @@ class DomBackup(_BaseDomBackup):
         """
         assert not self.running
         assert self.dom and self.target_dir
+        if not os.path.exists(self.target_dir):
+            os.mkdir(self.target_dir)
 
         backup_target = None
         logger.info("%s: Backup started", self.dom.name())
         definition = self.get_definition()
         definition["disks"] = {}
 
-        if not os.path.exists(self.target_dir):
-            logger.debug("%s: create dir %s", self.dom.name(), self.target_dir)
-            os.mkdir(self.target_dir)
         try:
             self._running = True
             self._ext_snapshot_helper = DomExtSnapshot(
@@ -159,16 +161,13 @@ class DomBackup(_BaseDomBackup):
             snapshot_date, definition = (
                 self._snapshot_and_save_date(definition)
             )
-
-            backup_target = (
-                self.target_dir if self.compression is None
-                else self.get_new_tar(self.target_dir, snapshot_date)
-            )
+            packager = self._get_packager(snapshot_date)
 
             # TODO: handle backingStore cases
-            for disk, prop in self.disks.items():
-                self._backup_disk(disk, prop, backup_target, definition)
-                self._ext_snapshot_helper.clean_for_disk(disk)
+            with packager:
+                for disk, prop in self.disks.items():
+                    self._backup_disk(disk, prop, packager, definition)
+                    self._ext_snapshot_helper.clean_for_disk(disk)
 
             self._dump_json_definition(definition)
             self.post_backup(backup_target)
@@ -179,6 +178,16 @@ class DomBackup(_BaseDomBackup):
         finally:
             self._running = False
         logger.info("%s: Backup finished", self.dom.name())
+
+    def _get_packager(self, snapshot_date):
+        name = self._main_backup_name_format(snapshot_date)
+        if not self.compression:
+            return WriteBackupPackagers.directory.value(name, self.target_dir)
+        elif self.compression in ("tar", "gz", "bz2", "xz"):
+            return WriteBackupPackagers.tar.value(
+                name, self.target_dir, name,
+                compression_lvl=self.compression_lvl
+            )
 
     def _snapshot_and_save_date(self, definition):
         """
@@ -217,66 +226,31 @@ class DomBackup(_BaseDomBackup):
             "domain_xml": self.dom.XMLDesc(), "version": virt_backup.VERSION
         }
 
-    def get_new_tar(self, target, snapshot_date):
-        """
-        Get a new tar for this backup
-
-        self._main_backup_name_format will be used to generate a new tar name
-
-        :param target: directory path that will contain our tar. If not exists,
-                       will be created.
-        """
-        extra_args = {}
-        if self.compression not in (None, "tar"):
-            mode = "w:{}".format(self.compression)
-            extension = "tar.{}".format(self.compression)
-            if self.compression is "xz":
-                extra_args["preset"] = self.compression_lvl
-            else:
-                extra_args["compresslevel"] = self.compression_lvl
-        else:
-            mode = "w"
-            extension = "tar"
-
-        if not os.path.isdir(target):
-            os.makedirs(target)
-
-        complete_path = os.path.join(
-            target,
-            "{}.{}".format(
-                self._main_backup_name_format(snapshot_date), extension
-            )
-        )
-        if os.path.exists(complete_path):
-            raise FileExistsError()
-        return tarfile.open(complete_path, mode, **extra_args)
-
-    def _backup_disk(self, disk, disk_properties, backup_target, definition):
+    def _backup_disk(self, disk, disk_properties, packager, definition):
         """
         Backup a disk and complete the definition by adding this disk
 
         :param disk: diskname to backup
         :param disk_properties: dictionary discribing our disk (typically
                                 contained in self.disks[disk])
-        :param backup_target: target path of our backup
+        :param packager: a BackupPackager object
         :param definition: dictionary representing the domain backup
         """
         snapshot_date = arrow.get(definition["date"]).to("local")
         logger.info("%s: Backup disk %s", self.dom.name(), disk)
-        target_img = "{}.{}".format(
+        bak_img = "{}.{}".format(
             self._disk_backup_name_format(snapshot_date, disk),
             disk_properties["type"]
         )
-        self.pending_info["disks"][disk]["target"] = target_img
+        self.pending_info["disks"][disk]["target"] = bak_img
         self._dump_pending_info()
 
         if definition.get("disks", None) is None:
             definition["disks"] = {}
-        definition["disks"][disk] = target_img
+        definition["disks"][disk] = bak_img
 
-        backup_path = self.backup_img(
-            disk_properties["src"], backup_target, target_img
-        )
+        packager.add(disk_properties["src"], bak_img)
+        backup_path = packager.complete_path
         if self.compression:
             if not definition.get("tar", None):
                 # all disks will be compacted in the same tar, so already
@@ -294,62 +268,6 @@ class DomBackup(_BaseDomBackup):
             "{}_{}".format(self._main_backup_name_format(snapdate), disk_name)
         )
 
-    def backup_img(self, disk, target, target_filename=None):
-        """
-        Backup a disk image
-
-        :param disk: path of the image to backup
-        :param target: dir or filename to copy into/as. If self.compress,
-                       target has to be a tarfile.TarFile
-        :param target_filename: destination file will have this name, or keep
-                                the original one. target has to be a dir
-                                (if not exists, will be created)
-        :returns backup_path: complete path of our backup
-        """
-        if self.compression:
-            backup_path = self._add_img_to_tarfile(
-                disk, target, target_filename
-            )
-        else:
-            backup_path = self._copy_img_to_file(disk, target, target_filename)
-
-        logger.debug("%s: %s successfully copied", self.dom.name(), disk)
-        return os.path.abspath(backup_path)
-
-    def _add_img_to_tarfile(self, img, target, target_filename):
-        """
-        :param img: source img path
-        :param target: tarfile.TarFile where img will be added
-        :param target_filename: img name in the tarfile
-        """
-        logger.debug("%s: Copy %s", self.dom.name(), img)
-        if self.compression == "xz":
-            backup_path = target.fileobj._fp.name
-        else:
-            backup_path = target.fileobj.name
-        self.pending_info["tar"] = os.path.basename(backup_path)
-        self._dump_pending_info()
-
-        target.add(img, arcname=target_filename)
-
-        return backup_path
-
-    def _copy_img_to_file(self, img, target, target_filename=None):
-        """
-        :param img: source img path
-        :param target: target is a directory if target_filename is set, or an
-                       existing directory or a destination file
-        :param target_filename: name of the img copy
-        """
-        if target_filename is not None:
-            if not os.path.isdir(target):
-                os.makedirs(target)
-        target = os.path.join(target, target_filename or img)
-        logger.debug("%s: Copy %s as %s", self.dom.name(), img, target)
-        copy_file(img, target)
-
-        return target
-
     def post_backup(self, backup_target):
         """
         Post backup process
@@ -359,8 +277,6 @@ class DomBackup(_BaseDomBackup):
         if self._ext_snapshot_helper is not None:
             self._ext_snapshot_helper.clean()
             self._ext_snapshot_helper = None
-        if isinstance(backup_target, tarfile.TarFile):
-            backup_target.close()
         self._running = False
 
     def _parse_dom_xml(self):

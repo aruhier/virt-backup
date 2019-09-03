@@ -7,6 +7,7 @@ import os
 import shutil
 import tarfile
 
+from virt_backup.backups.packagers import ReadBackupPackagers
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
 from virt_backup.tools import copy_file
@@ -56,15 +57,6 @@ class DomCompleteBackup(_BaseDomBackup):
 
         #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
         self.disks = disks
-
-    def get_size_of_disk(self, disk):
-        if self.tar is None:
-            return os.path.getsize(self.get_complete_path_of(self.disks[disk]))
-        else:
-            tar_path = self.get_complete_path_of(self.tar)
-            with tarfile.open(tar_path, "r:*") as tar_f:
-                disk_tarinfo = tar_f.getmember(self.disks[disk])
-                return disk_tarinfo.size
 
     def restore_replace_domain(self, conn, id=None):
         """
@@ -150,27 +142,19 @@ class DomCompleteBackup(_BaseDomBackup):
         :param disk: disk name
         :param target: destination path for the restoration
         """
+        packager = self._get_packager()
+        with packager:
+            return packager.restore(self.disks[disk], target)
+
+    def _get_packager(self):
         if self.tar is None:
-            disk_img = self.disks[disk]
-            logger.debug("Restore {} in {}".format(disk, target))
-            disk_img_path = self.get_complete_path_of(disk_img)
-            return copy_file(disk_img_path, target)
+            return ReadBackupPackagers.directory.value(
+                self.dom_name, self.backup_dir
+            )
         else:
-            return self._extract_disk_to(disk, target)
-
-    def _extract_disk_to(self, disk, target):
-        disk_img = self.disks[disk]
-        tar_path = self.get_complete_path_of(self.tar)
-        with tarfile.open(tar_path, "r:*") as tar_f:
-            disk_tarinfo = tar_f.getmember(disk_img)
-
-            if not os.path.exists(target) and target.endswith("/"):
-                os.makedirs(target)
-            if os.path.isdir(target):
-                target = os.path.join(target, disk_img)
-
-            with open(target, "wb") as ftarget:
-                shutil.copyfileobj(tar_f.extractfile(disk_tarinfo), ftarget)
+            return ReadBackupPackagers.tar.value(
+                self.dom_name, self.backup_dir, self.tar,
+            )
 
     def delete(self):
         if not self.backup_dir:

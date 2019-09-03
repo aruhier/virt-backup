@@ -123,9 +123,10 @@ class TestDomCompleteBackup():
                                  tmpdir):
         backup = get_uncompressed_complete_backup
         src_img = backup.get_complete_path_of(backup.disks["vda"])
-        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+        extract_dir = tmpdir.mkdir("extract")
+        dst_img = os.path.join(str(extract_dir), backup.disks["vda"])
 
-        backup.restore_disk_to("vda", str(tmpdir))
+        backup.restore_disk_to("vda", str(extract_dir))
 
         assert filecmp.cmp(src_img, dst_img)
 
@@ -135,7 +136,8 @@ class TestDomCompleteBackup():
         """
         backup = get_uncompressed_complete_backup
         src_img = backup.get_complete_path_of(backup.disks["vda"])
-        dst_img = os.path.join(str(tmpdir), "vda.img")
+        extract_dir = tmpdir.mkdir("extract")
+        dst_img = os.path.join(str(extract_dir), "vda.img")
 
         backup.restore_disk_to("vda", dst_img)
 
@@ -165,7 +167,8 @@ class TestDomCompleteBackup():
         Test with a compressed backup
         """
         backup = get_compressed_complete_backup
-        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+        extract_dir = tmpdir.mkdir("extract")
+        dst_img = os.path.join(str(extract_dir), backup.disks["vda"])
 
         backup.restore_disk_to("vda", dst_img)
         src_img = self.extract_disk_from_backup_tar(backup, "vda")
@@ -178,9 +181,10 @@ class TestDomCompleteBackup():
         Test with a compressed backup
         """
         backup = get_compressed_complete_backup
-        dst_img = os.path.join(str(tmpdir), backup.disks["vda"])
+        extract_dir = tmpdir.mkdir("extract")
+        dst_img = os.path.join(str(extract_dir), backup.disks["vda"])
 
-        backup.restore_disk_to("vda", str(tmpdir))
+        backup.restore_disk_to("vda", str(extract_dir))
         src_img = self.extract_disk_from_backup_tar(backup, "vda")
 
         assert filecmp.cmp(src_img, dst_img, shallow=False)
@@ -200,9 +204,3 @@ class TestDomCompleteBackup():
         expected_path = os.path.join(backup.backup_dir, backup.disks["vda"])
 
         assert complete_path_of_vda == expected_path
-
-    def test_get_size_of_disk(self, get_uncompressed_complete_backup, tmpdir):
-        backup = get_uncompressed_complete_backup
-        disk_img = backup.get_complete_path_of(backup.disks["vda"])
-
-        assert backup.get_size_of_disk("vda") == os.path.getsize(disk_img)

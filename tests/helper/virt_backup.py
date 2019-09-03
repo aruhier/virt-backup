@@ -5,7 +5,10 @@ import libvirt
 import lxml
 import os
 
-from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
+from virt_backup.backups import (
+    DomBackup, DomExtSnapshotCallbackRegistrer, ReadBackupPackagers,
+    WriteBackupPackagers
+)
 from virt_backup.groups import BackupGroup
 
 
@@ -119,7 +122,7 @@ class MockConn():
     def defineXML(self, xml):
         md = MockDomain(_conn=self)
         md.dom_xml = defusedxml.lxml.fromstring(xml)
-        for i, d in enumerate(self._domains):
+        for _, d in enumerate(self._domains):
             if d.ID() == md.ID():
                 d.dom_xml = md.dom_xml
                 return d
@@ -144,28 +147,34 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
 
     backup_dir = dbackup.target_dir
 
+    packager_name = dbackup._main_backup_name_format(
+        arrow.get(definition["date"]).to("local")
+    )
     if dbackup.compression:
-        tar = dbackup.get_new_tar(backup_dir, date)
-        if dbackup.compression == "xz":
-            definition["tar"] = tar.fileobj._fp.name
-        else:
-            definition["tar"] = tar.fileobj.name
-    for disk in dbackup.disks:
-        # create empty files as our backup images
-        img_name = "{}.qcow2".format(
-            dbackup._disk_backup_name_format(date, disk),
+        packager = WriteBackupPackagers.tar.value(
+            packager_name, backup_dir, packager_name,
+            compression=dbackup.compression,
+            compression_lvl=dbackup.compression_lvl
         )
-        definition["disks"][disk] = img_name
+        definition["tar"] = packager.complete_path
+    else:
+        packager = WriteBackupPackagers.directory.value(
+            packager_name, backup_dir
+        )
+    with packager:
+        for disk in dbackup.disks:
+            # create empty files as our backup images
+            img_name = "{}.qcow2".format(
+                dbackup._disk_backup_name_format(date, disk),
+            )
+            definition["disks"][disk] = img_name
 
-        img_complete_path = os.path.join(backup_dir, img_name)
-        with open(img_complete_path, "w"):
-            pass
-        if dbackup.compression:
-            # add img to the tar file and remove it
-            tar.add(img_complete_path, arcname=img_name)
-            os.remove(img_complete_path)
-    if dbackup.compression:
-        tar.close()
+            img_complete_path = os.path.join(backup_dir, img_name)
+            with open(img_complete_path, "w"):
+                pass
+            if dbackup.compression:
+                packager.add(img_complete_path, img_name)
+                os.remove(img_complete_path)
     return definition
 
 
