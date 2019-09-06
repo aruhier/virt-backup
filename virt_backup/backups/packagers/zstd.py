@@ -2,12 +2,13 @@ import glob
 import logging
 import os
 import re
+import shutil
 import zstandard as zstd
 
 from virt_backup.exceptions import ImageNotFoundError
 from . import (
     _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractWriteBackupPackager, _opened_only
+    _AbstractWriteBackupPackager, _opened_only, _closed_only
 )
 
 
@@ -114,3 +115,10 @@ class WriteBackupPackagerZSTD(
             )
 
         os.remove(self.archive_path(name))
+
+    @_closed_only
+    def remove_package(self):
+        if not os.path.exists(self.complete_path):
+            raise FileNotFoundError(self.complete_path)
+
+        return shutil.rmtree(self.complete_path)

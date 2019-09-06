@@ -1,4 +1,5 @@
 from abc import ABC
+import os
 import pytest
 
 from virt_backup.exceptions import ImageNotFoundError
@@ -48,6 +49,12 @@ class _BaseTestBackupPackager(ABC):
             tmpdir = tmpdir.mkdir("extract")
             with pytest.raises(ImageNotFoundError):
                 read_packager.restore("test", str(tmpdir))
+
+    def test_delete(self, write_packager):
+        with write_packager:
+            pass
+        write_packager.remove_package()
+        assert not os.path.exists(write_packager.complete_path)
 
 
 class TestBackupPackagerDir(_BaseTestBackupPackager):

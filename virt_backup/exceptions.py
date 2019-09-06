@@ -62,3 +62,12 @@ class DiskNotSnapshot(Exception):
 class BackupPackagerNotOpenedError(Exception):
     def __init__(self, packager):
         super().__init__("Backup packager {} not opened".format(packager.name))
+
+
+class BackupPackagerOpenedError(Exception):
+    def __init__(self, packager):
+        super().__init__(
+            "Backup packager {} opened, needs to be closed".format(
+                packager.name
+            )
+        )

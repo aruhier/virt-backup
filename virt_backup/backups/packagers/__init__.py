@@ -2,7 +2,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import logging
 
-from virt_backup.exceptions import BackupPackagerNotOpenedError
+from virt_backup.exceptions import (
+    BackupPackagerNotOpenedError, BackupPackagerOpenedError
+)
 
 
 logger = logging.getLogger("virt_backup")
@@ -11,6 +13,14 @@ logger = logging.getLogger("virt_backup")
 def _opened_only(f):
     def wrapper(self, *args, **kwargs):
         self.assert_opened()
+        return f(self, *args, **kwargs)
+
+    return wrapper
+
+
+def _closed_only(f):
+    def wrapper(self, *args, **kwargs):
+        self.assert_closed()
         return f(self, *args, **kwargs)
 
     return wrapper
@@ -49,6 +59,10 @@ class _AbstractBackupPackager(ABC):
         if self.closed:
             raise BackupPackagerNotOpenedError(self)
 
+    def assert_closed(self):
+        if not self.closed:
+            raise BackupPackagerOpenedError(self)
+
     def log(self, level, message, *args, **kwargs):
         if self.name:
             message = "{}: {}".format(self.name, message)
@@ -66,6 +80,10 @@ class _AbstractWriteBackupPackager(_AbstractBackupPackager, ABC):
 
     @abstractmethod
     def add(self, src, name=None):
+        pass
+
+    @abstractmethod
+    def remove_package(self):
         pass
 
 

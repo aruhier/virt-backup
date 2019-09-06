@@ -7,7 +7,7 @@ import tarfile
 from virt_backup.exceptions import ImageNotFoundError
 from . import (
     _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractWriteBackupPackager, _opened_only
+    _AbstractWriteBackupPackager, _opened_only, _closed_only
 )
 
 
@@ -121,3 +121,10 @@ class WriteBackupPackagerTar(
         self.log(logging.DEBUG, "Add %s into %s", src, self.complete_path)
         self._tarfile.add(src, arcname=name or os.path.basename(src))
         return self.complete_path
+
+    @_closed_only
+    def remove_package(self):
+        if not os.path.exists(self.complete_path):
+            raise FileNotFoundError(self.complete_path)
+
+        return os.remove(self.complete_path)
