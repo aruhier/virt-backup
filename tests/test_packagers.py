@@ -50,7 +50,7 @@ class _BaseTestBackupPackager(ABC):
             with pytest.raises(ImageNotFoundError):
                 read_packager.restore("test", str(tmpdir))
 
-    def test_delete(self, write_packager):
+    def test_remove_package(self, write_packager):
         with write_packager:
             pass
         write_packager.remove_package()
@@ -70,6 +70,14 @@ class TestBackupPackagerDir(_BaseTestBackupPackager):
         return WriteBackupPackagers.directory.value(
             "test", str(tmpdir.join("packager"))
         )
+
+    def test_remove(self, tmpdir, write_packager, new_image):
+        name = new_image.basename
+
+        with write_packager:
+            write_packager.add(str(new_image))
+            write_packager.remove(name)
+            assert not write_packager.list()
 
 
 class TestBackupPackagerTar(_BaseTestBackupPackager):

@@ -180,14 +180,30 @@ class DomBackup(_BaseDomBackup):
         logger.info("%s: Backup finished", self.dom.name())
 
     def _get_packager(self, snapshot_date):
+        """
+        Get packager returns an adapted packager and update the pending info
+        """
         name = self._main_backup_name_format(snapshot_date)
+        self.pending_info["packager"] = {}
+        packager = None
+        packager_type = ""
+        kwargs = {
+            "name": name, "path": self.target_dir
+        }
+
         if not self.compression:
-            return WriteBackupPackagers.directory.value(name, self.target_dir)
+            packager_type = "directory"
+            self.pending_info["packager"]["init"] = kwargs
+            packager = WriteBackupPackagers.directory.value(**kwargs)
         elif self.compression in ("tar", "gz", "bz2", "xz"):
-            return WriteBackupPackagers.tar.value(
-                name, self.target_dir, name,
-                compression_lvl=self.compression_lvl
-            )
+            packager_type = "tar"
+            kwargs["compression"] = self.compression
+            kwargs["compression_lvl"] = self.compression_lvl
+            packager = WriteBackupPackagers.tar.value(**kwargs)
+
+        self.pending_info["packager"]["type"] = packager_type
+        self.pending_info["packager"]["init"] = kwargs
+        return packager
 
     def _snapshot_and_save_date(self, definition):
         """
@@ -250,12 +266,6 @@ class DomBackup(_BaseDomBackup):
         definition["disks"][disk] = bak_img
 
         packager.add(disk_properties["src"], bak_img)
-        backup_path = packager.complete_path
-        if self.compression:
-            if not definition.get("tar", None):
-                # all disks will be compacted in the same tar, so already
-                # store it in definition if it was not set before
-                definition["tar"] = os.path.basename(backup_path)
 
     def _disk_backup_name_format(self, snapdate, disk_name, *args, **kwargs):
         """
@@ -355,15 +365,47 @@ class DomBackup(_BaseDomBackup):
         if self._ext_snapshot_helper:
             self._ext_snapshot_helper.clean()
 
-        if self.pending_info.get("tar", None):
-            self._clean_aborted_tar()
+        if self.pending_info.get("packager"):
+            packager = getattr(
+                WriteBackupPackagers, self.pending_info["packager"]["type"]
+            ).value(**self.pending_info["packager"]["init"])
+            try:
+                self._clean_packager(packager)
+            except FileNotFoundError:
+                logger.info(
+                    "%s: Packager not found, nothing to clean.",
+                    self.dom.name()
+                )
         else:
-            self._clean_aborted_non_tar_img()
+            # Legacy. Could be removed once issue #22 is done.
+            if self.pending_info.get("tar", None):
+                self._clean_aborted_tar()
+            else:
+                self._clean_aborted_non_tar_img()
         try:
             self._clean_pending_info()
         except KeyError:
-            # Pending info had no time to be filled, so had not be dumped
+            # Pending info had no time to be filled, so had not be dumped.
             pass
+
+    def _clean_packager(self, packager):
+        """
+        If the package is shareable, will remove each disk backup then will
+        only remove the packager if empty.
+        """
+        if packager.is_shareable:
+            targets = (
+                d["target"] for d in self.pending_info["disks"].values()
+            )
+            with packager:
+                for target in targets:
+                    packager.remove(target)
+                if packager.list():
+                    # Other non related backups still exists, do not delete
+                    # the package.
+                    return
+
+        packager.remove_package()
 
     def _clean_aborted_tar(self):
         tar_path = self.get_complete_path_of(self.pending_info["tar"])

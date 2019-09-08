@@ -185,7 +185,32 @@ class TestDomBackup():
         dombkup._clean_pending_info()
         assert len(target_dir.listdir()) == 0
 
-    def test_clean_aborted(self, build_mock_domain, tmpdir, mocker):
+    def test_clean_aborted_packager(self, build_mock_domain, tmpdir, mocker):
+        target_dir = tmpdir.mkdir("clean_aborted")
+        dombkup = self.prepare_clean_aborted_dombkup(
+            build_mock_domain, target_dir, mocker
+        )
+
+        target_dir.join("vda.qcow2").write("")
+        dombkup.pending_info["disks"] = {
+            "vda": {
+                "src": "vda.qcow2", "target": "vda.qcow2",
+                "snapshot": "vda.snap"
+            },
+        }
+        dombkup.pending_info["packager"] = {
+            "type": "directory",
+            "init": {
+                "name": "test", "path": str(target_dir)
+            }
+        }
+        dombkup._dump_pending_info()
+        assert len(target_dir.listdir()) == 2
+
+        dombkup.clean_aborted()
+        assert not target_dir.listdir()
+
+    def test_clean_aborted_legacy(self, build_mock_domain, tmpdir, mocker):
         target_dir = tmpdir.mkdir("clean_aborted")
         dombkup = self.prepare_clean_aborted_dombkup(
             build_mock_domain, target_dir, mocker
@@ -235,7 +260,7 @@ class TestDomBackup():
             }
         }
 
-    def test_clean_aborted_tar(self, build_mock_domain, tmpdir, mocker):
+    def test_clean_aborted_legacy_tar(self, build_mock_domain, tmpdir, mocker):
         target_dir = tmpdir.mkdir("clean_aborted_tar")
         dombkup = self.prepare_clean_aborted_dombkup(
             build_mock_domain, target_dir, mocker
@@ -252,7 +277,6 @@ class TestDomBackup():
 
     def prepare_clean_aborted_dombkup(self, mock_domain, target_dir,
                                       mocker):
-
         dombkup = build_dombackup(dom=mock_domain, target_dir=str(target_dir))
         dombkup.pending_info["date"] = 0
 

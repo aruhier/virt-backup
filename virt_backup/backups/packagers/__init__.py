@@ -28,6 +28,9 @@ def _closed_only(f):
 
 class _AbstractBackupPackager(ABC):
     closed = True
+    #: is_shareable indicates if the same packager can be shared with multiple
+    #: backups.
+    is_shareable = False
 
     def __init__(self, name=None):
         #: Used for logging
@@ -76,7 +79,7 @@ class _AbstractReadBackupPackager(_AbstractBackupPackager, ABC):
         pass
 
 
-class _AbstractWriteBackupPackager(_AbstractBackupPackager, ABC):
+class _AbstractWriteBackupPackager():
 
     @abstractmethod
     def add(self, src, name=None):
@@ -84,6 +87,14 @@ class _AbstractWriteBackupPackager(_AbstractBackupPackager, ABC):
 
     @abstractmethod
     def remove_package(self):
+        pass
+
+
+class _AbstractShareableWriteBackupPackager(_AbstractBackupPackager, ABC):
+    is_shareable = True
+
+    @abstractmethod
+    def remove(self, name):
         pass
 
 

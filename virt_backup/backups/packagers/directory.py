@@ -5,7 +5,7 @@ import shutil
 from virt_backup.exceptions import ImageNotFoundError
 from . import (
     _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractWriteBackupPackager, _opened_only, _closed_only
+    _AbstractShareableWriteBackupPackager, _opened_only, _closed_only
 )
 
 
@@ -63,7 +63,7 @@ class ReadBackupPackagerDir(
 
 
 class WriteBackupPackagerDir(
-        _AbstractWriteBackupPackager, _AbstractBackupPackagerDir
+        _AbstractShareableWriteBackupPackager, _AbstractBackupPackagerDir
 ):
 
     @_opened_only
@@ -75,6 +75,12 @@ class WriteBackupPackagerDir(
         self._copy_file(src, target)
 
         return target
+
+    @_opened_only
+    def remove(self, name):
+        target = os.path.join(self.path, name)
+        self.log(logging.DEBUG, "Remove file %s", target)
+        os.remove(target)
 
     @_closed_only
     def remove_package(self):
