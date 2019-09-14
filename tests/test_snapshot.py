@@ -90,6 +90,19 @@ class TestDomExtSnapshot():
         )
         assert self.snapshot_helper.gen_libvirt_snapshot_xml() == expected_xml
 
+    def test_get_libvirt_snapshot_xml_ignored_disk(self):
+        self.snapshot_helper.disks.pop("vdb")
+        expected_xml = (
+            "<domainsnapshot>\n"
+            "  <description>Pre-backup external snapshot</description>\n"
+            "  <disks>\n"
+            "    <disk name=\"vda\" snapshot=\"external\"/>\n"
+            "    <disk name=\"vdb\" snapshot=\"no\"/>\n"
+            "  </disks>\n"
+            "</domainsnapshot>\n"
+        )
+        assert self.snapshot_helper.gen_libvirt_snapshot_xml() == expected_xml
+
     def test_manually_pivot_disk(self, build_mock_libvirtconn):
         self.snapshot_helper.conn = build_mock_libvirtconn
         self.snapshot_helper._manually_pivot_disk("vda", "/testvda")

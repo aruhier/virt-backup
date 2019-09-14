@@ -8,7 +8,7 @@ import defusedxml.lxml
 import libvirt
 import lxml.etree
 
-from virt_backup.domains import get_xml_block_of_disk
+from virt_backup.domains import get_domain_disks_of, get_xml_block_of_disk
 from virt_backup.exceptions import DiskNotSnapshot, SnapshotNotStarted
 
 
@@ -132,10 +132,19 @@ class DomExtSnapshot():
 
         disks_el = lxml.etree.Element("disks")
         root_el.append(disks_el)
-        for d in sorted(self.disks.keys()):
+
+        all_domain_disks = get_domain_disks_of(
+            defusedxml.lxml.fromstring(self.dom.XMLDesc())
+        )
+        for d in sorted(all_domain_disks.keys()):
             disk_el = lxml.etree.Element("disk")
             disk_el.attrib["name"] = d
-            disk_el.attrib["snapshot"] = "external"
+            # Skipped disks need to have an entry, with a snapshot value
+            # explicitly set to "no", otherwise libvirt will be created a
+            # snapshot for them.
+            disk_el.attrib["snapshot"] = (
+                "external" if d in self.disks else "no"
+            )
             disks_el.append(disk_el)
 
         return lxml.etree.tostring(xml_tree, pretty_print=True).decode()
