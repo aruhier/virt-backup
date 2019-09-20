@@ -230,7 +230,7 @@ class DomBackup(_BaseDomBackup):
         if self.compression not in (None, "tar"):
             mode = "w:{}".format(self.compression)
             extension = "tar.{}".format(self.compression)
-            if self.compression is "xz":
+            if self.compression == "xz":
                 extra_args["preset"] = self.compression_lvl
             else:
                 extra_args["compresslevel"] = self.compression_lvl
