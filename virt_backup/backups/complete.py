@@ -7,7 +7,9 @@ import os
 import shutil
 import tarfile
 
-from virt_backup.backups.packagers import ReadBackupPackagers
+from virt_backup.backups.packagers import (
+    ReadBackupPackagers, WriteBackupPackagers
+)
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
 from virt_backup.tools import copy_file
@@ -156,21 +158,24 @@ class DomCompleteBackup(_BaseDomBackup):
                 self.dom_name, self.backup_dir, self.tar,
             )
 
+    def _get_write_packager(self):
+        if self.tar is None:
+            return WriteBackupPackagers.directory.value(
+                self.dom_name, self.backup_dir
+            )
+        else:
+            return WriteBackupPackagers.tar.value(
+                self.dom_name, self.backup_dir, self.tar,
+            )
+
     def delete(self):
         if not self.backup_dir:
             raise Exception("Backup dir not defined, cannot clean backup")
 
-        if self.tar:
-            self._delete_with_error_printing(
-                self.get_complete_path_of(self.tar)
-            )
-        else:
-            for d in self.disks.values():
-                self._delete_with_error_printing(self.get_complete_path_of(d))
+        packager = self._get_write_packager()
+        self._clean_packager(packager, self.disks.values())
         if self.definition_filename:
-            self._delete_with_error_printing(
-                self.get_complete_path_of(self.definition_filename)
-            )
+            os.remove(self.get_complete_path_of(self.definition_filename))
 
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)

@@ -204,3 +204,9 @@ class TestDomCompleteBackup():
         expected_path = os.path.join(backup.backup_dir, backup.disks["vda"])
 
         assert complete_path_of_vda == expected_path
+
+    def test_delete(self, get_uncompressed_complete_backup):
+        backup = get_uncompressed_complete_backup
+        backup.delete()
+
+        assert not os.path.exists(backup.backup_dir)

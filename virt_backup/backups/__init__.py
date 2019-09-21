@@ -29,6 +29,22 @@ class _BaseDomBackup():
         except Exception as e:
             logger.error("Error removing {}: {}".format(file_to_remove, e))
 
+    def _clean_packager(self, packager, disks):
+        """
+        If the package is shareable, will remove each disk backup then will
+        only remove the packager if empty.
+        """
+        if packager.is_shareable:
+            with packager:
+                for d in disks:
+                    packager.remove(d)
+                if packager.list():
+                    # Other non related backups still exists, do not delete
+                    # the package.
+                    return
+
+        packager.remove_package()
+
     def get_complete_path_of(self, filename):
         # TODO: could be shared, but target_dir and backup_dir have to be
         # renamed
