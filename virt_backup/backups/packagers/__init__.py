@@ -100,7 +100,19 @@ class _AbstractShareableWriteBackupPackager(_AbstractBackupPackager, ABC):
 
 from .directory import ReadBackupPackagerDir, WriteBackupPackagerDir
 from .tar import ReadBackupPackagerTar, WriteBackupPackagerTar
-from .zstd import ReadBackupPackagerZSTD, WriteBackupPackagerZSTD
+try:
+    from .zstd import ReadBackupPackagerZSTD, WriteBackupPackagerZSTD
+except ImportError as e:
+    from .unsupported import (
+        UnsupportedReadBackupPackagerZSTD, UnsupportedWriteBackupPackagerZSTD
+    )
+    ReadBackupPackagerZSTD, WriteBackupPackagerZSTD = (
+        UnsupportedReadBackupPackagerZSTD, UnsupportedWriteBackupPackagerZSTD
+    )
+    error = str(e)
+    ReadBackupPackagerZSTD.reason, WriteBackupPackagerZSTD.reason = (
+        error, error
+    )
 
 
 class ReadBackupPackagers(Enum):

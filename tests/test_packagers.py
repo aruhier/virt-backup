@@ -95,6 +95,7 @@ class TestBackupPackagerTar(_BaseTestBackupPackager):
         )
 
 
+@pytest.mark.extra
 class TestBackupPackagerZSTD(_BaseTestBackupPackager):
 
     @pytest.fixture()

@@ -71,3 +71,11 @@ class BackupPackagerOpenedError(Exception):
                 packager.name
             )
         )
+
+class UnsupportedPackagerError(Exception):
+    def __init__(self, packager_name, reason=None):
+        msg = "Packager {} unsupported".format(packager_name)
+        if reason:
+            msg = "{}: {}".format(msg, reason)
+
+        super().__init__(msg)
