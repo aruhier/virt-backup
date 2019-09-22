@@ -12,17 +12,33 @@ class UnsupportedBackupPackager(_AbstractBackupPackager):
     def __init__(self, *args, **kwargs):
         raise UnsupportedPackagerError(self.packager, self.reason)
 
+    def open(self):
+        pass
+
+    def close(self):
+        pass
+
+    def list(self):
+        pass
+
 
 class UnsupportedReadBackupPackager(
         _AbstractReadBackupPackager, UnsupportedBackupPackager
 ):
-    pass
+
+    def restore(self, name, target):
+        pass
 
 
 class UnsupportedWriteBackupPackager(
         _AbstractWriteBackupPackager, UnsupportedBackupPackager
 ):
-    pass
+
+    def add(self, src, name=None):
+        pass
+
+    def remove_package(self, name):
+        pass
 
 
 class UnsupportedReadBackupPackagerZSTD(UnsupportedReadBackupPackager):

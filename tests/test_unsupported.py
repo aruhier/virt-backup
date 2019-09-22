@@ -11,17 +11,21 @@ from virt_backup.backups.packagers.unsupported import (
 
 @pytest.mark.no_extra
 @pytest.mark.no_zstd
-class UnsupportedZSTD():
+class TestUnsupportedZSTD():
 
     def test_zstd_unsupported(self):
-        assert isinstance(
-            ReadBackupPackagers.zstd, UnsupportedReadBackupPackagerZSTD
+        assert (
+            ReadBackupPackagers.zstd.value == UnsupportedReadBackupPackagerZSTD
         )
-        assert isinstance(
-            WriteBackupPackagers.zstd, UnsupportedWriteBackupPackagerZSTD
+        assert (
+            WriteBackupPackagers.zstd.value ==
+            UnsupportedWriteBackupPackagerZSTD
         )
 
     def test_unsupported_error(self):
-        for packager in ReadBackupPackagers.zstd, WriteBackupPackagers.zstd:
+        packagers = (
+            ReadBackupPackagers.zstd.value, WriteBackupPackagers.zstd.value
+        )
+        for packager in packagers:
             with pytest.raises(UnsupportedPackagerError):
                 packager()
