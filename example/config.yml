@@ -35,6 +35,7 @@ passphrase:
 
 ## Define default options for all groups. ##
 default:
+  hourly: 1
   daily: 4
   weekly: 2
   monthly: 5
