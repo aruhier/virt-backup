@@ -1,0 +1,41 @@
+---
+
+debug: False
+threads: 1
+
+uri: "qemu:///system"
+username:
+passphrase:
+
+default:
+  daily: 4
+  weekly: 2
+  monthly: 5
+  yearly: 1
+
+groups:
+  test:
+    target: /mnt/kvm/backups
+    compression: xz
+    compression_lvl: 6
+    autostart: True
+
+    hourly: 1
+    daily: 3
+    weekly: 2
+    monthly: 5
+    yearly: 1
+
+    hosts:
+      - host: domainname
+        disks:
+          - vda
+          - vdb
+      - domainname2
+      - "r:^prod.*"
+      - "!domainname3"
+      - "!r:^test.*"
+
+  test_dir:
+    compression:
+    target: /mnt/kvm/backups

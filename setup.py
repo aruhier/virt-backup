@@ -36,7 +36,7 @@ setup(
         "PyYAML"
     ],
     setup_requires=['pytest-runner', ],
-    tests_require=['pytest', 'pytest-cov', "pytest-mock"],
+    tests_require=['pytest', 'pytest-cov', "pytest-mock", "deepdiff"],
     extras_require={"zstd": ["zstandard"], },
     entry_points={
         'console_scripts': [
