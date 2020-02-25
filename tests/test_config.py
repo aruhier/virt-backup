@@ -1,4 +1,3 @@
-
 import pytest
 
 import os
@@ -17,9 +16,7 @@ def get_testing_config():
 
 
 def test_get_config():
-    config.CONFIG_DIRS = (
-        (os.path.join(CUR_PATH, "testconfig"), ) + config.CONFIG_DIRS
-    )
+    config.CONFIG_DIRS = (os.path.join(CUR_PATH, "testconfig"),) + config.CONFIG_DIRS
     conf = get_config()
     with open(os.path.join(config.CONFIG_DIRS[0], "config.yml"), "r") as f:
         expected_conf = yaml.safe_load(f)
@@ -44,7 +41,7 @@ def test_get_config_not_existing(tmpdir):
         get_config(custom_path=testconf_path)
 
 
-class TestConfig():
+class TestConfig:
     def test_config(self):
         Config()
 
@@ -75,7 +72,9 @@ class TestConfig():
         conf = Config()
 
         conf["default"] = {"daily": 4}
-        conf["groups"] = {"test_group": {"daily": 3, }, }
+        conf["groups"] = {
+            "test_group": {"daily": 3,},
+        }
 
         groups = conf.get_groups()
         assert groups["test_group"]["daily"] == 3

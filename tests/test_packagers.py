@@ -3,9 +3,7 @@ import os
 import pytest
 
 from virt_backup.exceptions import ImageNotFoundError
-from virt_backup.backups.packagers import (
-    ReadBackupPackagers, WriteBackupPackagers
-)
+from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
 
 
 @pytest.fixture()
@@ -16,7 +14,6 @@ def new_image(tmpdir, name="test", content="test"):
 
 
 class _BaseTestBackupPackager(ABC):
-
     def test_add(self, write_packager, new_image):
         with write_packager:
             write_packager.add(str(new_image))
@@ -58,12 +55,9 @@ class _BaseTestBackupPackager(ABC):
 
 
 class TestBackupPackagerDir(_BaseTestBackupPackager):
-
     @pytest.fixture()
     def read_packager(self, tmpdir):
-        return ReadBackupPackagers.directory.value(
-            "test", str(tmpdir.join("packager"))
-        )
+        return ReadBackupPackagers.directory.value("test", str(tmpdir.join("packager")))
 
     @pytest.fixture()
     def write_packager(self, tmpdir):
@@ -81,7 +75,6 @@ class TestBackupPackagerDir(_BaseTestBackupPackager):
 
 
 class TestBackupPackagerTar(_BaseTestBackupPackager):
-
     @pytest.fixture()
     def read_packager(self, tmpdir):
         return ReadBackupPackagers.tar.value(
@@ -97,7 +90,6 @@ class TestBackupPackagerTar(_BaseTestBackupPackager):
 
 @pytest.mark.extra
 class TestBackupPackagerZSTD(_BaseTestBackupPackager):
-
     @pytest.fixture()
     def read_packager(self, tmpdir):
         return ReadBackupPackagers.zstd.value(

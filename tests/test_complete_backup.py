@@ -13,9 +13,7 @@ from helper.virt_backup import build_complete_backup_files_from_domainbackup
 
 
 def transform_dombackup_to_dom_complete_backup(dombkup):
-    definition = build_complete_backup_files_from_domainbackup(
-        dombkup, arrow.now()
-    )
+    definition = build_complete_backup_files_from_domainbackup(dombkup, arrow.now())
 
     return build_dom_complete_backup_from_def(definition, dombkup.target_dir)
 
@@ -61,16 +59,15 @@ def get_and_tweak_def_from_dombackup(dombkup, date=None):
 
 def test_get_complete_backup_from_def(build_bak_definition_with_compression):
     definition = build_bak_definition_with_compression
-    complete_backup = build_dom_complete_backup_from_def(
-        definition, backup_dir="./"
-    )
+    complete_backup = build_dom_complete_backup_from_def(definition, backup_dir="./")
 
     assert complete_backup.dom_xml == definition["domain_xml"]
 
 
-class TestDomCompleteBackup():
-    def test_restore_disk_in_domain(self, get_uncompressed_complete_backup,
-                                    build_stopped_mock_domain, tmpdir):
+class TestDomCompleteBackup:
+    def test_restore_disk_in_domain(
+        self, get_uncompressed_complete_backup, build_stopped_mock_domain, tmpdir
+    ):
         backup = get_uncompressed_complete_backup
         domain = build_stopped_mock_domain
 
@@ -82,12 +79,13 @@ class TestDomCompleteBackup():
 
         assert filecmp.cmp(src_img, dst_img)
         assert (
-            get_domain_disks_of(domain.XMLDesc())["vda"]["type"] ==
-            get_domain_disks_of(backup.dom_xml)["vda"]["type"]
+            get_domain_disks_of(domain.XMLDesc())["vda"]["type"]
+            == get_domain_disks_of(backup.dom_xml)["vda"]["type"]
         )
 
     def test_restore_disk_in_running_domain(
-            self, get_uncompressed_complete_backup, build_mock_domain):
+        self, get_uncompressed_complete_backup, build_mock_domain
+    ):
         backup = get_uncompressed_complete_backup
         domain = build_mock_domain
 
@@ -103,8 +101,7 @@ class TestDomCompleteBackup():
 
         return self.restore_to(backup, target_dir)
 
-    def test_restore_to_with_tar(self, get_compressed_complete_backup,
-                                 tmpdir):
+    def test_restore_to_with_tar(self, get_compressed_complete_backup, tmpdir):
         """
         Test with a not compressed backup
         """
@@ -119,8 +116,7 @@ class TestDomCompleteBackup():
         # there should be 1 .xml file + all disks
         assert len(target.listdir()) == 1 + len(complete_backup.disks)
 
-    def test_restore_disk_to_dir(self, get_uncompressed_complete_backup,
-                                 tmpdir):
+    def test_restore_disk_to_dir(self, get_uncompressed_complete_backup, tmpdir):
         backup = get_uncompressed_complete_backup
         src_img = backup.get_complete_path_of(backup.disks["vda"])
         extract_dir = tmpdir.mkdir("extract")
@@ -144,14 +140,16 @@ class TestDomCompleteBackup():
         assert filecmp.cmp(src_img, dst_img)
 
     def test_restore_replace_domain(
-            self, get_uncompressed_complete_backup, build_mock_libvirtconn):
+        self, get_uncompressed_complete_backup, build_mock_libvirtconn
+    ):
         conn = build_mock_libvirtconn
         backup = get_uncompressed_complete_backup
 
         backup.restore_replace_domain(conn)
 
     def test_restore_domain_to(
-            self, get_uncompressed_complete_backup, build_mock_libvirtconn):
+        self, get_uncompressed_complete_backup, build_mock_libvirtconn
+    ):
         """
         Test to restore the domain to a specific id
         """
@@ -161,8 +159,7 @@ class TestDomCompleteBackup():
         # TODO: check if id of the new domain matches
         backup.restore_replace_domain(conn, id=13)
 
-    def test_restore_compressed_disk_to(
-            self, get_compressed_complete_backup, tmpdir):
+    def test_restore_compressed_disk_to(self, get_compressed_complete_backup, tmpdir):
         """
         Test with a compressed backup
         """
@@ -176,7 +173,8 @@ class TestDomCompleteBackup():
         assert filecmp.cmp(src_img, dst_img, shallow=False)
 
     def test_restore_compressed_disk_to_dir(
-            self, get_compressed_complete_backup, tmpdir):
+        self, get_compressed_complete_backup, tmpdir
+    ):
         """
         Test with a compressed backup
         """
@@ -196,8 +194,7 @@ class TestDomCompleteBackup():
 
         return backup.get_complete_path_of(backup.disks[disk])
 
-    def test_get_complete_backup_from_def(
-            self, get_uncompressed_complete_backup):
+    def test_get_complete_backup_from_def(self, get_uncompressed_complete_backup):
         backup = get_uncompressed_complete_backup
 
         complete_path_of_vda = backup.get_complete_path_of(backup.disks["vda"])

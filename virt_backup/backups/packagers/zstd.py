@@ -7,8 +7,11 @@ import zstandard as zstd
 
 from virt_backup.exceptions import ImageNotFoundError
 from . import (
-    _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractWriteBackupPackager, _opened_only, _closed_only
+    _AbstractBackupPackager,
+    _AbstractReadBackupPackager,
+    _AbstractWriteBackupPackager,
+    _opened_only,
+    _closed_only,
 )
 
 
@@ -64,17 +67,13 @@ class _AbstractBackupPackagerZSTD(_AbstractBackupPackager):
         return results
 
 
-class ReadBackupPackagerZSTD(
-        _AbstractReadBackupPackager, _AbstractBackupPackagerZSTD
-):
+class ReadBackupPackagerZSTD(_AbstractReadBackupPackager, _AbstractBackupPackagerZSTD):
     _mode = "r"
 
     @_opened_only
     def restore(self, name, target):
         if name not in self.list():
-            raise ImageNotFoundError(
-                self.archive_path(name), self.complete_path
-            )
+            raise ImageNotFoundError(self.archive_path(name), self.complete_path)
 
         if not os.path.exists(target) and target.endswith("/"):
             os.makedirs(target)
@@ -90,16 +89,14 @@ class ReadBackupPackagerZSTD(
 
 
 class WriteBackupPackagerZSTD(
-        _AbstractWriteBackupPackager, _AbstractBackupPackagerZSTD
+    _AbstractWriteBackupPackager, _AbstractBackupPackagerZSTD
 ):
     _mode = "x"
 
     @_opened_only
     def add(self, src, name=None):
         name = name or os.path.basename(src)
-        self.log(
-            logging.DEBUG, "Add %s into %s", src, self.archive_path(name)
-        )
+        self.log(logging.DEBUG, "Add %s into %s", src, self.archive_path(name))
         cctx = zstd.ZstdCompressor()
         with open(src, "rb") as ifh:
             with open(self.archive_path(name), "wb") as ofh:
@@ -110,9 +107,7 @@ class WriteBackupPackagerZSTD(
     @_opened_only
     def remove(self, name):
         if name not in self.list():
-            raise ImageNotFoundError(
-                self.archive_path(name), self.complete_path
-            )
+            raise ImageNotFoundError(self.archive_path(name), self.complete_path)
 
         os.remove(self.archive_path(name))
 

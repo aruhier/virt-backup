@@ -4,8 +4,11 @@ import shutil
 
 from virt_backup.exceptions import ImageNotFoundError
 from . import (
-    _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractShareableWriteBackupPackager, _opened_only, _closed_only
+    _AbstractBackupPackager,
+    _AbstractReadBackupPackager,
+    _AbstractShareableWriteBackupPackager,
+    _opened_only,
+    _closed_only,
 )
 
 
@@ -48,10 +51,7 @@ class _AbstractBackupPackagerDir(_AbstractBackupPackager):
         return dst
 
 
-class ReadBackupPackagerDir(
-        _AbstractReadBackupPackager, _AbstractBackupPackagerDir
-):
-
+class ReadBackupPackagerDir(_AbstractReadBackupPackager, _AbstractBackupPackagerDir):
     @_opened_only
     def restore(self, name, target):
         src = os.path.join(self.path, name)
@@ -63,9 +63,8 @@ class ReadBackupPackagerDir(
 
 
 class WriteBackupPackagerDir(
-        _AbstractShareableWriteBackupPackager, _AbstractBackupPackagerDir
+    _AbstractShareableWriteBackupPackager, _AbstractBackupPackagerDir
 ):
-
     @_opened_only
     def add(self, src, name=None):
         if not name:

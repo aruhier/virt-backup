@@ -1,7 +1,8 @@
 from virt_backup.exceptions import UnsupportedPackagerError
 from . import (
-    _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractWriteBackupPackager
+    _AbstractBackupPackager,
+    _AbstractReadBackupPackager,
+    _AbstractWriteBackupPackager,
 )
 
 
@@ -23,17 +24,15 @@ class UnsupportedBackupPackager(_AbstractBackupPackager):
 
 
 class UnsupportedReadBackupPackager(
-        _AbstractReadBackupPackager, UnsupportedBackupPackager
+    _AbstractReadBackupPackager, UnsupportedBackupPackager
 ):
-
     def restore(self, name, target):
         pass
 
 
 class UnsupportedWriteBackupPackager(
-        _AbstractWriteBackupPackager, UnsupportedBackupPackager
+    _AbstractWriteBackupPackager, UnsupportedBackupPackager
 ):
-
     def add(self, src, name=None):
         pass
 

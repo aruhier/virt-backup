@@ -4,15 +4,18 @@ from virt_backup.domains import get_domain_disks_of
 
 
 __all__ = [
-    "DomBackup", "DomCompleteBackup", "DomExtSnapshotCallbackRegistrer",
-    "build_dom_complete_backup_from_def", "build_dom_backup_from_pending_info"
+    "DomBackup",
+    "DomCompleteBackup",
+    "DomExtSnapshotCallbackRegistrer",
+    "build_dom_complete_backup_from_def",
+    "build_dom_backup_from_pending_info",
 ]
 
 
 logger = logging.getLogger("virt_backup")
 
 
-class _BaseDomBackup():
+class _BaseDomBackup:
     def _parse_dom_xml(self):
         """
         Parse the domain's definition

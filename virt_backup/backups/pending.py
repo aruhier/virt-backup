@@ -9,9 +9,7 @@ import subprocess
 import tarfile
 
 import virt_backup
-from virt_backup.backups.packagers import (
-    ReadBackupPackagers, WriteBackupPackagers
-)
+from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
 from virt_backup.domains import get_xml_block_of_disk
 from virt_backup.tools import copy_file
 from . import _BaseDomBackup
@@ -22,7 +20,7 @@ logger = logging.getLogger("virt_backup")
 
 
 def build_dom_backup_from_pending_info(
-        pending_info, backup_dir, conn, callbacks_registrer
+    pending_info, backup_dir, conn, callbacks_registrer
 ):
     backup = DomBackup(
         dom=conn.lookupByName(pending_info["domain_name"]),
@@ -30,7 +28,7 @@ def build_dom_backup_from_pending_info(
         dev_disks=tuple(pending_info.get("disks", {}).keys()),
         compression=pending_info.get("compression", "tar"),
         compression_lvl=pending_info.get("compression_lvl", None),
-        callbacks_registrer=callbacks_registrer
+        callbacks_registrer=callbacks_registrer,
     )
     backup.pending_info = pending_info
 
@@ -41,9 +39,20 @@ class DomBackup(_BaseDomBackup):
     """
     Libvirt domain backup
     """
-    def __init__(self, dom, target_dir=None, dev_disks=None, compression="tar",
-                 compression_lvl=None, conn=None, timeout=None, disks=None,
-                 ext_snapshot_helper=None, callbacks_registrer=None):
+
+    def __init__(
+        self,
+        dom,
+        target_dir=None,
+        dev_disks=None,
+        compression="tar",
+        compression_lvl=None,
+        conn=None,
+        timeout=None,
+        disks=None,
+        ext_snapshot_helper=None,
+        callbacks_registrer=None,
+    ):
         """
         :param dev_disks: list of disks dev names to backup. Disks will be
                           searched in the domain to pull more informations, and
@@ -154,13 +163,10 @@ class DomBackup(_BaseDomBackup):
         try:
             self._running = True
             self._ext_snapshot_helper = DomExtSnapshot(
-                self.dom, self.disks, self._callbacks_registrer, self.conn,
-                self.timeout
+                self.dom, self.disks, self._callbacks_registrer, self.conn, self.timeout
             )
 
-            snapshot_date, definition = (
-                self._snapshot_and_save_date(definition)
-            )
+            snapshot_date, definition = self._snapshot_and_save_date(definition)
             packager = self._get_packager(snapshot_date)
 
             # TODO: handle backingStore cases
@@ -187,9 +193,7 @@ class DomBackup(_BaseDomBackup):
         self.pending_info["packager"] = {}
         packager = None
         packager_type = ""
-        kwargs = {
-            "name": name, "path": self.target_dir
-        }
+        kwargs = {"name": name, "path": self.target_dir}
 
         if not self.compression:
             packager_type = "directory"
@@ -224,8 +228,9 @@ class DomBackup(_BaseDomBackup):
         self.pending_info["disks"] = {
             disk: {
                 "src": prop["src"],
-                "snapshot": snapshot_metadatas["disks"][disk]["snapshot"]
-            } for disk, prop in self.disks.items()
+                "snapshot": snapshot_metadatas["disks"][disk]["snapshot"],
+            }
+            for disk, prop in self.disks.items()
         }
         self._dump_pending_info()
 
@@ -238,8 +243,10 @@ class DomBackup(_BaseDomBackup):
         return {
             "compression": self.compression,
             "compression_lvl": self.compression_lvl,
-            "domain_id": self.dom.ID(), "domain_name": self.dom.name(),
-            "domain_xml": self.dom.XMLDesc(), "version": virt_backup.VERSION
+            "domain_id": self.dom.ID(),
+            "domain_name": self.dom.name(),
+            "domain_xml": self.dom.XMLDesc(),
+            "version": virt_backup.VERSION,
         }
 
     def _backup_disk(self, disk, disk_properties, packager, definition):
@@ -255,8 +262,7 @@ class DomBackup(_BaseDomBackup):
         snapshot_date = arrow.get(definition["date"]).to("local")
         logger.info("%s: Backup disk %s", self.dom.name(), disk)
         bak_img = "{}.{}".format(
-            self._disk_backup_name_format(snapshot_date, disk),
-            disk_properties["type"]
+            self._disk_backup_name_format(snapshot_date, disk), disk_properties["type"]
         )
         self.pending_info["disks"][disk]["target"] = bak_img
         self._dump_pending_info()
@@ -274,9 +280,7 @@ class DomBackup(_BaseDomBackup):
         :param snapdate: date when external snapshots have been created
         :param disk_name: disk name currently being backup
         """
-        return (
-            "{}_{}".format(self._main_backup_name_format(snapdate), disk_name)
-        )
+        return "{}_{}".format(self._main_backup_name_format(snapdate), disk_name)
 
     def post_backup(self, backup_target):
         """
@@ -305,7 +309,7 @@ class DomBackup(_BaseDomBackup):
         backup_date = arrow.get(definition["date"]).to("local")
         definition_path = os.path.join(
             self.target_dir,
-            "{}.{}".format(self._main_backup_name_format(backup_date), "json")
+            "{}.{}".format(self._main_backup_name_format(backup_date), "json"),
         )
         with open(definition_path, "w") as json_definition:
             json.dump(definition, json_definition, indent=4)
@@ -328,9 +332,7 @@ class DomBackup(_BaseDomBackup):
         backup_date = arrow.get(self.pending_info["date"]).to("local")
         json_path = os.path.join(
             self.target_dir,
-            "{}.{}.pending".format(
-                self._main_backup_name_format(backup_date), "json"
-            )
+            "{}.{}.pending".format(self._main_backup_name_format(backup_date), "json"),
         )
         return json_path
 
@@ -347,13 +349,11 @@ class DomBackup(_BaseDomBackup):
 
     def clean_aborted(self):
         is_ext_snap_helper_needed = (
-            not self._ext_snapshot_helper and
-            self.pending_info.get("disks", None)
+            not self._ext_snapshot_helper and self.pending_info.get("disks", None)
         )
         if is_ext_snap_helper_needed:
             self._ext_snapshot_helper = DomExtSnapshot(
-                self.dom, self.disks, self._callbacks_registrer, self.conn,
-                self.timeout
+                self.dom, self.disks, self._callbacks_registrer, self.conn, self.timeout
             )
             self._ext_snapshot_helper.metadatas = {
                 "disks": {
@@ -373,8 +373,7 @@ class DomBackup(_BaseDomBackup):
                 self._clean_packager(packager)
             except FileNotFoundError:
                 logger.info(
-                    "%s: Packager not found, nothing to clean.",
-                    self.dom.name()
+                    "%s: Packager not found, nothing to clean.", self.dom.name()
                 )
         else:
             # Legacy. Could be removed once issue #22 is done.
@@ -394,9 +393,7 @@ class DomBackup(_BaseDomBackup):
         only remove the packager if empty.
         """
         if packager.is_shareable:
-            targets = (
-                d["target"] for d in self.pending_info["disks"].values()
-            )
+            targets = (d["target"] for d in self.pending_info["disks"].values())
             with packager:
                 for target in targets:
                     packager.remove(target)
@@ -428,12 +425,11 @@ class DomBackup(_BaseDomBackup):
         compression and compression_lvl, self and dombackup are considered
         compatibles.
         """
+
         def same_dombackup_and_self_attr(attr):
             return getattr(self, attr) == getattr(dombackup, attr)
 
-        attributes_to_compare = (
-            "target_dir", "compression", "compression_lvl"
-        )
+        attributes_to_compare = ("target_dir", "compression", "compression_lvl")
         for a in attributes_to_compare:
             if not same_dombackup_and_self_attr(a):
                 return False

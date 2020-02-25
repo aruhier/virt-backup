@@ -1,4 +1,3 @@
-
 import arrow
 import defusedxml.lxml
 import logging
@@ -7,9 +6,7 @@ import os
 import shutil
 import tarfile
 
-from virt_backup.backups.packagers import (
-    ReadBackupPackagers, WriteBackupPackagers
-)
+from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
 from virt_backup.tools import copy_file
@@ -19,8 +16,9 @@ from . import _BaseDomBackup
 logger = logging.getLogger("virt_backup")
 
 
-def build_dom_complete_backup_from_def(definition, backup_dir,
-                                       definition_filename=None):
+def build_dom_complete_backup_from_def(
+    definition, backup_dir, definition_filename=None
+):
     backup = DomCompleteBackup(
         dom_name=definition["domain_name"],
         backup_dir=backup_dir,
@@ -37,8 +35,16 @@ def build_dom_complete_backup_from_def(definition, backup_dir,
 
 
 class DomCompleteBackup(_BaseDomBackup):
-    def __init__(self, dom_name, backup_dir, date=None, dom_xml=None,
-                 disks=None, tar=None, definition_filename=None):
+    def __init__(
+        self,
+        dom_name,
+        backup_dir,
+        date=None,
+        dom_xml=None,
+        disks=None,
+        tar=None,
+        definition_filename=None,
+    ):
         #: domain name
         self.dom_name = dom_name
 
@@ -65,9 +71,7 @@ class DomCompleteBackup(_BaseDomBackup):
         :param conn: libvirt connection to the hypervisor
         :param id: new id for the restored domain
         """
-        dom_xml = (
-            self._get_dom_xml_with_other_id(id) if id else self.dom_xml
-        )
+        dom_xml = self._get_dom_xml_with_other_id(id) if id else self.dom_xml
         return conn.defineXML(dom_xml)
 
     def _get_dom_xml_with_other_id(self, id):
@@ -88,9 +92,9 @@ class DomCompleteBackup(_BaseDomBackup):
         :param disk_to_replace: which disk of `domain` to replace
         """
         self._ensure_domain_not_running(domain)
-        disk_target_path = (
-            get_domain_disks_of(domain.XMLDesc(), disk_to_replace)[disk]["src"]
-        )
+        disk_target_path = get_domain_disks_of(domain.XMLDesc(), disk_to_replace)[disk][
+            "src"
+        ]
 
         # TODO: restore disk with a correct extension, and not by keeping the
         #       old disk one
@@ -103,17 +107,12 @@ class DomCompleteBackup(_BaseDomBackup):
             raise DomainRunningError(domain)
 
     def _copy_disk_driver_with_domain(self, disk, domain, domain_disk):
-        disk_xml = self._get_elemxml_of_domain_disk(
-            self._parse_dom_xml(), disk
-        )
+        disk_xml = self._get_elemxml_of_domain_disk(self._parse_dom_xml(), disk)
         domain_xml = defusedxml.lxml.fromstring(domain.XMLDesc())
-        domain_disk_xml = self._get_elemxml_of_domain_disk(
-            domain_xml, domain_disk
-        )
+        domain_disk_xml = self._get_elemxml_of_domain_disk(domain_xml, domain_disk)
 
         domain_disk_xml.replace(
-            domain_disk_xml.xpath("driver")[0],
-            disk_xml.xpath("driver")[0]
+            domain_disk_xml.xpath("driver")[0], disk_xml.xpath("driver")[0]
         )
 
     def _get_elemxml_of_domain_disk(self, dom_xml, disk):
@@ -150,9 +149,7 @@ class DomCompleteBackup(_BaseDomBackup):
 
     def _get_packager(self):
         if self.tar is None:
-            return ReadBackupPackagers.directory.value(
-                self.dom_name, self.backup_dir
-            )
+            return ReadBackupPackagers.directory.value(self.dom_name, self.backup_dir)
         else:
             return ReadBackupPackagers.tar.value(
                 self.dom_name, self.backup_dir, self.tar,
@@ -160,9 +157,7 @@ class DomCompleteBackup(_BaseDomBackup):
 
     def _get_write_packager(self):
         if self.tar is None:
-            return WriteBackupPackagers.directory.value(
-                self.dom_name, self.backup_dir
-            )
+            return WriteBackupPackagers.directory.value(self.dom_name, self.backup_dir)
         else:
             return WriteBackupPackagers.tar.value(
                 self.dom_name, self.backup_dir, self.tar,

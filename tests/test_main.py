@@ -5,8 +5,11 @@ import pytest
 
 import virt_backup.__main__
 from virt_backup.__main__ import (
-    build_all_or_selected_groups, clean_backups,
-    build_parser, list_groups, get_usable_complete_groups,
+    build_all_or_selected_groups,
+    clean_backups,
+    build_parser,
+    list_groups,
+    get_usable_complete_groups,
 )
 from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
@@ -22,7 +25,7 @@ def args_parser():
     return build_parser()
 
 
-class AbstractMainTest():
+class AbstractMainTest:
     backups = None
 
     @pytest.fixture
@@ -45,13 +48,12 @@ class AbstractMainTest():
 
 
 class AbstractTestList(AbstractMainTest):
-
     def extract_groups(self, list_output):
         raise NotImplementedError()
 
 
 class TestList(AbstractTestList):
-    default_parser_args = ("list", )
+    default_parser_args = ("list",)
 
     def test_list_basic(self, args_parser, mocked_config, capsys):
         args = args_parser.parse_args(self.default_parser_args)
@@ -77,9 +79,9 @@ class TestList(AbstractTestList):
             group_name = lines[0].lstrip().rstrip()
             groups[group_name] = {}
 
-            nb_domains = int(re.match(
-                r".*: (?P<domains>\d*) .*, \d* .*$", lines[2]
-            ).group("domains"))
+            nb_domains = int(
+                re.match(r".*: (?P<domains>\d*) .*, \d* .*$", lines[2]).group("domains")
+            )
 
             for i in range(nb_domains):
                 domain, nb_backups = re.match(
@@ -88,7 +90,7 @@ class TestList(AbstractTestList):
 
                 groups[group_name][domain.lstrip()] = int(nb_backups)
 
-            lines = lines[4 + nb_domains:]
+            lines = lines[4 + nb_domains :]
 
         return groups
 
@@ -139,9 +141,9 @@ class TestListShort(TestList):
         while lines:
             group_name = lines[0].lstrip().rstrip()
 
-            nb_backups = int(re.match(
-                r".*: \d* .*, (?P<backups>\d*) .*$", lines[2]
-            ).group("backups"))
+            nb_backups = int(
+                re.match(r".*: \d* .*, (?P<backups>\d*) .*$", lines[2]).group("backups")
+            )
             groups[group_name] = nb_backups
 
             lines = lines[3:]
@@ -163,9 +165,7 @@ class TestListDetailed(AbstractTestList):
     default_parser_args = ("list",)
 
     def test_list_detailed(self, args_parser, mocked_config, capsys):
-        args = args_parser.parse_args(
-            self.default_parser_args + ("-D", "matching", )
-        )
+        args = args_parser.parse_args(self.default_parser_args + ("-D", "matching",))
         return self.list_and_compare(args, mocked_config, capsys)
 
     def list_and_compare(self, args, mocked_config, capsys):
@@ -200,12 +200,12 @@ class TestListDetailed(AbstractTestList):
 
                 host, nb_backups = (
                     host_matching.group("host"),
-                    int(host_matching.group("backups"))
+                    int(host_matching.group("backups")),
                 )
                 groups[group_name][host] = self.extract_backups_for_host(
-                    lines[1:1 + nb_backups]
+                    lines[1 : 1 + nb_backups]
                 )
-                lines = lines[1 + nb_backups:]
+                lines = lines[1 + nb_backups :]
 
             lines = lines[3:]
 
@@ -232,8 +232,7 @@ class TestListDetailed(AbstractTestList):
                     h, parsed_group, backups, groups[parsed_group]
                 )
 
-    def compare_parsed_host_with_complete(self, host, group, backups,
-                                          complete_group):
+    def compare_parsed_host_with_complete(self, host, group, backups, complete_group):
         scanned_backups = complete_group.backups[host]
         assert len(scanned_backups) == len(backups)
 
@@ -245,8 +244,7 @@ class TestListDetailed(AbstractTestList):
                 scanned_backup.definition_filename
             )
 
-    def test_list_detailed_multiple_hosts(self, args_parser, mocked_config,
-                                          capsys):
+    def test_list_detailed_multiple_hosts(self, args_parser, mocked_config, capsys):
         args = args_parser.parse_args(
             self.default_parser_args + ("-D", "matching", "-D", "vm-10")
         )
@@ -254,9 +252,7 @@ class TestListDetailed(AbstractTestList):
 
     def test_list_detailed_empty(self, args_parser, mocked_config, capsys):
         with pytest.raises(SystemExit):
-            args_parser.parse_args(
-                self.default_parser_args + ("-D",)
-            )
+            args_parser.parse_args(self.default_parser_args + ("-D",))
 
 
 class TestListAll(TestList):
@@ -275,11 +271,10 @@ class TestListAll(TestList):
                                    be printed in the listing
         """
         callbacks_registrer = DomExtSnapshotCallbackRegistrer(self.conn)
-        complete_groups = {
-            g.name: g for g in get_usable_complete_groups(config)
-        }
+        complete_groups = {g.name: g for g in get_usable_complete_groups(config)}
         pending_groups = {
-            g.name: g for g in build_all_or_selected_groups(
+            g.name: g
+            for g in build_all_or_selected_groups(
                 config, self.conn, callbacks_registrer
             )
         }
@@ -294,13 +289,11 @@ class TestListAll(TestList):
             assert sorted(parsed_values.keys()) == sorted(expected_domains)
 
             for parsed_domain, parsed_backups in parsed_values.items():
-                assert parsed_backups == len(
-                    cgroup.backups.get(parsed_domain, [])
-                )
+                assert parsed_backups == len(cgroup.backups.get(parsed_domain, []))
 
 
 class TestClean(AbstractMainTest):
-    default_parser_args = ("clean", )
+    default_parser_args = ("clean",)
 
     def test_clean_basic(self, args_parser, mocked_config, mocked_conn):
         args = args_parser.parse_args(self.default_parser_args)
@@ -308,30 +301,26 @@ class TestClean(AbstractMainTest):
 
 
 def mock_get_config(monkeypatch):
-    config = Config(defaults={"debug": False, })
+    config = Config(defaults={"debug": False,})
     config.from_dict(get_config(TESTCONF_PATH))
 
-    monkeypatch.setattr(
-        virt_backup.__main__, "get_setup_config", lambda: config
-    )
+    monkeypatch.setattr(virt_backup.__main__, "get_setup_config", lambda: config)
 
     return config
 
 
 def mock_get_conn(monkeypatch, conn):
-    monkeypatch.setattr(
-        virt_backup.__main__, "get_setup_conn", lambda x: conn
-    )
+    monkeypatch.setattr(virt_backup.__main__, "get_setup_conn", lambda x: conn)
 
 
 def mock_callbacks_registrer(monkeypatch):
     monkeypatch.setattr(
-        virt_backup.__main__.DomExtSnapshotCallbackRegistrer, "open",
-        lambda *args: None
+        virt_backup.__main__.DomExtSnapshotCallbackRegistrer, "open", lambda *args: None
     )
     monkeypatch.setattr(
-        virt_backup.__main__.DomExtSnapshotCallbackRegistrer, "close",
-        lambda *args: None
+        virt_backup.__main__.DomExtSnapshotCallbackRegistrer,
+        "close",
+        lambda *args: None,
     )
 
 

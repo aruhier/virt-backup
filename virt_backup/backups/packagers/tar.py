@@ -6,8 +6,11 @@ import tarfile
 
 from virt_backup.exceptions import ImageNotFoundError
 from . import (
-    _AbstractBackupPackager, _AbstractReadBackupPackager,
-    _AbstractWriteBackupPackager, _opened_only, _closed_only
+    _AbstractBackupPackager,
+    _AbstractReadBackupPackager,
+    _AbstractWriteBackupPackager,
+    _opened_only,
+    _closed_only,
 )
 
 
@@ -16,8 +19,7 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
     _mode = ""
 
     def __init__(
-            self, name, path, archive_name, compression=None,
-            compression_lvl=None
+        self, name, path, archive_name, compression=None, compression_lvl=None
     ):
         super().__init__(name)
 
@@ -67,13 +69,8 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
         if not os.path.isdir(self.path):
             os.makedirs(self.path)
 
-        mode = (
-            "{}:{}".format(mode_prefix, mode_suffix) if mode_suffix
-            else mode_prefix
-        )
-        return tarfile.open(
-            self.complete_path, mode, **extra_args
-        )
+        mode = "{}:{}".format(mode_prefix, mode_suffix) if mode_suffix else mode_prefix
+        return tarfile.open(self.complete_path, mode, **extra_args)
 
     @_opened_only
     def close(self):
@@ -85,9 +82,7 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
         return self._tarfile.getnames()
 
 
-class ReadBackupPackagerTar(
-        _AbstractReadBackupPackager, _AbstractBackupPackagerTar
-):
+class ReadBackupPackagerTar(_AbstractReadBackupPackager, _AbstractBackupPackagerTar):
     _mode = "r"
 
     @_opened_only
@@ -104,16 +99,12 @@ class ReadBackupPackagerTar(
 
         self._tarfile.fileobj.flush()
         with open(target, "xb") as ftarget:
-            shutil.copyfileobj(
-                self._tarfile.extractfile(disk_tarinfo), ftarget
-            )
+            shutil.copyfileobj(self._tarfile.extractfile(disk_tarinfo), ftarget)
 
             return target
 
 
-class WriteBackupPackagerTar(
-        _AbstractWriteBackupPackager, _AbstractBackupPackagerTar
-):
+class WriteBackupPackagerTar(_AbstractWriteBackupPackager, _AbstractBackupPackagerTar):
     _mode = "x"
 
     @_opened_only

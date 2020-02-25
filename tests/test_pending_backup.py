@@ -5,13 +5,11 @@ import pytest
 
 import virt_backup
 from virt_backup.backups import DomBackup
-from virt_backup.backups.snapshot import (
-    DomExtSnapshot, DomExtSnapshotCallbackRegistrer
-)
+from virt_backup.backups.snapshot import DomExtSnapshot, DomExtSnapshotCallbackRegistrer
 from helper.virt_backup import MockSnapshot, build_dombackup
 
 
-class TestDomBackup():
+class TestDomBackup:
     def test_get_self_domain_disks(self, get_dombackup):
         dombkup = get_dombackup
         expected_disks = {
@@ -22,7 +20,7 @@ class TestDomBackup():
             "vdb": {
                 "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
                 "type": "qcow2",
-            }
+            },
         }
 
         assert dombkup._get_self_domain_disks() == expected_disks
@@ -39,7 +37,7 @@ class TestDomBackup():
         assert dombkup._get_self_domain_disks("vda") == expected_disks
 
     def test_init_with_disk(self, build_mock_domain):
-        dombkup = build_dombackup(build_mock_domain, dev_disks=("vda", ))
+        dombkup = build_dombackup(build_mock_domain, dev_disks=("vda",))
 
         expected_disks = {
             "vda": {
@@ -59,7 +57,7 @@ class TestDomBackup():
                 "type": "qcow2",
             },
         }
-        dombkup = build_dombackup(build_mock_domain, disks=("vda", ))
+        dombkup = build_dombackup(build_mock_domain, disks=("vda",))
         expected_disks = {
             "vda": {
                 "src": "/var/lib/libvirt/images/test-disk-1.qcow2",
@@ -77,7 +75,7 @@ class TestDomBackup():
             "vdb": {
                 "src": "/var/lib/libvirt/images/test-disk-2.qcow2",
                 "type": "qcow2",
-            }
+            },
         }
         assert dombkup.disks == expected_disks
 
@@ -89,8 +87,9 @@ class TestDomBackup():
         with pytest.raises(KeyError):
             dombkup.add_disks("vdc")
 
-    def test_snapshot_and_save_date_test_pending_info(self, build_mock_domain,
-                                                      monkeypatch, tmpdir):
+    def test_snapshot_and_save_date_test_pending_info(
+        self, build_mock_domain, monkeypatch, tmpdir
+    ):
         """
         Create a DomBackup, snapshot, then tests if dumped pending info are
         correct
@@ -107,21 +106,20 @@ class TestDomBackup():
         assert "snapshot" in pending_info["disks"]["vda"]
         assert "src" in pending_info["disks"]["vda"]
 
-    def take_snapshot_and_return_date(self, mock_domain, target_dir,
-                                      monkeypatch):
+    def take_snapshot_and_return_date(self, mock_domain, target_dir, monkeypatch):
         dombkup = build_dombackup(
-            dom=mock_domain, dev_disks=("vda", ), target_dir=target_dir
+            dom=mock_domain, dev_disks=("vda",), target_dir=target_dir
         )
 
         snapshot_helper = DomExtSnapshot(
-            dombkup.dom, dombkup.disks,
-            DomExtSnapshotCallbackRegistrer(dombkup.conn), dombkup.conn,
+            dombkup.dom,
+            dombkup.disks,
+            DomExtSnapshotCallbackRegistrer(dombkup.conn),
+            dombkup.conn,
             dombkup.timeout,
-
         )
         monkeypatch.setattr(
-            snapshot_helper, "external_snapshot",
-            lambda: MockSnapshot(name="test")
+            snapshot_helper, "external_snapshot", lambda: MockSnapshot(name="test")
         )
         dombkup._ext_snapshot_helper = snapshot_helper
 
@@ -145,24 +143,30 @@ class TestDomBackup():
 
     def test_get_definition(self, build_mock_domain):
         dombkup = build_dombackup(
-            dom=build_mock_domain, dev_disks=("vda", ),
-            compression="xz", compression_lvl=4
+            dom=build_mock_domain,
+            dev_disks=("vda",),
+            compression="xz",
+            compression_lvl=4,
         )
 
         expected_def = {
-            "compression": "xz", "compression_lvl": 4,
+            "compression": "xz",
+            "compression_lvl": 4,
             "domain_id": build_mock_domain.ID(),
             "domain_name": build_mock_domain.name(),
             "domain_xml": build_mock_domain.XMLDesc(),
-            "version": virt_backup.VERSION
+            "version": virt_backup.VERSION,
         }
         assert dombkup.get_definition() == expected_def
 
     def test_dump_json_definition(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("json_dump")
         dombkup = build_dombackup(
-            dom=build_mock_domain, dev_disks=("vda", ),
-            compression="xz", compression_lvl=4, target_dir=str(target_dir),
+            dom=build_mock_domain,
+            dev_disks=("vda",),
+            compression="xz",
+            compression_lvl=4,
+            target_dir=str(target_dir),
         )
 
         definition = dombkup.get_definition()
@@ -175,9 +179,7 @@ class TestDomBackup():
 
     def test_clean_pending_info(self, build_mock_domain, tmpdir):
         target_dir = tmpdir.mkdir("clean_pending_info")
-        dombkup = build_dombackup(
-            dom=build_mock_domain, target_dir=str(target_dir)
-        )
+        dombkup = build_dombackup(dom=build_mock_domain, target_dir=str(target_dir))
         dombkup.pending_info["date"] = 0
 
         dombkup._dump_pending_info()
@@ -193,16 +195,11 @@ class TestDomBackup():
 
         target_dir.join("vda.qcow2").write("")
         dombkup.pending_info["disks"] = {
-            "vda": {
-                "src": "vda.qcow2", "target": "vda.qcow2",
-                "snapshot": "vda.snap"
-            },
+            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
         }
         dombkup.pending_info["packager"] = {
             "type": "directory",
-            "init": {
-                "name": "test", "path": str(target_dir)
-            }
+            "init": {"name": "test", "path": str(target_dir)},
         }
         dombkup._dump_pending_info()
         assert len(target_dir.listdir()) == 2
@@ -218,10 +215,7 @@ class TestDomBackup():
 
         target_dir.join("vda.qcow2").write("")
         dombkup.pending_info["disks"] = {
-            "vda": {
-                "src": "vda.qcow2", "target": "vda.qcow2",
-                "snapshot": "vda.snap"
-            },
+            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
         }
         dombkup._dump_pending_info()
         assert len(target_dir.listdir()) == 2
@@ -229,8 +223,7 @@ class TestDomBackup():
         dombkup.clean_aborted()
         assert not target_dir.listdir()
 
-    def test_clean_aborted_test_ext_snapshot(self, build_mock_domain, tmpdir,
-                                             mocker):
+    def test_clean_aborted_test_ext_snapshot(self, build_mock_domain, tmpdir, mocker):
         """
         Ensure that the external snapshot helper is correctly declared
 
@@ -243,10 +236,7 @@ class TestDomBackup():
 
         target_dir.join("vda.qcow2").write("")
         disk_infos = {
-            "vda": {
-                "src": "vda.qcow2", "target": "vda.qcow2",
-                "snapshot": "vda.snap"
-            },
+            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
         }
         dombkup.pending_info["disks"] = disk_infos.copy()
         dombkup._dump_pending_info()
@@ -256,7 +246,7 @@ class TestDomBackup():
         assert dombkup._ext_snapshot_helper.metadatas["disks"] == {
             "vda": {
                 "src": disk_infos["vda"]["src"],
-                "snapshot": disk_infos["vda"]["snapshot"]
+                "snapshot": disk_infos["vda"]["snapshot"],
             }
         }
 
@@ -275,8 +265,7 @@ class TestDomBackup():
         dombkup.clean_aborted()
         assert not target_dir.listdir()
 
-    def prepare_clean_aborted_dombkup(self, mock_domain, target_dir,
-                                      mocker):
+    def prepare_clean_aborted_dombkup(self, mock_domain, target_dir, mocker):
         dombkup = build_dombackup(dom=mock_domain, target_dir=str(target_dir))
         dombkup.pending_info["date"] = 0
 
@@ -284,21 +273,19 @@ class TestDomBackup():
 
         return dombkup
 
-    def test_compatible_with(self, get_uncompressed_dombackup,
-                             build_mock_domain):
+    def test_compatible_with(self, get_uncompressed_dombackup, build_mock_domain):
         dombackup1 = get_uncompressed_dombackup
         dombackup2 = build_dombackup(
-            dom=build_mock_domain, dev_disks=("vdb", ), compression=None,
+            dom=build_mock_domain, dev_disks=("vdb",), compression=None,
         )
 
         assert dombackup1.compatible_with(dombackup2)
 
-    def test_not_compatible_with(self, get_uncompressed_dombackup,
-                                 build_mock_domain):
+    def test_not_compatible_with(self, get_uncompressed_dombackup, build_mock_domain):
         dombackup1 = get_uncompressed_dombackup
         dombackup1.target_dir = "/tmp/test"
         dombackup2 = build_dombackup(
-            dom=build_mock_domain, dev_disks=("vdb", ), compression=None,
+            dom=build_mock_domain, dev_disks=("vdb",), compression=None,
         )
 
         assert not dombackup1.compatible_with(dombackup2)

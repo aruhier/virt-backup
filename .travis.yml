@@ -3,6 +3,8 @@ language: python
 matrix:
   include:
     - python: 3.7-dev
+      env: TOXENV=black
+    - python: 3.7-dev
       env: TOXENV=coveralls
     - python: 3.5-dev
       env: TOXENV=py35

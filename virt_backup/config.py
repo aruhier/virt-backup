@@ -1,7 +1,7 @@
-import appdirs
 import errno
 import logging
 import os
+import appdirs
 import yaml
 
 from virt_backup import APP_NAME
@@ -36,9 +36,7 @@ def get_config(custom_path=None):
     except FileNotFoundError as e:
         logger.debug(e)
         if custom_path:
-            logger.error(
-                "Configuration file {} not found.".format(custom_path)
-            )
+            logger.error("Configuration file {} not found.".format(custom_path))
         else:
             logger.error(
                 "No configuration file can be found. Please create a "
@@ -56,6 +54,7 @@ class Config(dict):
 
     :param defaults: an optional dictionary of default values
     """
+
     def __init__(self, defaults=None):
         dict.__init__(self, defaults or {})
         self.refresh_global_logger_lvl()
@@ -93,7 +92,7 @@ class Config(dict):
         except IOError as e:
             if silent and e.errno in (errno.ENOENT, errno.EISDIR):
                 return False
-            e.strerror = 'Unable to load configuration file (%s)' % e.strerror
+            e.strerror = "Unable to load configuration file (%s)" % e.strerror
             raise
         return True
 

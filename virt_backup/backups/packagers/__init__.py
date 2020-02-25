@@ -3,7 +3,8 @@ from enum import Enum
 import logging
 
 from virt_backup.exceptions import (
-    BackupPackagerNotOpenedError, BackupPackagerOpenedError
+    BackupPackagerNotOpenedError,
+    BackupPackagerOpenedError,
 )
 
 
@@ -73,14 +74,12 @@ class _AbstractBackupPackager(ABC):
 
 
 class _AbstractReadBackupPackager(_AbstractBackupPackager, ABC):
-
     @abstractmethod
     def restore(self, name, target):
         pass
 
 
-class _AbstractWriteBackupPackager():
-
+class _AbstractWriteBackupPackager:
     @abstractmethod
     def add(self, src, name=None):
         pass
@@ -100,19 +99,21 @@ class _AbstractShareableWriteBackupPackager(_AbstractBackupPackager, ABC):
 
 from .directory import ReadBackupPackagerDir, WriteBackupPackagerDir
 from .tar import ReadBackupPackagerTar, WriteBackupPackagerTar
+
 try:
     from .zstd import ReadBackupPackagerZSTD, WriteBackupPackagerZSTD
 except ImportError as e:
     from .unsupported import (
-        UnsupportedReadBackupPackagerZSTD, UnsupportedWriteBackupPackagerZSTD
+        UnsupportedReadBackupPackagerZSTD,
+        UnsupportedWriteBackupPackagerZSTD,
     )
+
     ReadBackupPackagerZSTD, WriteBackupPackagerZSTD = (
-        UnsupportedReadBackupPackagerZSTD, UnsupportedWriteBackupPackagerZSTD
+        UnsupportedReadBackupPackagerZSTD,
+        UnsupportedWriteBackupPackagerZSTD,
     )
     error = str(e)
-    ReadBackupPackagerZSTD.reason, WriteBackupPackagerZSTD.reason = (
-        error, error
-    )
+    ReadBackupPackagerZSTD.reason, WriteBackupPackagerZSTD.reason = (error, error)
 
 
 class ReadBackupPackagers(Enum):
