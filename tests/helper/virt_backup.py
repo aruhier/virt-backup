@@ -146,22 +146,14 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
     definition["date"] = date.timestamp
     definition["disks"] = {}
 
-    backup_dir = dbackup.target_dir
+    backup_dir = dbackup.backup_dir
+    definition["path"] = backup_dir
 
-    packager_name = dbackup._main_backup_name_format(
+    definition["name"] = dbackup._main_backup_name_format(
         arrow.get(definition["date"]).to("local")
     )
-    if dbackup.compression:
-        packager = WriteBackupPackagers.tar.value(
-            packager_name,
-            backup_dir,
-            packager_name,
-            compression=dbackup.compression,
-            compression_lvl=dbackup.compression_lvl,
-        )
-        definition["tar"] = packager.complete_path
-    else:
-        packager = WriteBackupPackagers.directory.value(packager_name, backup_dir)
+    packager = dbackup._get_write_packager(definition["name"])
+
     with packager:
         for disk in dbackup.disks:
             # create empty files as our backup images
@@ -171,7 +163,7 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
             img_complete_path = os.path.join(backup_dir, img_name)
             with open(img_complete_path, "w"):
                 pass
-            if dbackup.compression:
+            if dbackup.packager != "directory":
                 packager.add(img_complete_path, img_name)
                 os.remove(img_complete_path)
     return definition
@@ -180,16 +172,16 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
 def build_completed_backups(backup_dir):
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
     backup_properties = (
-        (arrow.get("2016-07-08 19:40:02").to("local"), None),
-        (arrow.get("2016-07-08 18:40:02").to("local"), None),
-        (arrow.get("2016-07-08 18:30:02").to("local"), None),
-        (arrow.get("2016-07-08 17:40:02").to("local"), None),
-        (arrow.get("2016-07-07 19:40:02").to("local"), None),
-        (arrow.get("2016-07-07 21:40:02").to("local"), None),
-        (arrow.get("2016-07-06 20:40:02").to("local"), None),
-        (arrow.get("2016-04-08 19:40:02").to("local"), None),
-        (arrow.get("2014-05-01 00:30:00").to("local"), "tar"),
-        (arrow.get("2016-03-08 14:28:13").to("local"), "xz"),
+        (arrow.get("2016-07-08 19:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-08 18:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-08 18:30:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-08 17:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-07 19:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-07 21:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-06 20:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-04-08 19:40:02").to("local"), "directory", {}),
+        (arrow.get("2014-05-01 00:30:00").to("local"), "tar", {}),
+        (arrow.get("2016-03-08 14:28:13").to("local"), "tar", {"compression": "xz"}),
     )
     conn = MockConn()
     for domain_id, domain_name in enumerate(domain_names):
@@ -198,8 +190,10 @@ def build_completed_backups(backup_dir):
         domain = MockDomain(conn, name=domain_name, id=domain_id)
         dbackup = build_dombackup(domain, domain_bdir, dev_disks=("vda", "vdb"))
 
-        for bakdate, compression in backup_properties:
-            dbackup.compression = compression
+        for bakdate, packager, packager_opts in backup_properties:
+            dbackup.packager = packager
+            dbackup.packager_opts = packager_opts.copy()
+
             definition = build_complete_backup_files_from_domainbackup(dbackup, bakdate)
             dbackup._dump_json_definition(definition)
         # create a bad json file

@@ -84,14 +84,14 @@ class TestBackupGroup:
         self, build_mock_libvirtconn, build_mock_domain, mocker
     ):
         backup_group = build_backup_group(
-            build_mock_libvirtconn, domlst=(build_mock_domain,), target_dir="/tmp"
+            build_mock_libvirtconn, domlst=(build_mock_domain,), backup_dir="/tmp"
         )
         dombackup = backup_group.backups[0]
         dombackup.start = mocker.stub()
 
-        expected_target_dir = os.path.join("/tmp", dombackup.dom.name())
+        expected_backup_dir = os.path.join("/tmp", dombackup.dom.name())
         backup_group.start()
-        assert dombackup.target_dir == expected_target_dir
+        assert dombackup.backup_dir == expected_backup_dir
 
     def test_start_with_err(self, build_mock_libvirtconn, mocker):
         conn = build_mock_libvirtconn
@@ -144,33 +144,37 @@ class TestBackupGroup:
 
     def test_propagate_attr(self, build_mock_libvirtconn, build_mock_domain):
         backup_group = build_backup_group(
-            conn=build_mock_libvirtconn, domlst=(build_mock_domain,), compression="xz"
+            conn=build_mock_libvirtconn,
+            domlst=(build_mock_domain,),
+            packager="tar",
+            packager_opts={"compression": "xz"},
         )
-        assert backup_group.backups[0].compression == "xz"
+        assert backup_group.backups[0].packager_opts["compression"] == "xz"
 
-        backup_group.default_bak_param["target_dir"] = "/test"
-        assert backup_group.backups[0].target_dir is None
+        backup_group.default_bak_param["backup_dir"] = "/test"
+        assert backup_group.backups[0].backup_dir is None
         backup_group.propagate_default_backup_attr()
-        assert backup_group.backups[0].target_dir == "/test"
+        assert backup_group.backups[0].backup_dir == "/test"
 
     def test_propagate_attr_multiple_domains(self, build_mock_libvirtconn, mocker):
         conn = build_mock_libvirtconn
         backup_group = build_backup_group(
             conn,
             domlst=(MockDomain(_conn=conn), MockDomain(_conn=conn),),
-            compression="xz",
+            packager="tar",
+            packager_opts={"compression": "xz"},
         )
 
         for b in backup_group.backups:
-            assert b.compression == "xz"
+            assert b.packager_opts["compression"] == "xz"
 
-        backup_group.default_bak_param["target_dir"] = "/test"
+        backup_group.default_bak_param["backup_dir"] = "/test"
         for b in backup_group.backups:
-            assert b.target_dir is None
+            assert b.backup_dir is None
 
         backup_group.propagate_default_backup_attr()
         for b in backup_group.backups:
-            assert b.target_dir == "/test"
+            assert b.backup_dir == "/test"
 
 
 def test_pattern_matching_domains_in_libvirt_regex(build_mock_libvirtconn_filled):
@@ -261,7 +265,7 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
     groups_config = {
         "test": {
             "target": "/mnt/test",
-            "compression": "tar",
+            "packager": "tar",
             "hosts": [
                 {"host": "r:^matching\d?$", "disks": ["vda", "vdb"]},
                 "!matching2",
@@ -274,11 +278,8 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
     assert len(groups) == 1
     test_group = groups[0]
 
-    target, compression = (
-        test_group.default_bak_param[k] for k in ("target_dir", "compression")
-    )
-    assert target == "/mnt/test"
-    assert compression == "tar"
+    assert test_group.default_bak_param["backup_dir"] == "/mnt/test"
+    assert test_group.default_bak_param["packager"] == "tar"
 
     dombackups = test_group.backups
     assert len(dombackups) == 1
@@ -301,7 +302,7 @@ def test_groups_from_sanitize_dict_all_config_group_param(
     groups_config = {
         "test": {
             "target": "/mnt/test",
-            "compression": "tar",
+            "packager": "tar",
             "autostart": True,
             "hourly": 1,
             "daily": 3,
@@ -328,11 +329,7 @@ def test_groups_from_dict_multiple_groups(build_mock_libvirtconn_filled):
     conn = build_mock_libvirtconn_filled
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     groups_config = {
-        "test0": {
-            "target": "/mnt/test0",
-            "compression": "tar",
-            "hosts": ["matching2",],
-        },
+        "test0": {"target": "/mnt/test0", "packager": "tar", "hosts": ["matching2",],},
         "test1": {"target": "/mnt/test1", "hosts": ["matching", "a"],},
     }
 

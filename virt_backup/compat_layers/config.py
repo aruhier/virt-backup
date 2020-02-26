@@ -59,7 +59,7 @@ class ToV0_4(ConfigConverter):
             new_packager_opts = {}
 
             if old_compression is None:
-                new_packager = "dir"
+                new_packager = "directory"
             else:
                 new_packager = "tar"
                 if old_compression != "tar":

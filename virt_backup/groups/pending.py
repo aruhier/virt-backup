@@ -55,7 +55,9 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
     def sanitize_properties(properties):
         # replace some properties by the correct ones
         if properties.get("target", None):
-            properties["target_dir"] = properties.pop("target")
+            properties["backup_dir"] = properties.pop("target")
+        elif properties.get("target_dir", None):
+            properties["backup_dir"] = properties.pop("target_dir")
 
         # pop params related to complete groups only
         for prop in ("hourly", "daily", "weekly", "monthly", "yearly"):
@@ -270,10 +272,10 @@ class BackupGroup:
         Ensure that a dombackup is set to be in a directory having the name of
         the related Domain
         """
-        if not dombackup.target_dir:
+        if not dombackup.backup_dir:
             return
 
-        if os.path.dirname(dombackup.target_dir) != dombackup.dom.name():
-            dombackup.target_dir = os.path.join(
-                dombackup.target_dir, dombackup.dom.name()
+        if os.path.dirname(dombackup.backup_dir) != dombackup.dom.name():
+            dombackup.backup_dir = os.path.join(
+                dombackup.backup_dir, dombackup.dom.name()
             )

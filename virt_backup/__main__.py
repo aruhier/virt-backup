@@ -12,7 +12,7 @@ from virt_backup.exceptions import BackupNotFoundError, BackupsFailureInGroupErr
 from virt_backup.groups import groups_from_dict, BackupGroup, complete_groups_from_dict
 from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
-from virt_backup import APP_NAME, VERSION
+from virt_backup import APP_NAME, VERSION, compat_layers
 
 
 logger = logging.getLogger("virt_backup")
@@ -320,9 +320,12 @@ def list_detailed_backups_for_domain(group, domains_names, short=False):
 def get_setup_config():
     config = Config(defaults={"debug": False,})
     try:
-        config.from_dict(get_config())
+        loaded_config = get_config()
     except FileNotFoundError:
         sys.exit(1)
+
+    compat_layers.config.convert_warn(loaded_config)
+    config.from_dict(loaded_config)
     return config
 
 

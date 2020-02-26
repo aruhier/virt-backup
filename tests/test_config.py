@@ -34,8 +34,8 @@ def test_get_config_custom_path(get_testing_config):
 
 
 def test_get_config_not_existing(tmpdir):
-    target_dir = tmpdir.mkdir("no_config")
-    testconf_path = str(target_dir.join("config.yml"))
+    backup_dir = tmpdir.mkdir("no_config")
+    testconf_path = str(backup_dir.join("config.yml"))
 
     with pytest.raises(FileNotFoundError):
         get_config(custom_path=testconf_path)

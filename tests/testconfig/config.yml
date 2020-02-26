@@ -15,7 +15,9 @@ default:
 groups:
   test:
     target: /mnt/kvm/backups
-    compression: xz
+    packager: tar
+    packager_opts:
+      compression: xz
 
     autostart: true
     daily: 3

@@ -39,5 +39,5 @@ groups:
       - "!r:^test.*"
 
   test_dir:
-    packager: dir
+    packager: directory
     target: /mnt/kvm/backups

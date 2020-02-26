@@ -50,7 +50,7 @@ def get_uncompressed_dombackup(build_mock_domain, build_mock_libvirtconn):
     return DomBackup(
         dom=build_mock_domain,
         dev_disks=("vda",),
-        compression=None,
+        packager="directory",
         callbacks_registrer=callbacks_registrer,
     )
 
@@ -61,8 +61,8 @@ def get_compressed_dombackup(build_mock_domain, build_mock_libvirtconn):
     return DomBackup(
         dom=build_mock_domain,
         dev_disks=("vda",),
-        compression="xz",
-        compression_lvl=4,
+        packager="tar",
+        packager_opts={"compression": "xz", "compression_lvl": 4},
         callbacks_registrer=callbacks_registrer,
     )
 

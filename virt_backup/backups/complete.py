@@ -20,12 +20,15 @@ def build_dom_complete_backup_from_def(
     definition, backup_dir, definition_filename=None
 ):
     backup = DomCompleteBackup(
+        name=definition["name"],
         dom_name=definition["domain_name"],
         backup_dir=backup_dir,
         date=arrow.get(definition["date"]),
         dom_xml=definition.get("domain_xml", None),
         disks=definition.get("disks", None),
-        tar=definition.get("tar", None),
+        packager=definition["packager"]["type"],
+        packager_opts=definition["packager"].get("opts", {}),
+        packager_init=definition["packager"].get("init", {}),
     )
 
     if definition_filename:
@@ -37,12 +40,15 @@ def build_dom_complete_backup_from_def(
 class DomCompleteBackup(_BaseDomBackup):
     def __init__(
         self,
+        name,
         dom_name,
         backup_dir,
         date=None,
         dom_xml=None,
         disks=None,
-        tar=None,
+        packager="tar",
+        packager_opts=None,
+        packager_init=None,
         definition_filename=None,
     ):
         #: domain name
@@ -54,14 +60,23 @@ class DomCompleteBackup(_BaseDomBackup):
         #: definition filename
         self.definition_filename = definition_filename
 
+        #: name is the backup name. It is used by the packagers and internal process.
+        self.name = name
+
         #: backup date
         self.date = date
 
         #: domain XML as it was during the backup
         self.dom_xml = dom_xml
 
-        #: if disks were compressed or contained into a tar file
-        self.tar = tar
+        #: packager name
+        self.packager = packager if packager else "directory"
+
+        #: packager options arguments used during compression
+        self.packager_opts = packager_opts or {}
+
+        #: packager special init arguments used during compression
+        self.packager_init = packager_init or {}
 
         #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
         self.disks = disks
@@ -148,20 +163,10 @@ class DomCompleteBackup(_BaseDomBackup):
             return packager.restore(self.disks[disk], target)
 
     def _get_packager(self):
-        if self.tar is None:
-            return ReadBackupPackagers.directory.value(self.dom_name, self.backup_dir)
-        else:
-            return ReadBackupPackagers.tar.value(
-                self.dom_name, self.backup_dir, self.tar,
-            )
+        return self._get_read_packager(self.name)
 
     def _get_write_packager(self):
-        if self.tar is None:
-            return WriteBackupPackagers.directory.value(self.dom_name, self.backup_dir)
-        else:
-            return WriteBackupPackagers.tar.value(
-                self.dom_name, self.backup_dir, self.tar,
-            )
+        return super()._get_write_packager(self.name)
 
     def delete(self):
         if not self.backup_dir:
@@ -171,6 +176,3 @@ class DomCompleteBackup(_BaseDomBackup):
         self._clean_packager(packager, self.disks.values())
         if self.definition_filename:
             os.remove(self.get_complete_path_of(self.definition_filename))
-
-    def get_complete_path_of(self, filename):
-        return os.path.join(self.backup_dir, filename)

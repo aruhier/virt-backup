@@ -85,6 +85,13 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
 class ReadBackupPackagerTar(_AbstractReadBackupPackager, _AbstractBackupPackagerTar):
     _mode = "r"
 
+    def __init__(
+        self, name, path, archive_name, compression=None, compression_lvl=None
+    ):
+        # Do not set compression_lvl on readonly, as it can trigger some errors (with
+        # XZ for example)
+        super().__init__(name, path, archive_name, compression)
+
     @_opened_only
     def restore(self, name, target):
         try:

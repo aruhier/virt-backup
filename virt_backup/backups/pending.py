@@ -22,14 +22,17 @@ logger = logging.getLogger("virt_backup")
 def build_dom_backup_from_pending_info(
     pending_info, backup_dir, conn, callbacks_registrer
 ):
-    backup = DomBackup(
-        dom=conn.lookupByName(pending_info["domain_name"]),
-        target_dir=backup_dir,
-        dev_disks=tuple(pending_info.get("disks", {}).keys()),
-        compression=pending_info.get("compression", "tar"),
-        compression_lvl=pending_info.get("compression_lvl", None),
-        callbacks_registrer=callbacks_registrer,
-    )
+    kwargs = {
+        "dom": conn.lookupByName(pending_info["domain_name"]),
+        "backup_dir": backup_dir,
+        "dev_disks": tuple(pending_info.get("disks", {}).keys()),
+        "callbacks_registrer": callbacks_registrer,
+    }
+    if pending_info.get("packager"):
+        kwargs["packager"] = pending_info["packager"].get("type")
+        kwargs["packager_opts"] = pending_info["packager"].get("opts", {})
+
+    backup = DomBackup(**kwargs)
     backup.pending_info = pending_info
 
     return backup
@@ -43,10 +46,10 @@ class DomBackup(_BaseDomBackup):
     def __init__(
         self,
         dom,
-        target_dir=None,
+        backup_dir=None,
         dev_disks=None,
-        compression="tar",
-        compression_lvl=None,
+        packager="tar",
+        packager_opts=None,
         conn=None,
         timeout=None,
         disks=None,
@@ -66,7 +69,7 @@ class DomBackup(_BaseDomBackup):
         self.dom = dom
 
         #: directory where backups will be saved
-        self.target_dir = target_dir
+        self.backup_dir = backup_dir
 
         #: disks to backups. If None, will backup every vm disks
         self.disks = {}
@@ -78,15 +81,13 @@ class DomBackup(_BaseDomBackup):
             self.disks = self._get_self_domain_disks()
 
         #: string indicating how to compress the backups:
-        #    * None: no compression, backups will be only copied
-        #    * "tar": backups will not be compressed, but packaged in a tar
-        #    * "gz"/"bz2"/"xz": backups will be compressed in a tar +
-        #        compression selected. For more informations, read the
-        #        documentation about the mode argument of tarfile.open
-        self.compression = compression
+        #    * None/dir: no compression, backups will be only copied
+        #    * "tar": backups will be packaged in a tarfile (compression available
+        #        through packager_opts)
+        self.packager = packager or "directory"
 
-        #: If compression, indicates the lvl to use
-        self.compression_lvl = compression_lvl
+        #: dict of packager options.
+        self.packager_opts = dict(packager_opts) if packager_opts else {}
 
         #: libvirt connection to use. If not sent, will use the connection used
         #  for self.domain
@@ -114,6 +115,9 @@ class DomBackup(_BaseDomBackup):
         #: useful info collected during a pending backup, allowing to clean
         #  the backup if anything goes wrong
         self.pending_info = {}
+
+        #: store the backup name (usually generated with the internal format)
+        self._name = ""
 
         #: Used as lock when the backup is already running
         self._running = False
@@ -151,11 +155,10 @@ class DomBackup(_BaseDomBackup):
         Start the entire backup process for all disks in self.disks
         """
         assert not self.running
-        assert self.dom and self.target_dir
-        if not os.path.exists(self.target_dir):
-            os.mkdir(self.target_dir)
+        assert self.dom and self.backup_dir
+        if not os.path.exists(self.backup_dir):
+            os.mkdir(self.backup_dir)
 
-        backup_target = None
         logger.info("%s: Backup started", self.dom.name())
         definition = self.get_definition()
         definition["disks"] = {}
@@ -167,8 +170,10 @@ class DomBackup(_BaseDomBackup):
             )
 
             snapshot_date, definition = self._snapshot_and_save_date(definition)
-            packager = self._get_packager(snapshot_date)
+            self._name = self._main_backup_name_format(snapshot_date)
+            definition["name"], self.pending_info["name"] = self._name
 
+            packager = self._get_packager()
             # TODO: handle backingStore cases
             with packager:
                 for disk, prop in self.disks.items():
@@ -176,7 +181,7 @@ class DomBackup(_BaseDomBackup):
                     self._ext_snapshot_helper.clean_for_disk(disk)
 
             self._dump_json_definition(definition)
-            self.post_backup(backup_target)
+            self.post_backup()
             self._clean_pending_info()
         except:
             self.clean_aborted()
@@ -185,29 +190,9 @@ class DomBackup(_BaseDomBackup):
             self._running = False
         logger.info("%s: Backup finished", self.dom.name())
 
-    def _get_packager(self, snapshot_date):
-        """
-        Get packager returns an adapted packager and update the pending info
-        """
-        name = self._main_backup_name_format(snapshot_date)
-        self.pending_info["packager"] = {}
-        packager = None
-        packager_type = ""
-        kwargs = {"name": name, "path": self.target_dir}
-
-        if not self.compression:
-            packager_type = "directory"
-            self.pending_info["packager"]["init"] = kwargs
-            packager = WriteBackupPackagers.directory.value(**kwargs)
-        elif self.compression in ("tar", "gz", "bz2", "xz"):
-            packager_type = "tar"
-            kwargs["compression"] = self.compression
-            kwargs["compression_lvl"] = self.compression_lvl
-            packager = WriteBackupPackagers.tar.value(**kwargs)
-
-        self.pending_info["packager"]["type"] = packager_type
-        self.pending_info["packager"]["init"] = kwargs
-        return packager
+    def _get_packager(self):
+        assert self._name, "_name attribute needs to be defined to get a packager"
+        return self._get_write_packager(self._name)
 
     def _snapshot_and_save_date(self, definition):
         """
@@ -241,11 +226,10 @@ class DomBackup(_BaseDomBackup):
         Get a json defining this backup
         """
         return {
-            "compression": self.compression,
-            "compression_lvl": self.compression_lvl,
             "domain_id": self.dom.ID(),
             "domain_name": self.dom.name(),
             "domain_xml": self.dom.XMLDesc(),
+            "packager": {"type": self.packager, "opts": self.packager_opts},
             "version": virt_backup.VERSION,
         }
 
@@ -282,7 +266,7 @@ class DomBackup(_BaseDomBackup):
         """
         return "{}_{}".format(self._main_backup_name_format(snapdate), disk_name)
 
-    def post_backup(self, backup_target):
+    def post_backup(self):
         """
         Post backup process
 
@@ -308,7 +292,7 @@ class DomBackup(_BaseDomBackup):
         """
         backup_date = arrow.get(definition["date"]).to("local")
         definition_path = os.path.join(
-            self.target_dir,
+            self.backup_dir,
             "{}.{}".format(self._main_backup_name_format(backup_date), "json"),
         )
         with open(definition_path, "w") as json_definition:
@@ -331,21 +315,10 @@ class DomBackup(_BaseDomBackup):
     def _get_pending_info_json_path(self):
         backup_date = arrow.get(self.pending_info["date"]).to("local")
         json_path = os.path.join(
-            self.target_dir,
+            self.backup_dir,
             "{}.{}.pending".format(self._main_backup_name_format(backup_date), "json"),
         )
         return json_path
-
-    def _main_backup_name_format(self, snapdate, *args, **kwargs):
-        """
-        Main backup name format
-
-        Extracted in its own function so it can be easily override
-
-        :param snapdate: date when external snapshots have been created
-        """
-        str_snapdate = snapdate.strftime("%Y%m%d-%H%M%S")
-        return "{}_{}_{}".format(str_snapdate, self.dom.ID(), self.dom.name())
 
     def clean_aborted(self):
         is_ext_snap_helper_needed = (
@@ -365,22 +338,11 @@ class DomBackup(_BaseDomBackup):
         if self._ext_snapshot_helper:
             self._ext_snapshot_helper.clean()
 
-        if self.pending_info.get("packager"):
-            packager = getattr(
-                WriteBackupPackagers, self.pending_info["packager"]["type"]
-            ).value(**self.pending_info["packager"]["init"])
-            try:
-                self._clean_packager(packager)
-            except FileNotFoundError:
-                logger.info(
-                    "%s: Packager not found, nothing to clean.", self.dom.name()
-                )
-        else:
-            # Legacy. Could be removed once issue #22 is done.
-            if self.pending_info.get("tar", None):
-                self._clean_aborted_tar()
-            else:
-                self._clean_aborted_non_tar_img()
+        packager = self._get_write_packager(self.pending_info["name"])
+        try:
+            self._clean_packager(packager)
+        except FileNotFoundError:
+            logger.info("%s: Packager not found, nothing to clean.", self.dom.name())
         try:
             self._clean_pending_info()
         except KeyError:
@@ -404,43 +366,33 @@ class DomBackup(_BaseDomBackup):
 
         packager.remove_package()
 
-    def _clean_aborted_tar(self):
-        tar_path = self.get_complete_path_of(self.pending_info["tar"])
-        if os.path.exists(tar_path):
-            self._delete_with_error_printing(tar_path)
-
-    def _clean_aborted_non_tar_img(self):
-        for disk in self.pending_info.get("disks", {}).values():
-            if not disk.get("target", None):
-                continue
-            target_path = self.get_complete_path_of(disk["target"])
-            if os.path.exists(target_path):
-                self._delete_with_error_printing(target_path)
-
     def compatible_with(self, dombackup):
         """
         Is compatible with dombackup ?
 
         If the target is the same for both dombackup and self, same thing for
-        compression and compression_lvl, self and dombackup are considered
+        packager and packager_opts, self and dombackup are considered
         compatibles.
         """
+        same_domain = dombackup.dom.ID() == self.dom.ID()
+        if not same_domain:
+            return False
 
-        def same_dombackup_and_self_attr(attr):
-            return getattr(self, attr) == getattr(dombackup, attr)
-
-        attributes_to_compare = ("target_dir", "compression", "compression_lvl")
+        attributes_to_compare = ("backup_dir", "packager")
         for a in attributes_to_compare:
-            if not same_dombackup_and_self_attr(a):
+            if getattr(self, a) != getattr(dombackup, a):
                 return False
 
-        same_domain = dombackup.dom.ID() == self.dom.ID()
-        return same_domain
+        # compare the packager_opts by converting them to json and diffing the strings
+        same_package_opts = json.dumps(
+            self.packager_opts, sort_keys=True
+        ) == json.dumps(dombackup.packager_opts, sort_keys=True)
+        if not same_package_opts:
+            return False
+
+        return True
 
     def merge_with(self, dombackup):
         self.add_disks(*dombackup.disks.keys())
         timeout = self.timeout or dombackup.timeout
         self.timeout = timeout
-
-    def get_complete_path_of(self, filename):
-        return os.path.join(self.target_dir, filename)
