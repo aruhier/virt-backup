@@ -68,11 +68,13 @@ groups:
 
     ## Retention policy: the first backup of the day is considered as the
     ## "daily" backup, first of the week "weekly", etc. The following options
-    ## detail how many backups of each type has to be kept. Set `None` for an
+    ## detail how many backups of each type has to be kept. Set to "*" or None for an
     ## infinite retention.
-    hourly: 1
-    daily: 3
-    weekly: 2
+    ## Default to 5 for everything, meaning that calling "virt-backup clean" will let 5
+    ## backups for each period not specified in the config.
+    hourly: 5
+    daily: 5
+    weekly: 5
     monthly: 5
     yearly: 1
 

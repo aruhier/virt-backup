@@ -110,6 +110,35 @@ class TestCompleteBackupGroup:
         nb_remaining_backups = sum(len(b) for b in group.backups.values())
         assert len(cleaned) == nb_initial_backups - nb_remaining_backups
 
+    def test_clean_unset_period(self, build_backup_directory):
+        """
+        Test if cleaning works if some periods are not set.
+
+        Related to issue #27
+        """
+        backup_dir = str(build_backup_directory["backup_dir"])
+        group = CompleteBackupGroup(name="test", backup_dir=backup_dir, hosts=["r:.*"])
+        group.scan_backup_dir()
+
+        group.clean(daily=3, monthly=1, yearly=2)
+        expected_dates = sorted(
+            (
+                arrow.get("2014-05-01 00:30:00").to("local"),
+                arrow.get("2016-03-08 14:28:13").to("local"),
+                arrow.get("2016-04-08 19:40:02").to("local"),
+                arrow.get("2016-07-06 20:40:02").to("local"),
+                arrow.get("2016-07-07 19:40:02").to("local"),
+                arrow.get("2016-07-07 21:40:02").to("local"),
+                arrow.get("2016-07-08 17:40:02").to("local"),
+                arrow.get("2016-07-08 18:30:02").to("local"),
+                arrow.get("2016-07-08 19:40:02").to("local"),
+            )
+        )
+
+        for domain, backups in group.backups.items():
+            dates = sorted(b.date for b in backups)
+            assert dates == expected_dates
+
     def test_clean_broken(
         self, build_backup_directory, build_mock_domain, build_mock_libvirtconn, mocker
     ):

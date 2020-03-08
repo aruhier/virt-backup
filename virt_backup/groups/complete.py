@@ -214,25 +214,19 @@ class CompleteBackupGroup:
 
         return diff_list[:n] if diff_list else None
 
-    def clean(self, hourly="*", daily="*", weekly="*", monthly="*", yearly="*"):
+    def clean(self, hourly=5, daily=5, weekly=5, monthly=5, yearly=5):
         backups_removed = set()
         for domain, domain_backups in self.backups.items():
             domain_backups = sorted(domain_backups, key=lambda b: b.date)
             keep_backups = set()
 
-            period_tuples = (
-                ("hour", "hourly"),
-                ("day", "daily"),
-                ("week", "weekly"),
-                ("month", "monthly"),
-                ("year", "yearly"),
+            keep_backups.update(
+                self._keep_n_periodic_backups(domain_backups, "hour", hourly),
+                self._keep_n_periodic_backups(domain_backups, "day", daily),
+                self._keep_n_periodic_backups(domain_backups, "week", weekly),
+                self._keep_n_periodic_backups(domain_backups, "month", monthly),
+                self._keep_n_periodic_backups(domain_backups, "year", yearly),
             )
-            for period, periodly in period_tuples:
-                n_to_keep = locals()[periodly]
-                if n_to_keep:
-                    keep_backups.update(
-                        self._keep_n_periodly_backups(domain_backups, period, n_to_keep)
-                    )
 
             backups_to_remove = set(domain_backups).difference(keep_backups)
             for b in backups_to_remove:
@@ -253,7 +247,7 @@ class CompleteBackupGroup:
 
         return backups_removed
 
-    def _keep_n_periodly_backups(self, sorted_backups, period, n):
+    def _keep_n_periodic_backups(self, sorted_backups, period, n):
         if not n:
             return []
 

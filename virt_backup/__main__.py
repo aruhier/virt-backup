@@ -227,12 +227,16 @@ def clean_backups(parsed_args, *args, **kwargs):
             g.scan_backup_dir()
             current_group_config = config.get_groups()[g.name]
             clean_params = {
-                "hourly": current_group_config.get("hourly", "*"),
-                "daily": current_group_config.get("daily", "*"),
-                "weekly": current_group_config.get("weekly", "*"),
-                "monthly": current_group_config.get("monthly", "*"),
-                "yearly": current_group_config.get("yearly", "*"),
+                "hourly": current_group_config.get("hourly", 5),
+                "daily": current_group_config.get("daily", 5),
+                "weekly": current_group_config.get("weekly", 5),
+                "monthly": current_group_config.get("monthly", 5),
+                "yearly": current_group_config.get("yearly", 5),
             }
+            for k, v in clean_params.items():
+                if v is None:
+                    clean_params[k] = "*"
+
             if not parsed_args.broken_only:
                 print(
                     "Backups removed for group {}: {}".format(
