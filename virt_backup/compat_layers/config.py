@@ -40,7 +40,7 @@ class ToV0_4(ConfigConverter):
 
             if msg:
                 warnings.append(
-                    "Group {}: {}.\nAdapt its config for:\n{}".format(
+                    'Action needed for group "{}": {}.\nAdapt its config for:\n\t{}'.format(
                         group, msg, yaml.safe_dump(changed, default_flow_style=False)
                     )
                 )
