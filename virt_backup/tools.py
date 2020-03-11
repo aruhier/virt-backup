@@ -1,6 +1,8 @@
+import logging
 import os
 import re
 import shutil
+import sys
 import tarfile
 
 
@@ -13,3 +15,8 @@ def copy_file(src, dst, buffersize=None):
     with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
         shutil.copyfileobj(fsrc, fdst, buffersize)
     return dst
+
+
+class InfoFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno in (logging.DEBUG, logging.INFO)

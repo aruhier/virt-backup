@@ -12,6 +12,7 @@ from virt_backup.exceptions import BackupNotFoundError, BackupsFailureInGroupErr
 from virt_backup.groups import groups_from_dict, BackupGroup, complete_groups_from_dict
 from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
+from virt_backup.tools import InfoFilter
 from virt_backup import APP_NAME, VERSION, compat_layers
 
 
@@ -114,12 +115,24 @@ def parse_args_and_run(parser):
     # Parse argument
     args = parser.parse_args()
 
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(logging.DEBUG)
+    stdout_handler.addFilter(InfoFilter())
+
+    stderr_handler = logging.StreamHandler()
+    stderr_handler.setLevel(logging.WARNING)
+    log_handlers = (stdout_handler, stderr_handler)
+
     if args.debug:
         logging.basicConfig(
-            level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s"
+            level=logging.DEBUG,
+            format="%(levelname)s:%(name)s:%(message)s",
+            handlers=log_handlers,
         )
     else:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        logging.basicConfig(
+            level=logging.INFO, format="%(message)s", handlers=log_handlers
+        )
 
     # Execute correct function, or print usage
     if hasattr(args, "func"):
