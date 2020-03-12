@@ -7,6 +7,7 @@ import shutil
 import tarfile
 
 from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
+from virt_backup.compat_layers.definition import convert as compat_convert_definition
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
 from virt_backup.tools import copy_file
@@ -19,6 +20,7 @@ logger = logging.getLogger("virt_backup")
 def build_dom_complete_backup_from_def(
     definition, backup_dir, definition_filename=None
 ):
+    compat_convert_definition(definition)
     backup = DomCompleteBackup(
         name=definition["name"],
         dom_name=definition["domain_name"],

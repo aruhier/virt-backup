@@ -1,3 +1,4 @@
-__all__ = ["config"]
+__all__ = ["config", "definition"]
 
 from . import config
+from . import definition
