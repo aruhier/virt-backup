@@ -33,7 +33,7 @@ setup(
     packages=["virt_backup", "virt_backup.groups", "virt_backup.backups"],
     install_requires=[
         "appdirs", "argparse", "arrow", "defusedxml", "libvirt-python", "lxml",
-        "PyYAML"
+        "packaging", "PyYAML"
     ],
     setup_requires=['pytest-runner', ],
     tests_require=['pytest', 'pytest-cov', "pytest-mock", "deepdiff"],
