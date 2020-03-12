@@ -28,7 +28,6 @@ def build_dom_complete_backup_from_def(
         disks=definition.get("disks", None),
         packager=definition["packager"]["type"],
         packager_opts=definition["packager"].get("opts", {}),
-        packager_init=definition["packager"].get("init", {}),
     )
 
     if definition_filename:
@@ -48,7 +47,6 @@ class DomCompleteBackup(_BaseDomBackup):
         disks=None,
         packager="tar",
         packager_opts=None,
-        packager_init=None,
         definition_filename=None,
     ):
         #: domain name
@@ -74,9 +72,6 @@ class DomCompleteBackup(_BaseDomBackup):
 
         #: packager options arguments used during compression
         self.packager_opts = packager_opts or {}
-
-        #: packager special init arguments used during compression
-        self.packager_init = packager_init or {}
 
         #: expected format: {disk_name1: filename1, disk_name2: filename2, …}
         self.disks = disks
