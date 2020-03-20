@@ -7,7 +7,7 @@ See:
 """
 
 from os import path
-from setuptools import setup
+from setuptools import find_packages, setup
 
 here = path.abspath(path.dirname(__file__))
 
@@ -30,7 +30,7 @@ setup(
     ],
 
     keywords="libvirt",
-    packages=["virt_backup", "virt_backup.groups", "virt_backup.backups"],
+    packages=find_packages(exclude=["example", "tests"]),
     install_requires=[
         "appdirs", "argparse", "arrow", "defusedxml", "libvirt-python", "lxml",
         "packaging", "PyYAML"
