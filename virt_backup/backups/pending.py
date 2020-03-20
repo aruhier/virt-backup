@@ -174,8 +174,11 @@ class DomBackup(_BaseDomBackup):
             )
 
             snapshot_date, definition = self._snapshot_and_save_date(definition)
+
             self._name = self._main_backup_name_format(snapshot_date)
             definition["name"], self.pending_info["name"] = self._name, self._name
+            self._dump_json_definition(definition)
+            self._dump_pending_info()
 
             packager = self._get_packager()
             # TODO: handle backingStore cases
@@ -342,14 +345,18 @@ class DomBackup(_BaseDomBackup):
         if self._ext_snapshot_helper:
             self._ext_snapshot_helper.clean()
 
-        packager = self._get_write_packager(self.pending_info["name"])
-        try:
-            self._clean_packager(packager)
-        except FileNotFoundError:
-            logger.info("%s: Packager not found, nothing to clean.", self.dom.name())
+        # If the name couldn't have been written, no packager has been created.
+        if "name" in self.pending_info:
+            packager = self._get_write_packager(self.pending_info["name"])
+            try:
+                self._clean_packager(packager)
+            except FileNotFoundError:
+                logger.info(
+                    "%s: Packager not found, nothing to clean.", self.dom.name()
+                )
         try:
             self._clean_pending_info()
-        except KeyError:
+        except FileNotFoundError:
             # Pending info had no time to be filled, so had not be dumped.
             pass
 
