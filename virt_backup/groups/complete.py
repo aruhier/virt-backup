@@ -1,4 +1,3 @@
-
 from collections import defaultdict
 import glob
 import json
@@ -6,7 +5,8 @@ import logging
 import os
 
 from virt_backup.backups import (
-    build_dom_complete_backup_from_def, build_dom_backup_from_pending_info
+    build_dom_complete_backup_from_def,
+    build_dom_backup_from_pending_info,
 )
 from virt_backup.exceptions import BackupNotFoundError, DomainNotFoundError
 from .pattern import domains_matching_with_patterns
@@ -36,9 +36,7 @@ def list_broken_backups_by_domain(backup_dir):
     :returns: {domain_name: [(backup_dir, pending_info_dict), …], …}
     :rtype: dict
     """
-    return _list_json_following_pattern_by_domain(
-        backup_dir, "*/*.json.pending"
-    )
+    return _list_json_following_pattern_by_domain(backup_dir, "*/*.json.pending")
 
 
 def _list_json_following_pattern_by_domain(directory, glob_pattern):
@@ -58,9 +56,7 @@ def _list_json_following_pattern_by_domain(directory, glob_pattern):
     return backups
 
 
-def complete_groups_from_dict(
-        groups_dict, conn=None, callbacks_registrer=None
-):
+def complete_groups_from_dict(groups_dict, conn=None, callbacks_registrer=None):
     """
     Construct and yield CompleteBackupGroups from a dict (typically as stored
     in config)
@@ -70,6 +66,7 @@ def complete_groups_from_dict(
     :param conn: libvirt connection
     :param callbacks_registrer: handle snapshot events. Required if conn is set
     """
+
     def build(name, properties):
         attrs = {}
         attrs["hosts"] = []
@@ -90,8 +87,7 @@ def complete_groups_from_dict(
             attrs["backup_dir"] = properties["target"]
 
         complete_backup_group = CompleteBackupGroup(
-            name=name, conn=conn, callbacks_registrer=callbacks_registrer,
-            **attrs
+            name=name, conn=conn, callbacks_registrer=callbacks_registrer, **attrs
         )
         return complete_backup_group
 
@@ -99,13 +95,20 @@ def complete_groups_from_dict(
         yield build(group_name, group_properties)
 
 
-class CompleteBackupGroup():
+class CompleteBackupGroup:
     """
     Group of complete libvirt domain backups
     """
+
     def __init__(
-            self, name="unnamed", backup_dir=None, hosts=None, conn=None,
-            backups=None, broken_backups=None, callbacks_registrer=None
+        self,
+        name="unnamed",
+        backup_dir=None,
+        hosts=None,
+        conn=None,
+        backups=None,
+        broken_backups=None,
+        callbacks_registrer=None,
     ):
         #: dict of domains and their backups (CompleteDomBackup)
         self.backups = backups or dict()
@@ -156,20 +159,18 @@ class CompleteBackupGroup():
                     build_dom_complete_backup_from_def(
                         definition,
                         backup_dir=os.path.dirname(definition_filename),
-                        definition_filename=definition_filename
+                        definition_filename=definition_filename,
                     )
-                    for definition_filename, definition
-                    in backups_by_domain[dom_name]
-                ), key=lambda b: b.date
+                    for definition_filename, definition in backups_by_domain[dom_name]
+                ),
+                key=lambda b: b.date,
             )
 
         self.backups = backups
 
     def _build_broken_backups(self):
         broken_backups = {}
-        broken_backups_by_domain = list_broken_backups_by_domain(
-            self.backup_dir
-        )
+        broken_backups_by_domain = list_broken_backups_by_domain(self.backup_dir)
         domains_to_include = domains_matching_with_patterns(
             broken_backups_by_domain.keys(), self.hosts
         )
@@ -180,11 +181,13 @@ class CompleteBackupGroup():
                         pending_info,
                         backup_dir=os.path.dirname(pending_info_json),
                         conn=self.conn,
-                        callbacks_registrer=self._callbacks_registrer
+                        callbacks_registrer=self._callbacks_registrer,
                     )
-                    for pending_info_json, pending_info
-                    in broken_backups_by_domain[dom_name]
-                ), key=lambda b: b.pending_info.get("date", None)
+                    for pending_info_json, pending_info in broken_backups_by_domain[
+                        dom_name
+                    ]
+                ),
+                key=lambda b: b.pending_info.get("date", None),
             )
 
         self.broken_backups = broken_backups
@@ -207,35 +210,27 @@ class CompleteBackupGroup():
         except KeyError:
             raise DomainNotFoundError(domain_name)
 
-        diff_list = sorted(
-            backups, key=lambda b: abs(b.date - date)
-        )
+        diff_list = sorted(backups, key=lambda b: abs(b.date - date))
 
         return diff_list[:n] if diff_list else None
 
-    def clean(self, hourly="*", daily="*", weekly="*", monthly="*",
-              yearly="*"):
+    def clean(self, hourly=5, daily=5, weekly=5, monthly=5, yearly=5):
         backups_removed = set()
         for domain, domain_backups in self.backups.items():
             domain_backups = sorted(domain_backups, key=lambda b: b.date)
             keep_backups = set()
 
-            period_tuples = (
-                ("hour", "hourly"), ("day", "daily"), ("week", "weekly"),
-                ("month", "monthly"), ("year", "yearly"),
+            keep_backups.update(
+                self._keep_n_periodic_backups(domain_backups, "hour", hourly),
+                self._keep_n_periodic_backups(domain_backups, "day", daily),
+                self._keep_n_periodic_backups(domain_backups, "week", weekly),
+                self._keep_n_periodic_backups(domain_backups, "month", monthly),
+                self._keep_n_periodic_backups(domain_backups, "year", yearly),
             )
-            for period, periodly in period_tuples:
-                n_to_keep = locals()[periodly]
-                if n_to_keep:
-                    keep_backups.update(self._keep_n_periodly_backups(
-                        domain_backups, period, n_to_keep
-                    ))
 
             backups_to_remove = set(domain_backups).difference(keep_backups)
             for b in backups_to_remove:
-                logger.info(
-                    "Cleaning backup {} for domain {}".format(b.date, domain)
-                )
+                logger.info("Cleaning backup {} for domain {}".format(b.date, domain))
                 b.delete()
                 self.backups[domain].remove(b)
                 backups_removed.add(b)
@@ -252,7 +247,7 @@ class CompleteBackupGroup():
 
         return backups_removed
 
-    def _keep_n_periodly_backups(self, sorted_backups, period, n):
+    def _keep_n_periodic_backups(self, sorted_backups, period, n):
         if not n:
             return []
 
@@ -262,8 +257,7 @@ class CompleteBackupGroup():
         if n == "*":
             n = 0
         return set(
-            backups[0] for group, backups in
-            sorted(grouped_backups.items())[-n:]
+            backups[0] for group, backups in sorted(grouped_backups.items())[-n:]
         )
 
     def _group_backup_by_period(self, sorted_backups, period):
@@ -272,7 +266,7 @@ class CompleteBackupGroup():
         for backup in sorted_backups:
             key = tuple(
                 getattr(backup.date, p)
-                for p in reversed(periods[periods.index(period):])
+                for p in reversed(periods[periods.index(period) :])
             )
             grouped_backups[key].append(backup)
         return grouped_backups

@@ -15,7 +15,7 @@ from virt_backup.exceptions import DiskNotSnapshot, SnapshotNotStarted
 logger = logging.getLogger("virt_backup")
 
 
-class DomExtSnapshotCallbackRegistrer():
+class DomExtSnapshotCallbackRegistrer:
 
     _callback_id = None
 
@@ -34,8 +34,7 @@ class DomExtSnapshotCallbackRegistrer():
 
     def open(self):
         self._callback_id = self.conn.domainEventRegisterAny(
-            None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB, self.event_callback,
-            None
+            None, libvirt.VIR_DOMAIN_EVENT_ID_BLOCK_JOB, self.event_callback, None
         )
 
     def close(self):
@@ -49,23 +48,20 @@ class DomExtSnapshotCallbackRegistrer():
             return
 
         if snap not in self.callbacks:
-            logger.error(
-                "Callback for snapshot %s called but not existing", snap
-            )
+            logger.error("Callback for snapshot %s called but not existing", snap)
             return None
 
         return self.callbacks[snap](conn, dom, snap, event_id, status, *args)
 
 
-class DomExtSnapshot():
+class DomExtSnapshot:
     """
     Libvirt domain backup
     """
 
     metadatas = None
 
-    def __init__(self, dom, disks, callbacks_registrer, conn=None,
-                 timeout=None):
+    def __init__(self, dom, disks, callbacks_registrer, conn=None, timeout=None):
         #: domain to snapshot. Has to be a libvirt.virDomain object
         self.dom = dom
 
@@ -98,8 +94,9 @@ class DomExtSnapshot():
             "disks": {
                 disk: {
                     "src": prop["src"],
-                    "snapshot": self._get_snapshot_path(prop["src"], snapshot)
-                } for disk, prop in self.disks.items()
+                    "snapshot": self._get_snapshot_path(prop["src"], snapshot),
+                }
+                for disk, prop in self.disks.items()
             },
         }
 
@@ -113,10 +110,10 @@ class DomExtSnapshot():
         return self.dom.snapshotCreateXML(
             snap_xml,
             (
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY +
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC +
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
-            )
+                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY
+                + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC
+                + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
+            ),
         )
 
     def gen_libvirt_snapshot_xml(self):
@@ -150,9 +147,7 @@ class DomExtSnapshot():
         return lxml.etree.tostring(xml_tree, pretty_print=True).decode()
 
     def _get_snapshot_path(self, parent_disk_path, snapshot):
-        return "{}.{}".format(
-            os.path.splitext(parent_disk_path)[0], snapshot.getName()
-        )
+        return "{}.{}".format(os.path.splitext(parent_disk_path)[0], snapshot.getName())
 
     def clean(self):
         if not self.metadatas:
@@ -160,8 +155,7 @@ class DomExtSnapshot():
 
         disks = tuple(self.metadatas["disks"].keys())
         snapshot_paths = tuple(
-            os.path.abspath(self.metadatas["disks"][disk]["snapshot"])
-            for disk in disks
+            os.path.abspath(self.metadatas["disks"][disk]["snapshot"]) for disk in disks
         )
         try:
             for disk in disks:
@@ -170,8 +164,7 @@ class DomExtSnapshot():
                 except Exception as e:
                     logger.critical(
                         (
-                            "Failed to clean temp files of disk {} "
-                            "for domain {}: {}"
+                            "Failed to clean temp files of disk {} " "for domain {}: {}"
                         ).format(disk, self.dom.name(), e)
                     )
                     raise
@@ -185,22 +178,21 @@ class DomExtSnapshot():
         elif disk not in self.metadatas["disks"]:
             raise DiskNotSnapshot(disk)
 
-        snapshot_path = os.path.abspath(
-            self.metadatas["disks"][disk]["snapshot"]
-        )
+        snapshot_path = os.path.abspath(self.metadatas["disks"][disk]["snapshot"])
         disk_path = os.path.abspath(self.metadatas["disks"][disk]["src"])
 
         # Do not commit and pivot if our snapshot is not the current top disk
-        current_disk_path = get_xml_block_of_disk(
-            self.dom.XMLDesc(), disk
-        ).xpath("source")[0].get("file")
+        current_disk_path = (
+            get_xml_block_of_disk(self.dom.XMLDesc(), disk)
+            .xpath("source")[0]
+            .get("file")
+        )
         if os.path.abspath(current_disk_path) != snapshot_path:
             logger.warning(
                 "It seems that the domain configuration (and specifically the "
                 "one related to its disks) has been changed. The current disk "
                 "will not be committed nor pivoted with the external "
                 "snapshot, to not break the backing chain.\n\n"
-
                 "You might want to manually check, where your domain image is "
                 "stored, if no temporary file is remaining ({}).".format(
                     os.path.dirname(current_disk_path)
@@ -228,22 +220,19 @@ class DomExtSnapshot():
 
         :param disk: diskname to blockcommit
         """
-        snapshot_path = os.path.abspath(
-            self.metadatas["disks"][disk]["snapshot"]
-        )
-        self._callbacks_registrer.callbacks[snapshot_path] = (
-            self._pivot_callback
-        )
+        snapshot_path = os.path.abspath(self.metadatas["disks"][disk]["snapshot"])
+        self._callbacks_registrer.callbacks[snapshot_path] = self._pivot_callback
 
-        logger.debug(
-            "%s: blockcommit %s to pivot snapshot", self.dom.name(), disk
-        )
+        logger.debug("%s: blockcommit %s to pivot snapshot", self.dom.name(), disk)
         self.dom.blockCommit(
-            disk, None, None, 0,
+            disk,
+            None,
+            None,
+            0,
             (
-                libvirt.VIR_DOMAIN_BLOCK_COMMIT_ACTIVE +
-                libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
-            )
+                libvirt.VIR_DOMAIN_BLOCK_COMMIT_ACTIVE
+                + libvirt.VIR_DOMAIN_BLOCK_COMMIT_SHALLOW
+            ),
         )
 
         self._wait_for_pivot[snapshot_path].wait(timeout=self.timeout)
@@ -289,9 +278,7 @@ class DomExtSnapshot():
             # update a disk is broken in libvirt < 3.0
             return self.dom.updateDeviceFlags(
                 defusedxml.lxml.tostring(disk_xml).decode(),
-                libvirt.VIR_DOMAIN_AFFECT_CONFIG
+                libvirt.VIR_DOMAIN_AFFECT_CONFIG,
             )
         else:
-            return self.conn.defineXML(
-                defusedxml.lxml.tostring(dom_xml).decode()
-            )
+            return self.conn.defineXML(defusedxml.lxml.tostring(dom_xml).decode())

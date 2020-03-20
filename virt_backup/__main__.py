@@ -8,15 +8,12 @@ import sys
 import threading
 from collections import defaultdict
 
-from virt_backup.exceptions import (
-    BackupNotFoundError, BackupsFailureInGroupError
-)
-from virt_backup.groups import (
-    groups_from_dict, BackupGroup, complete_groups_from_dict
-)
+from virt_backup.exceptions import BackupNotFoundError, BackupsFailureInGroupError
+from virt_backup.groups import groups_from_dict, BackupGroup, complete_groups_from_dict
 from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
-from virt_backup import APP_NAME, VERSION
+from virt_backup.tools import InfoFilter
+from virt_backup import APP_NAME, VERSION, compat_layers
 
 
 logger = logging.getLogger("virt_backup")
@@ -34,57 +31,81 @@ def build_parser():
     # Start/Stop/Show command
     sp_action = parser.add_subparsers()
 
-    sp_backup = sp_action.add_parser("backup", aliases=["bak"],
-                                     help=("backup groups"))
-    sp_backup.add_argument("groups", metavar="group", type=str, nargs="*",
-                           help="domain group to backup")
+    sp_backup = sp_action.add_parser("backup", aliases=["bak"], help=("backup groups"))
+    sp_backup.add_argument(
+        "groups", metavar="group", type=str, nargs="*", help="domain group to backup"
+    )
     sp_backup.set_defaults(func=start_backups)
 
     sp_restore = sp_action.add_parser("restore", help=("restore backup"))
-    sp_restore.add_argument("group", metavar="group",
-                            help="domain group")
-    sp_restore.add_argument("domain_name", metavar="domain",
-                            help="domain name")
-    sp_restore.add_argument("--date", metavar="date",
-                            help="backup date (default: last backup)")
-    sp_restore.add_argument("target_dir", metavar="target_dir",
-                            help="backup date")
+    sp_restore.add_argument("group", metavar="group", help="domain group")
+    sp_restore.add_argument("domain_name", metavar="domain", help="domain name")
+    sp_restore.add_argument(
+        "--date", metavar="date", help="backup date (default: last backup)"
+    )
+    sp_restore.add_argument("target_dir", metavar="target_dir", help="backup date")
     sp_restore.set_defaults(func=restore_backup)
 
-    sp_clean = sp_action.add_parser("clean", aliases=["cl"],
-                                    help=("clean groups"))
-    sp_clean.add_argument("groups", metavar="group", type=str, nargs="*",
-                          help="domain group to clean")
+    sp_clean = sp_action.add_parser("clean", aliases=["cl"], help=("clean groups"))
+    sp_clean.add_argument(
+        "groups", metavar="group", type=str, nargs="*", help="domain group to clean"
+    )
     sp_clean_broken_opts = sp_clean.add_mutually_exclusive_group()
-    sp_clean_broken_opts.add_argument("-b", "--broken-only",
-                                      help="only clean broken backups",
-                                      dest="broken_only", action="store_true")
-    sp_clean_broken_opts.add_argument("-B", "--no-broken",
-                                      help="do not clean broken backups",
-                                      dest="no_broken", action="store_true")
+    sp_clean_broken_opts.add_argument(
+        "-b",
+        "--broken-only",
+        help="only clean broken backups",
+        dest="broken_only",
+        action="store_true",
+    )
+    sp_clean_broken_opts.add_argument(
+        "-B",
+        "--no-broken",
+        help="do not clean broken backups",
+        dest="no_broken",
+        action="store_true",
+    )
     sp_clean.set_defaults(func=clean_backups)
 
-    sp_list = sp_action.add_parser("list", aliases=["ls"],
-                                   help=("list groups"))
-    sp_list.add_argument("groups", metavar="group", type=str, nargs="*",
-                         help="domain group to clean")
-    sp_list.add_argument("-D", "--domain", metavar="domain_name",
-                         dest="domains_names", action="append", default=[],
-                         help="show list of backups for specific domain")
-    sp_list.add_argument("-a", "--all",
-                         help="show all domains matching, even without backup",
-                         dest="list_all", action="store_true")
-    sp_list.add_argument("-s", "--short",
-                         help="short version, do not print details",
-                         dest="short", action="store_true")
+    sp_list = sp_action.add_parser("list", aliases=["ls"], help=("list groups"))
+    sp_list.add_argument(
+        "groups", metavar="group", type=str, nargs="*", help="domain group to clean"
+    )
+    sp_list.add_argument(
+        "-D",
+        "--domain",
+        metavar="domain_name",
+        dest="domains_names",
+        action="append",
+        default=[],
+        help="show list of backups for specific domain",
+    )
+    sp_list.add_argument(
+        "-a",
+        "--all",
+        help="show all domains matching, even without backup",
+        dest="list_all",
+        action="store_true",
+    )
+    sp_list.add_argument(
+        "-s",
+        "--short",
+        help="short version, do not print details",
+        dest="short",
+        action="store_true",
+    )
     sp_list.set_defaults(func=list_groups)
 
     # Debug option
-    parser.add_argument("-d", "--debug", help="enable debug, verbose output",
-                        dest="debug", action="store_true")
     parser.add_argument(
-        "--version", action="version",
-        version="{} {}".format(APP_NAME, VERSION)
+        "-d",
+        "--debug",
+        help="enable debug, verbose output",
+        dest="debug",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--version", action="version", version="{} {}".format(APP_NAME, VERSION)
     )
 
     return parser
@@ -94,12 +115,24 @@ def parse_args_and_run(parser):
     # Parse argument
     args = parser.parse_args()
 
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(logging.DEBUG)
+    stdout_handler.addFilter(InfoFilter())
+
+    stderr_handler = logging.StreamHandler()
+    stderr_handler.setLevel(logging.WARNING)
+    log_handlers = (stdout_handler, stderr_handler)
+
     if args.debug:
         logging.basicConfig(
-            level=logging.DEBUG, format="%(levelname)s:%(name)s:%(message)s"
+            level=logging.DEBUG,
+            format="%(levelname)s:%(name)s:%(message)s",
+            handlers=log_handlers,
         )
     else:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        logging.basicConfig(
+            level=logging.INFO, format="%(message)s", handlers=log_handlers
+        )
 
     # Execute correct function, or print usage
     if hasattr(args, "func"):
@@ -207,20 +240,28 @@ def clean_backups(parsed_args, *args, **kwargs):
             g.scan_backup_dir()
             current_group_config = config.get_groups()[g.name]
             clean_params = {
-                "hourly": current_group_config.get("hourly", "*"),
-                "daily": current_group_config.get("daily", "*"),
-                "weekly": current_group_config.get("weekly", "*"),
-                "monthly": current_group_config.get("monthly", "*"),
-                "yearly": current_group_config.get("yearly", "*"),
+                "hourly": current_group_config.get("hourly", 5),
+                "daily": current_group_config.get("daily", 5),
+                "weekly": current_group_config.get("weekly", 5),
+                "monthly": current_group_config.get("monthly", 5),
+                "yearly": current_group_config.get("yearly", 5),
             }
+            for k, v in clean_params.items():
+                if v is None:
+                    clean_params[k] = "*"
+
             if not parsed_args.broken_only:
-                print("Backups removed for group {}: {}".format(
-                    g.name or "Undefined", len(g.clean(**clean_params))
-                ))
+                print(
+                    "Backups removed for group {}: {}".format(
+                        g.name or "Undefined", len(g.clean(**clean_params))
+                    )
+                )
             if not parsed_args.no_broken:
-                print("Broken backups removed for group {}: {}".format(
-                    g.name or "Undefined", len(g.clean_broken_backups())
-                ))
+                print(
+                    "Broken backups removed for group {}: {}".format(
+                        g.name or "Undefined", len(g.clean_broken_backups())
+                    )
+                )
 
 
 def list_groups(parsed_args, *args, **kwargs):
@@ -242,14 +283,16 @@ def list_groups(parsed_args, *args, **kwargs):
     for group_name, dom_backups in backups_by_group.items():
         if parsed_args.domains_names:
             return list_detailed_backups_for_domain(
-                complete_groups[group_name], parsed_args.domains_names,
-                short=parsed_args.short
+                complete_groups[group_name],
+                parsed_args.domains_names,
+                short=parsed_args.short,
             )
-        print(" {}\n{}\n".format(group_name, (2 + len(group_name))*"="))
-        print("Total backups: {} hosts, {} backups".format(
-            len(dom_backups),
-            sum(len(backups) for backups in dom_backups.values())
-        ))
+        print(" {}\n{}\n".format(group_name, (2 + len(group_name)) * "="))
+        print(
+            "Total backups: {} hosts, {} backups".format(
+                len(dom_backups), sum(len(backups) for backups in dom_backups.values())
+            )
+        )
         if not parsed_args.short:
             print("Hosts:")
             # TODO: Should also print hosts matching in libvirt but not backup
@@ -258,19 +301,13 @@ def list_groups(parsed_args, *args, **kwargs):
                 print("\t{}: {} backup(s)".format(dom, len(backups)))
 
 
-def _get_all_hosts_and_bak_by_groups(
-        group_names, config, conn, callbacks_registrer
-):
+def _get_all_hosts_and_bak_by_groups(group_names, config, conn, callbacks_registrer):
     complete_groups = get_usable_complete_groups(config)
-    pending_groups = build_all_or_selected_groups(
-        config, conn, callbacks_registrer
-    )
+    pending_groups = build_all_or_selected_groups(config, conn, callbacks_registrer)
 
     backups_by_group = {}
     for pgroup in pending_groups:
-        backups_by_group[pgroup.name] = {
-            b.dom.name(): tuple() for b in pgroup.backups
-        }
+        backups_by_group[pgroup.name] = {b.dom.name(): tuple() for b in pgroup.backups}
 
     for cgroup in complete_groups:
         cgroup.scan_backup_dir()
@@ -285,22 +322,27 @@ def list_detailed_backups_for_domain(group, domains_names, short=False):
     if not group.backups:
         return
 
-    print(" {}\n{}\n".format(group.name, (2 + len(group.name))*"="))
+    print(" {}\n{}\n".format(group.name, (2 + len(group.name)) * "="))
     for d, backups in group.backups.items():
         print("{}: {} backup(s)".format(d, len(backups)))
         if not short:
             for b in reversed(sorted(backups, key=lambda x: x.date)):
-                print("\t{}: {}".format(
-                    b.date, b.get_complete_path_of(b.definition_filename)
-                ))
+                print(
+                    "\t{}: {}".format(
+                        b.date, b.get_complete_path_of(b.definition_filename)
+                    )
+                )
 
 
 def get_setup_config():
-    config = Config(defaults={"debug": False, })
+    config = Config(defaults={"debug": False,})
     try:
-        config.from_dict(get_config())
+        loaded_config = get_config()
     except FileNotFoundError:
         sys.exit(1)
+
+    compat_layers.config.convert_warn(loaded_config)
+    config.from_dict(loaded_config)
     return config
 
 
@@ -310,7 +352,7 @@ def get_setup_conn(config):
     else:
         conn = libvirt.open(config["uri"])
     if conn is None:
-        print('Failed to open connection to the hypervisor')
+        print("Failed to open connection to the hypervisor")
         sys.exit(1)
     conn.setKeepAlive(5, 3)
     return conn
@@ -327,13 +369,14 @@ def _get_auth_conn(config):
 
     auth = [
         [libvirt.VIR_CRED_AUTHNAME, libvirt.VIR_CRED_PASSPHRASE],
-        request_cred, None
+        request_cred,
+        None,
     ]
     return libvirt.openAuth(config["uri"], auth, 0)
 
 
 def get_usable_complete_groups(
-        config, only_groups_in=None, conn=None, callbacks_registrer=None
+    config, only_groups_in=None, conn=None, callbacks_registrer=None
 ):
     groups = complete_groups_from_dict(
         config.get_groups(), conn=conn, callbacks_registrer=callbacks_registrer
@@ -346,19 +389,18 @@ def get_usable_complete_groups(
         yield g
 
 
-def build_all_or_selected_groups(config, conn, callbacks_registrer,
-                                 groups=None):
+def build_all_or_selected_groups(config, conn, callbacks_registrer, groups=None):
     if not groups:
         groups = [
-            g for g in groups_from_dict(
-                config["groups"], conn, callbacks_registrer
-            ) if g.autostart
+            g
+            for g in groups_from_dict(config["groups"], conn, callbacks_registrer)
+            if g.autostart
         ]
     else:
         groups = [
-            g for g in groups_from_dict(
-                config["groups"], conn, callbacks_registrer
-            ) if g.name in groups
+            g
+            for g in groups_from_dict(config["groups"], conn, callbacks_registrer)
+            if g.name in groups
         ]
     return groups
 

@@ -5,14 +5,12 @@ import pytest
 
 from virt_backup.backups import DomBackup
 from virt_backup.domains import get_xml_block_of_disk
-from virt_backup.backups.snapshot import (
-    DomExtSnapshot, DomExtSnapshotCallbackRegistrer
-)
+from virt_backup.backups.snapshot import DomExtSnapshot, DomExtSnapshotCallbackRegistrer
 from virt_backup.exceptions import DiskNotFoundError, SnapshotNotStarted
 from helper.virt_backup import MockSnapshot
 
 
-class TestDomExtSnapshot():
+class TestDomExtSnapshot:
     snapshot_helper = None
 
     @pytest.fixture(autouse=True)
@@ -20,17 +18,12 @@ class TestDomExtSnapshot():
         dom = build_mock_domain
         callbacks_registrer = DomExtSnapshotCallbackRegistrer(dom._conn)
         self.snapshot_helper = DomExtSnapshot(
-            dom=dom, callbacks_registrer=callbacks_registrer,
+            dom=dom,
+            callbacks_registrer=callbacks_registrer,
             disks={
-                "vda": {
-                    "src": "/vda.qcow2",
-                    "type": "qcow2",
-                },
-                "vdb": {
-                    "src": "/vdb.qcow2",
-                    "type": "qcow2",
-                },
-            }
+                "vda": {"src": "/vda.qcow2", "type": "qcow2",},
+                "vdb": {"src": "/vdb.qcow2", "type": "qcow2",},
+            },
         )
 
     def test_snapshot_logic_date(self, monkeypatch):
@@ -65,15 +58,11 @@ class TestDomExtSnapshot():
         metadatas = self.start_snapshot(monkeypatch)
 
         for disk in metadatas["disks"].values():
-            assert (
-                os.path.dirname(disk["src"]) ==
-                os.path.dirname(disk["snapshot"])
-            )
+            assert os.path.dirname(disk["src"]) == os.path.dirname(disk["snapshot"])
 
     def start_snapshot(self, monkeypatch):
         monkeypatch.setattr(
-            self.snapshot_helper, "external_snapshot",
-            lambda: MockSnapshot("123")
+            self.snapshot_helper, "external_snapshot", lambda: MockSnapshot("123")
         )
 
         return self.snapshot_helper.start()
@@ -83,8 +72,8 @@ class TestDomExtSnapshot():
             "<domainsnapshot>\n"
             "  <description>Pre-backup external snapshot</description>\n"
             "  <disks>\n"
-            "    <disk name=\"vda\" snapshot=\"external\"/>\n"
-            "    <disk name=\"vdb\" snapshot=\"external\"/>\n"
+            '    <disk name="vda" snapshot="external"/>\n'
+            '    <disk name="vdb" snapshot="external"/>\n'
             "  </disks>\n"
             "</domainsnapshot>\n"
         )
@@ -147,26 +136,24 @@ class TestDomExtSnapshot():
         self.snapshot_helper.metadatas = {
             "date": arrow.now(),
             "disks": {
-                disk: {
-                    "src": prop["src"],
-                    "snapshot": snapshots[disk],
-                } for disk, prop in self.snapshot_helper.disks.items()
-            }
+                disk: {"src": prop["src"], "snapshot": snapshots[disk],}
+                for disk, prop in self.snapshot_helper.disks.items()
+            },
         }
         return tmpdir.join("snaps")
 
     def create_temp_snapshot_files(self, tmpdir):
         tmpdir = tmpdir.mkdir("snaps")
-        self.snapshot_helper.dom.set_storage_basedir(
-            os.path.abspath(str(tmpdir))
-        )
+        self.snapshot_helper.dom.set_storage_basedir(os.path.abspath(str(tmpdir)))
 
         snapshots = {}
         # swap disk and snapshots, to just change the domain basedir
         for disk, prop in self.snapshot_helper.disks.items():
             dom_disk_path = (
-                get_xml_block_of_disk(self.snapshot_helper.dom.XMLDesc(), disk)
-            ).xpath("source")[0].get("file")
+                (get_xml_block_of_disk(self.snapshot_helper.dom.XMLDesc(), disk))
+                .xpath("source")[0]
+                .get("file")
+            )
             tmpdir.join(os.path.basename(dom_disk_path)).write("")
             prop["snapshot"] = dom_disk_path
 
@@ -178,11 +165,9 @@ class TestDomExtSnapshot():
 
     def mock_pivot_mechanism(self, monkeypatch):
         monkeypatch.setattr(
-            self.snapshot_helper, "_qemu_img_commit",
-            lambda *args: None
+            self.snapshot_helper, "_qemu_img_commit", lambda *args: None
         )
 
         monkeypatch.setattr(
-            self.snapshot_helper, "_manually_pivot_disk",
-            lambda *args: None
+            self.snapshot_helper, "_manually_pivot_disk", lambda *args: None
         )

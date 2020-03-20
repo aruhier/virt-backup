@@ -1,21 +1,26 @@
-
 import arrow
 import defusedxml.lxml
 import libvirt
 import lxml
 import os
 
-from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
+from virt_backup.backups import (
+    DomBackup,
+    DomExtSnapshotCallbackRegistrer,
+    ReadBackupPackagers,
+    WriteBackupPackagers,
+)
 from virt_backup.groups import BackupGroup
 
 
 CUR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 
-class MockDomain():
+class MockDomain:
     """
     Simulate a libvirt domain
     """
+
     def XMLDesc(self):
         """
         Return the definition of a testing domain
@@ -70,9 +75,7 @@ class MockDomain():
         address = new_device_xml.get("address")
         device_to_replace = self._find_device_with_address(address)
 
-        self.dom_xml.xpath("devices")[0].replace(
-            device_to_replace, new_device_xml
-        )
+        self.dom_xml.xpath("devices")[0].replace(device_to_replace, new_device_xml)
 
     def _find_device_with_address(self, address):
         for elem in self.dom_xml.xpath("devices/*"):
@@ -93,7 +96,7 @@ class MockDomain():
         self.set_name(name)
 
 
-class MockSnapshot():
+class MockSnapshot:
     def getName(self):
         return self._name
 
@@ -101,10 +104,11 @@ class MockSnapshot():
         self._name = name
 
 
-class MockConn():
+class MockConn:
     """
     Simulate a libvirt connection
     """
+
     _libvirt_version = 3000000
 
     def listAllDomains(self):
@@ -119,7 +123,7 @@ class MockConn():
     def defineXML(self, xml):
         md = MockDomain(_conn=self)
         md.dom_xml = defusedxml.lxml.fromstring(xml)
-        for i, d in enumerate(self._domains):
+        for _, d in enumerate(self._domains):
             if d.ID() == md.ID():
                 d.dom_xml = md.dom_xml
                 return d
@@ -142,61 +146,55 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
     definition["date"] = date.timestamp
     definition["disks"] = {}
 
-    backup_dir = dbackup.target_dir
+    backup_dir = dbackup.backup_dir
+    definition["path"] = backup_dir
 
-    if dbackup.compression:
-        tar = dbackup.get_new_tar(backup_dir, date)
-        if dbackup.compression == "xz":
-            definition["tar"] = tar.fileobj._fp.name
-        else:
-            definition["tar"] = tar.fileobj.name
-    for disk in dbackup.disks:
-        # create empty files as our backup images
-        img_name = "{}.qcow2".format(
-            dbackup._disk_backup_name_format(date, disk),
-        )
-        definition["disks"][disk] = img_name
+    definition["name"] = dbackup._main_backup_name_format(
+        arrow.get(definition["date"]).to("local")
+    )
+    packager = dbackup._get_write_packager(definition["name"])
 
-        img_complete_path = os.path.join(backup_dir, img_name)
-        with open(img_complete_path, "w"):
-            pass
-        if dbackup.compression:
-            # add img to the tar file and remove it
-            tar.add(img_complete_path, arcname=img_name)
-            os.remove(img_complete_path)
-    if dbackup.compression:
-        tar.close()
+    with packager:
+        for disk in dbackup.disks:
+            # create empty files as our backup images
+            img_name = "{}.qcow2".format(dbackup._disk_backup_name_format(date, disk),)
+            definition["disks"][disk] = img_name
+
+            img_complete_path = os.path.join(backup_dir, img_name)
+            with open(img_complete_path, "w"):
+                pass
+            if dbackup.packager != "directory":
+                packager.add(img_complete_path, img_name)
+                os.remove(img_complete_path)
     return definition
 
 
 def build_completed_backups(backup_dir):
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
     backup_properties = (
-        (arrow.get("2016-07-08 19:40:02").to("local"), None),
-        (arrow.get("2016-07-08 18:40:02").to("local"), None),
-        (arrow.get("2016-07-08 18:30:02").to("local"), None),
-        (arrow.get("2016-07-08 17:40:02").to("local"), None),
-        (arrow.get("2016-07-07 19:40:02").to("local"), None),
-        (arrow.get("2016-07-07 21:40:02").to("local"), None),
-        (arrow.get("2016-07-06 20:40:02").to("local"), None),
-        (arrow.get("2016-04-08 19:40:02").to("local"), None),
-        (arrow.get("2014-05-01 00:30:00").to("local"), "tar"),
-        (arrow.get("2016-03-08 14:28:13").to("local"), "xz"),
+        (arrow.get("2016-07-08 19:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-08 18:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-08 18:30:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-08 17:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-07 19:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-07 21:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-07-06 20:40:02").to("local"), "directory", {}),
+        (arrow.get("2016-04-08 19:40:02").to("local"), "directory", {}),
+        (arrow.get("2014-05-01 00:30:00").to("local"), "tar", {}),
+        (arrow.get("2016-03-08 14:28:13").to("local"), "tar", {"compression": "xz"}),
     )
     conn = MockConn()
     for domain_id, domain_name in enumerate(domain_names):
         domain_bdir = os.path.join(backup_dir, domain_name)
         os.mkdir(domain_bdir)
         domain = MockDomain(conn, name=domain_name, id=domain_id)
-        dbackup = build_dombackup(
-            domain, domain_bdir, dev_disks=("vda", "vdb")
-        )
+        dbackup = build_dombackup(domain, domain_bdir, dev_disks=("vda", "vdb"))
 
-        for bakdate, compression in backup_properties:
-            dbackup.compression = compression
-            definition = build_complete_backup_files_from_domainbackup(
-                dbackup, bakdate
-            )
+        for bakdate, packager, packager_opts in backup_properties:
+            dbackup.packager = packager
+            dbackup.packager_opts = packager_opts.copy()
+
+            definition = build_complete_backup_files_from_domainbackup(dbackup, bakdate)
             dbackup._dump_json_definition(definition)
         # create a bad json file
         with open(os.path.join(domain_bdir, "badfile.json"), "w"):
@@ -208,7 +206,9 @@ def build_completed_backups(backup_dir):
 def build_dombackup(dom, *dombackup_args, **dombackup_kwargs):
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(dom._conn)
     return DomBackup(
-        dom, *dombackup_args, callbacks_registrer=callbacks_registrer,
+        dom,
+        *dombackup_args,
+        callbacks_registrer=callbacks_registrer,
         **dombackup_kwargs
     )
 

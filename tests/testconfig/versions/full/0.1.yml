@@ -1,9 +1,11 @@
 ---
 
-debug: true
+debug: False
+threads: 1
+
 uri: "qemu:///system"
-# username:
-# passphrase:
+username:
+passphrase:
 
 default:
   daily: 4
@@ -11,18 +13,18 @@ default:
   monthly: 5
   yearly: 1
 
-
 groups:
   test:
     target: /mnt/kvm/backups
-    packager: tar
-    packager_opts:
-      compression: xz
+    compression: xz
+    compression_lvl: 6
+    autostart: True
 
-    autostart: true
+    hourly: 1
     daily: 3
     weekly: 2
     monthly: 5
+    yearly: 1
 
     hosts:
       - host: domainname
@@ -30,9 +32,10 @@ groups:
           - vda
           - vdb
       - domainname2
-      - "r:.*"
+      - "r:^prod.*"
       - "!domainname3"
-      - "!g:stable"
-      - "r:^dom.*"
+      - "!r:^test.*"
 
-# vim: set ts=2 sw=2:
+  test_dir:
+    compression:
+    target: /mnt/kvm/backups

@@ -22,6 +22,7 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
                         config syntax for more info)
     :param conn: connection with libvirt
     """
+
     def build(name, properties):
         hosts = properties.pop("hosts")
         include, exclude = [], []
@@ -41,8 +42,7 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
         sanitize_properties(properties)
 
         backup_group = BackupGroup(
-            name=name, conn=conn, callbacks_registrer=callbacks_registrer,
-            **properties
+            name=name, conn=conn, callbacks_registrer=callbacks_registrer, **properties
         )
         for i in include:
             for domain_name in i["domains"]:
@@ -55,7 +55,9 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
     def sanitize_properties(properties):
         # replace some properties by the correct ones
         if properties.get("target", None):
-            properties["target_dir"] = properties.pop("target")
+            properties["backup_dir"] = properties.pop("target")
+        elif properties.get("target_dir", None):
+            properties["backup_dir"] = properties.pop("target_dir")
 
         # pop params related to complete groups only
         for prop in ("hourly", "daily", "weekly", "monthly", "yearly"):
@@ -70,12 +72,14 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
         yield build(group_name, group_properties.copy())
 
 
-class BackupGroup():
+class BackupGroup:
     """
     Group of libvirt domain backups
     """
-    def __init__(self, name="unnamed", domlst=None, autostart=True,
-                 **default_bak_param):
+
+    def __init__(
+        self, name="unnamed", domlst=None, autostart=True, **default_bak_param
+    ):
         """
         :param domlst: domain and disks to backup. If specified, has to be a
                        dict, where key would be the domain to backup, and value
@@ -120,9 +124,9 @@ class BackupGroup():
             existing_bak.add_disks(*disks)
         except StopIteration:
             # spawn a new DomBackup instance otherwise
-            self.backups.append(DomBackup(
-                dom=dom, dev_disks=disks, **self.default_bak_param
-            ))
+            self.backups.append(
+                DomBackup(dom=dom, dev_disks=disks, **self.default_bak_param)
+            )
 
     def add_dombackup(self, dombackup):
         """
@@ -213,9 +217,7 @@ class BackupGroup():
         with concurrent.futures.ThreadPoolExecutor(nb_threads) as executor:
             for backups_for_domain in backups_by_domain.values():
                 backup = backups_for_domain.pop()
-                future = self._submit_backup_future(
-                    executor, backup, completed_doms
-                )
+                future = self._submit_backup_future(executor, backup, completed_doms)
                 futures[future] = backup.dom
 
             while len(futures) < len(self.backups):
@@ -257,9 +259,7 @@ class BackupGroup():
             domain.
         """
         future = executor.submit(self._start_backup, backup)
-        future.add_done_callback(
-            lambda *args: completed_doms.append(backup.dom)
-        )
+        future.add_done_callback(lambda *args: completed_doms.append(backup.dom))
 
         return future
 
@@ -272,10 +272,10 @@ class BackupGroup():
         Ensure that a dombackup is set to be in a directory having the name of
         the related Domain
         """
-        if not dombackup.target_dir:
+        if not dombackup.backup_dir:
             return
 
-        if os.path.dirname(dombackup.target_dir) != dombackup.dom.name():
-            dombackup.target_dir = os.path.join(
-                dombackup.target_dir, dombackup.dom.name()
+        if os.path.dirname(dombackup.backup_dir) != dombackup.dom.name():
+            dombackup.backup_dir = os.path.join(
+                dombackup.backup_dir, dombackup.dom.name()
             )

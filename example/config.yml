@@ -48,20 +48,32 @@ groups:
     ## Backup directory ##
     target: /mnt/kvm/backups
 
-    ## Compression to use for each backup:
-    ##   None: images will be copied as they are
+    ## Packager to use for each backup:
+    ##   directory: images will be copied as they are, in a directory per domain
     ##   tar: images will be packaged in a tar file
-    ##   xz: images will be packaged in a tar file with xz compression
-    ##   gz: images will be packaged in a tar file with gzip compression
-    ##   bz2: images will be packaged in a tar file with bz2 compression
-    compression: xz
+    ##   zstd: images will be compressed with zstd. Requires python "zstandard" package to be installed.
+    packager: tar
 
-    ## Compression level to use for each backup:
-    ## Generally this should be an integer between 1~9 (depends on the
-    ## compression algorithm), where 1 will be the fastest while having
-    ## the lowest compression ratio, and 9 gives the best compression ratio
-    ## but takes the longest time to compress.
-    compression_lvl: 6
+    ## Options for the choosen packager:
+    ## tar:
+    ##   # Compression algorithm to use. Default to None.
+    ##   compression: None | "xz" | "gz" | "bz2"
+    ##   # Compression level to use for each backup.
+    ##   # Generally this should be an integer between 1~9 (depends on the
+    ##   # compression algorithm), where 1 will be the fastest while having
+    ##   # the lowest compression ratio, and 9 gives the best compression ratio
+    ##   # but takes the longest time to compress.
+    ##   compression_lvl: [1-9]
+    ##
+    ## zstd:
+    ##   # Compression level to use for each backup.
+    ##   # 1 will be the fastest while having the lowest compression ratio,
+    ##   # and 22 gives the best compression ratio but takes the longest time
+    ##   # to compress.
+    ##   compression_lvl: [1-22]
+    packager_opts:
+      compression: xz
+      compression_lvl: 6
 
     ## When doing `virt-backup backup` without specifying any group, only
     ## groups with the autostart option enabled will be backup.
@@ -69,11 +81,13 @@ groups:
 
     ## Retention policy: the first backup of the day is considered as the
     ## "daily" backup, first of the week "weekly", etc. The following options
-    ## detail how many backups of each type has to be kept. Set `None` for an
+    ## detail how many backups of each type has to be kept. Set to "*" or None for an
     ## infinite retention.
-    hourly: 1
-    daily: 3
-    weekly: 2
+    ## Default to 5 for everything, meaning that calling "virt-backup clean" will let 5
+    ## backups for each period not specified in the config.
+    hourly: 5
+    daily: 5
+    weekly: 5
     monthly: 5
     yearly: 1
 

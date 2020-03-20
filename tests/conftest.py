@@ -1,4 +1,3 @@
-
 import pytest
 from virt_backup.backups import DomBackup, DomExtSnapshotCallbackRegistrer
 from virt_backup.groups import BackupGroup
@@ -25,9 +24,7 @@ def build_mock_libvirtconn():
 def build_mock_libvirtconn_filled(build_mock_libvirtconn):
     conn = build_mock_libvirtconn
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
-    conn._domains = [
-        MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names
-    ]
+    conn._domains = [MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names]
     return conn
 
 
@@ -35,49 +32,46 @@ def build_mock_libvirtconn_filled(build_mock_libvirtconn):
 def build_backup_directory(tmpdir):
     domain_names, backup_dates = build_completed_backups(str(tmpdir))
     return {
-        "domain_names": domain_names, "backup_dates": backup_dates,
-        "backup_dir": tmpdir
+        "domain_names": domain_names,
+        "backup_dates": backup_dates,
+        "backup_dir": tmpdir,
     }
 
 
 @pytest.fixture
 def get_dombackup(build_mock_domain, build_mock_libvirtconn):
-    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
-        build_mock_libvirtconn
-    )
-    return DomBackup(
-        build_mock_domain, callbacks_registrer=callbacks_registrer
-    )
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(build_mock_libvirtconn)
+    return DomBackup(build_mock_domain, callbacks_registrer=callbacks_registrer)
 
 
 @pytest.fixture
 def get_uncompressed_dombackup(build_mock_domain, build_mock_libvirtconn):
-    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
-        build_mock_libvirtconn
-    )
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(build_mock_libvirtconn)
     return DomBackup(
-        dom=build_mock_domain, dev_disks=("vda", ), compression=None,
-        callbacks_registrer=callbacks_registrer
+        dom=build_mock_domain,
+        dev_disks=("vda",),
+        packager="directory",
+        callbacks_registrer=callbacks_registrer,
     )
 
 
 @pytest.fixture
 def get_compressed_dombackup(build_mock_domain, build_mock_libvirtconn):
-    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
-        build_mock_libvirtconn
-    )
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(build_mock_libvirtconn)
     return DomBackup(
-        dom=build_mock_domain, dev_disks=("vda", ), compression="xz",
-        compression_lvl=4, callbacks_registrer=callbacks_registrer
+        dom=build_mock_domain,
+        dev_disks=("vda",),
+        packager="tar",
+        packager_opts={"compression": "xz", "compression_lvl": 4},
+        callbacks_registrer=callbacks_registrer,
     )
 
 
 @pytest.fixture
 def get_backup_group(build_mock_domain, build_mock_libvirtconn):
-    callbacks_registrer = DomExtSnapshotCallbackRegistrer(
-        build_mock_libvirtconn
-    )
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(build_mock_libvirtconn)
     return BackupGroup(
-        build_mock_libvirtconn, domlst=((build_mock_domain, None),),
-        callbacks_registrer=callbacks_registrer
+        build_mock_libvirtconn,
+        domlst=((build_mock_domain, None),),
+        callbacks_registrer=callbacks_registrer,
     )

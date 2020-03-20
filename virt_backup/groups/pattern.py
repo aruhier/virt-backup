@@ -1,4 +1,3 @@
-
 import libvirt
 import logging
 import re
@@ -31,8 +30,7 @@ def matching_libvirt_domains_from_config(host, conn):
             pattern = host["host"]
         except KeyError as e:
             logger.error(
-                "Configuration error, missing host for lines: \n"
-                "{}".format(host)
+                "Configuration error, missing host for lines: \n" "{}".format(host)
             )
             raise e
     matches = pattern_matching_domains_in_libvirt(pattern, conn)
