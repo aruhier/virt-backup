@@ -158,6 +158,7 @@ class TestCompleteBackupGroup:
             backup_dir=str(backup_dir.mkdir(build_mock_domain.name())),
             callbacks_registrer=callbacks_registrer,
         )
+        dombkup.pending_info = dombkup.get_definition()
         dombkup.pending_info["domain_name"] = build_mock_domain.name()
         dombkup.pending_info["date"] = 0
         dombkup.pending_info["disks"] = {}

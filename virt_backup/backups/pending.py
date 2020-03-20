@@ -10,6 +10,9 @@ import tarfile
 
 import virt_backup
 from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
+from virt_backup.compat_layers.pending_info import (
+    convert as compat_convert_pending_info,
+)
 from virt_backup.domains import get_xml_block_of_disk
 from virt_backup.tools import copy_file
 from . import _BaseDomBackup
@@ -22,6 +25,7 @@ logger = logging.getLogger("virt_backup")
 def build_dom_backup_from_pending_info(
     pending_info, backup_dir, conn, callbacks_registrer
 ):
+    compat_convert_pending_info(pending_info)
     kwargs = {
         "dom": conn.lookupByName(pending_info["domain_name"]),
         "backup_dir": backup_dir,
