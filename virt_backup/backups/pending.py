@@ -175,7 +175,7 @@ class DomBackup(_BaseDomBackup):
 
             snapshot_date, definition = self._snapshot_and_save_date(definition)
             self._name = self._main_backup_name_format(snapshot_date)
-            definition["name"], self.pending_info["name"] = self._name
+            definition["name"], self.pending_info["name"] = self._name, self._name
 
             packager = self._get_packager()
             # TODO: handle backingStore cases
