@@ -139,9 +139,7 @@ class DomExtSnapshot:
             # Skipped disks need to have an entry, with a snapshot value
             # explicitly set to "no", otherwise libvirt will be created a
             # snapshot for them.
-            disk_el.attrib["snapshot"] = (
-                "external" if d in self.disks else "no"
-            )
+            disk_el.attrib["snapshot"] = "external" if d in self.disks else "no"
             disks_el.append(disk_el)
 
         return lxml.etree.tostring(xml_tree, pretty_print=True).decode()

@@ -85,8 +85,8 @@ class TestDomExtSnapshot:
             "<domainsnapshot>\n"
             "  <description>Pre-backup external snapshot</description>\n"
             "  <disks>\n"
-            "    <disk name=\"vda\" snapshot=\"external\"/>\n"
-            "    <disk name=\"vdb\" snapshot=\"no\"/>\n"
+            '    <disk name="vda" snapshot="external"/>\n'
+            '    <disk name="vdb" snapshot="no"/>\n'
             "  </disks>\n"
             "</domainsnapshot>\n"
         )
