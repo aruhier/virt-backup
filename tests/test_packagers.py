@@ -101,3 +101,21 @@ class TestBackupPackagerZSTD(_BaseTestBackupPackager):
         return WriteBackupPackagers.zstd.value(
             "test", str(tmpdir.join("packager")), "test_package"
         )
+
+    def test_remove_package(self, write_packager, new_image):
+        with write_packager:
+            write_packager.add(str(new_image), name="another_test")
+            backups = write_packager.list()
+
+        # Try to create a .zst file in the same directory, to check #29.
+        other_file = os.path.join(write_packager.complete_path, "test.zst")
+        with open(other_file, "w") as f:
+            f.write("")
+
+        write_packager.remove_package()
+
+        for b in backups:
+            assert not os.path.exists(write_packager.archive_path(b))
+
+        # Checks that remove_package only removed the wanted backups.
+        assert os.path.exists(other_file)

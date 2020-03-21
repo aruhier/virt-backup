@@ -116,4 +116,8 @@ class WriteBackupPackagerZSTD(
         if not os.path.exists(self.complete_path):
             raise FileNotFoundError(self.complete_path)
 
-        return shutil.rmtree(self.complete_path)
+        with self:
+            files = self.list()
+
+        for i in files:
+            os.remove(self.archive_path(i))
