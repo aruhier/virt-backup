@@ -1,5 +1,6 @@
 from abc import ABC
 import os
+import random
 import pytest
 
 from virt_backup.exceptions import ImageNotFoundError
@@ -7,8 +8,11 @@ from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackag
 
 
 @pytest.fixture()
-def new_image(tmpdir, name="test", content="test"):
+def new_image(tmpdir, name="test", content=None):
     image = tmpdir.join(name)
+    if content is None:
+        # Generate a content of around 5MB.
+        content = "{:016d}".format(random.randrange(16)) * int(5 * 2 ** 20 / 16)
     image.write(content)
     return image
 

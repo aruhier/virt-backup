@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import logging
 import os
+import threading
 from virt_backup.domains import get_domain_disks_of
 
 
@@ -21,6 +22,9 @@ class _BaseDomBackup(ABC):
     dom = None
     packager = ""
     packager_opts = None
+
+    def __init__(self, *args, **kwargs):
+        self._cancel_flag = threading.Event()
 
     def _parse_dom_xml(self):
         """

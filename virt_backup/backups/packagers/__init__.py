@@ -75,17 +75,17 @@ class _AbstractBackupPackager(ABC):
 
 class _AbstractReadBackupPackager(_AbstractBackupPackager, ABC):
     @abstractmethod
-    def restore(self, name, target):
+    def restore(self, name, target, stop_event=None):
         pass
 
 
 class _AbstractWriteBackupPackager:
     @abstractmethod
-    def add(self, src, name=None):
+    def add(self, src, name=None, stop_event=None):
         pass
 
     @abstractmethod
-    def remove_package(self):
+    def remove_package(self, stop_event=None):
         pass
 
 

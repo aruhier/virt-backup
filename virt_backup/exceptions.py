@@ -1,3 +1,8 @@
+class CancelledError(Exception):
+    def __init__(self):
+        super().__init__("process cancelled")
+
+
 class BackupNotFoundError(Exception):
     def __init__(self):
         super().__init__("backup not found")

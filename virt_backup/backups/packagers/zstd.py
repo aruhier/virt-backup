@@ -5,7 +5,7 @@ import re
 import shutil
 import zstandard as zstd
 
-from virt_backup.exceptions import ImageNotFoundError
+from virt_backup.exceptions import CancelledError, ImageNotFoundError
 from . import (
     _AbstractBackupPackager,
     _AbstractReadBackupPackager,
@@ -71,7 +71,7 @@ class ReadBackupPackagerZSTD(_AbstractReadBackupPackager, _AbstractBackupPackage
     _mode = "r"
 
     @_opened_only
-    def restore(self, name, target):
+    def restore(self, name, target, stop_event=None):
         if name not in self.list():
             raise ImageNotFoundError(self.archive_path(name), self.complete_path)
 
@@ -80,10 +80,26 @@ class ReadBackupPackagerZSTD(_AbstractReadBackupPackager, _AbstractBackupPackage
         if os.path.isdir(target):
             target = os.path.join(target, name)
 
+        buffersize = 2 ** 20
         dctx = zstd.ZstdDecompressor()
-        with open(self.archive_path(name), "rb") as ifh:
-            with open(target, "wb") as ofh:
-                dctx.copy_stream(ifh, ofh)
+        try:
+            with open(self.archive_path(name), "rb") as ifh, open(target, "xb") as ofh:
+                with dctx.stream_reader(ifh) as reader:
+                    while True:
+                        if stop_event and stop_event.is_set():
+                            raise CancelledError()
+
+                        data = reader.read(buffersize)
+                        if not data:
+                            break
+
+                        if stop_event and stop_event.is_set():
+                            raise CancelledError()
+                        ofh.write(data)
+        except:
+            if os.path.exists(target):
+                os.remove(target)
+            raise
 
         return target
 
@@ -94,13 +110,29 @@ class WriteBackupPackagerZSTD(
     _mode = "x"
 
     @_opened_only
-    def add(self, src, name=None):
+    def add(self, src, name=None, stop_event=None):
         name = name or os.path.basename(src)
         self.log(logging.DEBUG, "Add %s into %s", src, self.archive_path(name))
+
         cctx = zstd.ZstdCompressor()
-        with open(src, "rb") as ifh:
-            with open(self.archive_path(name), "wb") as ofh:
-                cctx.copy_stream(ifh, ofh)
+        try:
+            with open(src, "rb") as ifh, open(self.archive_path(name), "wb") as ofh:
+                with cctx.stream_writer(ofh) as writer:
+                    while True:
+                        if stop_event and stop_event.is_set():
+                            raise CancelledError()
+
+                        data = ifh.read(zstd.COMPRESSION_RECOMMENDED_INPUT_SIZE)
+                        if not data:
+                            break
+
+                        if stop_event and stop_event.is_set():
+                            raise CancelledError()
+                        writer.write(data)
+        except:
+            if os.path.exists(self.archive_path(name)):
+                os.remove(self.archive_path(name))
+            raise
 
         return self.archive_path(name)
 
@@ -112,7 +144,7 @@ class WriteBackupPackagerZSTD(
         os.remove(self.archive_path(name))
 
     @_closed_only
-    def remove_package(self):
+    def remove_package(self, stop_event=None):
         if not os.path.exists(self.complete_path):
             raise FileNotFoundError(self.complete_path)
 
@@ -120,4 +152,6 @@ class WriteBackupPackagerZSTD(
             files = self.list()
 
         for i in files:
+            if stop_event and stop_event.is_set():
+                raise CancelledError()
             os.remove(self.archive_path(i))

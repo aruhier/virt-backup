@@ -14,6 +14,7 @@ from virt_backup.compat_layers.pending_info import (
     convert as compat_convert_pending_info,
 )
 from virt_backup.domains import get_xml_block_of_disk
+from virt_backup.exceptions import CancelledError
 from virt_backup.tools import copy_file
 from . import _BaseDomBackup
 from .snapshot import DomExtSnapshot
@@ -69,6 +70,8 @@ class DomBackup(_BaseDomBackup):
                       `{"src": disk_path, "type": disk_format}`. Prefer
                       using dev disks when possible.
         """
+        super().__init__()
+
         #: domain to backup. Has to be a libvirt.virDomain object
         self.dom = dom
 
@@ -154,12 +157,17 @@ class DomBackup(_BaseDomBackup):
                 continue
             self.disks[dev] = dom_all_disks[dev]
 
+    def cancel(self):
+        self._cancel_flag.set()
+
     def start(self):
         """
         Start the entire backup process for all disks in self.disks
         """
         assert not self.running
         assert self.dom and self.backup_dir
+        self._cancel_flag.clear()
+
         if not os.path.exists(self.backup_dir):
             os.mkdir(self.backup_dir)
 
@@ -184,6 +192,9 @@ class DomBackup(_BaseDomBackup):
             # TODO: handle backingStore cases
             with packager:
                 for disk, prop in self.disks.items():
+                    if self._cancel_flag.is_set():
+                        raise CancelledError()
+
                     self._backup_disk(disk, prop, packager, definition)
                     self._ext_snapshot_helper.clean_for_disk(disk)
 

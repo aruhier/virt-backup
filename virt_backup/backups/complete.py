@@ -51,6 +51,8 @@ class DomCompleteBackup(_BaseDomBackup):
         packager_opts=None,
         definition_filename=None,
     ):
+        super().__init__()
+
         #: domain name
         self.dom_name = dom_name
 

@@ -1,10 +1,11 @@
+import io
 import logging
 import os
 import re
 import shutil
 import tarfile
 
-from virt_backup.exceptions import ImageNotFoundError
+from virt_backup.exceptions import CancelledError, ImageNotFoundError
 from . import (
     _AbstractBackupPackager,
     _AbstractReadBackupPackager,
@@ -93,7 +94,7 @@ class ReadBackupPackagerTar(_AbstractReadBackupPackager, _AbstractBackupPackager
         super().__init__(name, path, archive_name, compression)
 
     @_opened_only
-    def restore(self, name, target):
+    def restore(self, name, target, stop_event=None):
         try:
             disk_tarinfo = self._tarfile.getmember(name)
         except KeyError:
@@ -104,24 +105,78 @@ class ReadBackupPackagerTar(_AbstractReadBackupPackager, _AbstractBackupPackager
         if os.path.isdir(target):
             target = os.path.join(target, name)
 
+        buffersize = 2 ** 20
         self._tarfile.fileobj.flush()
-        with open(target, "xb") as ftarget:
-            shutil.copyfileobj(self._tarfile.extractfile(disk_tarinfo), ftarget)
+        try:
+            with self._tarfile.extractfile(disk_tarinfo) as fsrc:
+                with open(target, "xb") as fdst:
+                    while True:
+                        if stop_event and stop_event.is_set():
+                            raise CancelledError()
+                        data = fsrc.read(buffersize)
+                        if not data:
+                            break
 
-            return target
+                        if stop_event and stop_event.is_set():
+                            raise CancelledError()
+                        fdst.write(data)
+        except:
+            if os.path.exists(target):
+                os.remove(target)
+            raise
+
+        return target
 
 
 class WriteBackupPackagerTar(_AbstractWriteBackupPackager, _AbstractBackupPackagerTar):
     _mode = "x"
 
     @_opened_only
-    def add(self, src, name=None):
+    def add(self, src, name=None, stop_event=None):
+        """
+        WARNING: interrupting this function is unsafe, and will probably break the
+        tar archive.
+
+        Do not use tarfile.add() as it is a blocking operation. Workaround the issue by
+        copying a part of what tarfile.add() does, but checks after each buffer on the
+        stop_event.
+        """
         self.log(logging.DEBUG, "Add %s into %s", src, self.complete_path)
-        self._tarfile.add(src, arcname=name or os.path.basename(src))
+        tarinfo = self._tarfile.gettarinfo(src, arcname=name or os.path.basename(src))
+
+        if stop_event and stop_event.is_set():
+            raise CancelledError()
+
+        buf = tarinfo.tobuf(
+            self._tarfile.format, self._tarfile.encoding, self._tarfile.errors
+        )
+        self._tarfile.fileobj.write(buf)
+        self._tarfile.offset += len(buf)
+        buffersize = 2 ** 20
+
+        with open(src, "rb") as fsrc:
+            while True:
+                if stop_event and stop_event.is_set():
+                    raise CancelledError()
+                data = fsrc.read(buffersize)
+                if not data:
+                    break
+
+                if stop_event and stop_event.is_set():
+                    raise CancelledError()
+                self._tarfile.fileobj.write(data)
+
+        blocks, remainder = divmod(tarinfo.size, tarfile.BLOCKSIZE)
+        if remainder > 0:
+            self._tarfile.fileobj.write(tarfile.NUL * (tarfile.BLOCKSIZE - remainder))
+            blocks += 1
+        self._tarfile.offset += blocks * tarfile.BLOCKSIZE
+        self._tarfile.members.append(tarinfo)
+
         return self.complete_path
 
     @_closed_only
-    def remove_package(self):
+    def remove_package(self, stop_event=None):
         if not os.path.exists(self.complete_path):
             raise FileNotFoundError(self.complete_path)
 
