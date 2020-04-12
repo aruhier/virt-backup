@@ -82,6 +82,13 @@ class _BaseTestBackupPackager(ABC):
         write_packager.remove_package()
         assert not os.path.exists(write_packager.complete_path)
 
+    def test_remove_package_cancelled(self, write_packager, cancel_flag):
+        with write_packager:
+            pass
+        cancel_flag.set()
+        with pytest.raises(CancelledError):
+            write_packager.remove_package()
+
 
 class TestBackupPackagerDir(_BaseTestBackupPackager):
     @pytest.fixture()
@@ -102,6 +109,16 @@ class TestBackupPackagerDir(_BaseTestBackupPackager):
             write_packager.remove(name)
             assert not write_packager.list()
 
+    def test_remove_package_cancelled(self, write_packager, cancel_flag):
+        """
+        Atomic for the directory package, so cancel it will not fail.
+        """
+        with write_packager:
+            pass
+        cancel_flag.set()
+        write_packager.remove_package()
+        assert not os.path.exists(write_packager.complete_path)
+
 
 class TestBackupPackagerTar(_BaseTestBackupPackager):
     @pytest.fixture()
@@ -115,6 +132,16 @@ class TestBackupPackagerTar(_BaseTestBackupPackager):
         return WriteBackupPackagers.tar.value(
             "test", str(tmpdir.join("packager")), "test_package.tar"
         )
+
+    def test_remove_package_cancelled(self, write_packager, cancel_flag):
+        """
+        Atomic for the tar package, so cancel it will not fail.
+        """
+        with write_packager:
+            pass
+        cancel_flag.set()
+        write_packager.remove_package()
+        assert not os.path.exists(write_packager.complete_path)
 
 
 @pytest.mark.extra
@@ -148,3 +175,16 @@ class TestBackupPackagerZSTD(_BaseTestBackupPackager):
 
         # Checks that remove_package only removed the wanted backups.
         assert os.path.exists(other_file)
+
+    def test_remove_package_cancelled(self, write_packager, new_image, cancel_flag):
+        with write_packager:
+            write_packager.add(str(new_image), name="another_test")
+
+        # Try to create a .zst file in the same directory, to check #29.
+        other_file = os.path.join(write_packager.complete_path, "test.zst")
+        with open(other_file, "w") as f:
+            f.write("")
+
+        cancel_flag.set()
+        with pytest.raises(CancelledError):
+            write_packager.remove_package(cancel_flag)
