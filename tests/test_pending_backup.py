@@ -225,7 +225,8 @@ class TestDomBackup:
         }
         dombkup.pending_info["packager"] = {"type": "directory", "opts": {}}
         dombkup._dump_pending_info()
-        assert len(backup_dir.listdir()) == 2
+        dombkup._dump_json_definition(dombkup.definition)
+        assert len(backup_dir.listdir()) == 3
 
         dombkup.clean_aborted()
         assert not backup_dir.listdir()
@@ -247,6 +248,7 @@ class TestDomBackup:
         }
         dombkup.pending_info["disks"] = disk_infos.copy()
         dombkup._dump_pending_info()
+        dombkup._dump_json_definition(dombkup.definition)
 
         dombkup.clean_aborted()
         DomExtSnapshot.clean.assert_called_once_with()
@@ -261,7 +263,11 @@ class TestDomBackup:
         dombkup = build_dombackup(
             dom=mock_domain, backup_dir=str(backup_dir), packager="directory"
         )
+        dombkup.definition = dombkup.get_definition()
         dombkup.pending_info["date"] = 0
+        dombkup.definition["date"] = 0
+
+        dombkup.definition["name"] = "test"
         dombkup.pending_info["name"] = "test"
 
         mocker.patch("virt_backup.backups.snapshot.DomExtSnapshot.clean")

@@ -309,12 +309,19 @@ class DomBackup(_BaseDomBackup):
         disks names and other informations
         """
         backup_date = arrow.get(definition["date"]).to("local")
-        definition_path = os.path.join(
+        definition_path = self._get_json_definition_path(backup_date)
+        with open(definition_path, "w") as json_definition:
+            json.dump(definition, json_definition, indent=4)
+
+    def _clean_definition(self, definition={}):
+        backup_date = arrow.get(definition.get("date", self.pending_info["date"])).to("local")
+        os.remove(self._get_json_definition_path(backup_date))
+
+    def _get_json_definition_path(self, backup_date):
+        return os.path.join(
             self.backup_dir,
             "{}.{}".format(self._main_backup_name_format(backup_date), "json"),
         )
-        with open(definition_path, "w") as json_definition:
-            json.dump(definition, json_definition, indent=4)
 
     def _dump_pending_info(self):
         """
@@ -368,11 +375,14 @@ class DomBackup(_BaseDomBackup):
                 logger.info(
                     "%s: Packager not found, nothing to clean.", self.dom.name()
                 )
-        try:
-            self._clean_pending_info()
-        except FileNotFoundError:
-            # Pending info had no time to be filled, so had not be dumped.
-            pass
+
+        if "date" in self.pending_info:
+            for cleaning in (self._clean_definition, self._clean_pending_info):
+                try:
+                    cleaning()
+                except FileNotFoundError:
+                    # Info had no time to be filled, so had not be dumped.
+                    pass
 
     def compatible_with(self, dombackup):
         """
