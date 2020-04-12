@@ -18,7 +18,7 @@ from . import (
 class _AbstractBackupPackagerZSTD(_AbstractBackupPackager):
     _mode = ""
 
-    def __init__(self, name, path, name_prefix, compression_lvl=None):
+    def __init__(self, name, path, name_prefix, compression_lvl=0, threads=0):
         super().__init__(name)
 
         #: Directory path to store the archives in.
@@ -28,7 +28,10 @@ class _AbstractBackupPackagerZSTD(_AbstractBackupPackager):
         #: Their name will be prefixed by prefix_name
         self.name_prefix = name_prefix
 
-        self.compression_lvl = compression_lvl
+        #: zstd_params is used by the compressor.
+        self.zstd_params = zstd.ZstdCompressionParameters.from_level(
+            compression_lvl, threads=threads
+        )
 
     @property
     def complete_path(self):
@@ -114,7 +117,7 @@ class WriteBackupPackagerZSTD(
         name = name or os.path.basename(src)
         self.log(logging.DEBUG, "Add %s into %s", src, self.archive_path(name))
 
-        cctx = zstd.ZstdCompressor()
+        cctx = zstd.ZstdCompressor(compression_params=self.zstd_params)
         try:
             with open(src, "rb") as ifh, open(self.archive_path(name), "wb") as ofh:
                 with cctx.stream_writer(ofh) as writer:
