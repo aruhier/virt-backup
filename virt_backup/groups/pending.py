@@ -218,7 +218,9 @@ class BackupGroup:
             with concurrent.futures.ThreadPoolExecutor(nb_threads) as executor:
                 for backups_for_domain in backups_by_domain.values():
                     backup = backups_for_domain.pop()
-                    future = self._submit_backup_future(executor, backup, completed_doms)
+                    future = self._submit_backup_future(
+                        executor, backup, completed_doms
+                    )
                     futures[future] = backup
 
                 while len(futures) < len(self.backups):

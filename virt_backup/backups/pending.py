@@ -314,7 +314,9 @@ class DomBackup(_BaseDomBackup):
             json.dump(definition, json_definition, indent=4)
 
     def _clean_definition(self, definition={}):
-        backup_date = arrow.get(definition.get("date", self.pending_info["date"])).to("local")
+        backup_date = arrow.get(definition.get("date", self.pending_info["date"])).to(
+            "local"
+        )
         os.remove(self._get_json_definition_path(backup_date))
 
     def _get_json_definition_path(self, backup_date):
