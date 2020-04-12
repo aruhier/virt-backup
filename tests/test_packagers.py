@@ -1,9 +1,10 @@
 from abc import ABC
 import os
 import random
+import threading
 import pytest
 
-from virt_backup.exceptions import ImageNotFoundError
+from virt_backup.exceptions import CancelledError, ImageNotFoundError
 from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
 
 
@@ -15,6 +16,11 @@ def new_image(tmpdir, name="test", content=None):
         content = "{:016d}".format(random.randrange(16)) * int(5 * 2 ** 20 / 16)
     image.write(content)
     return image
+
+
+@pytest.fixture()
+def cancel_flag():
+    return threading.Event()
 
 
 class _BaseTestBackupPackager(ABC):
@@ -29,6 +35,12 @@ class _BaseTestBackupPackager(ABC):
         with write_packager:
             write_packager.add(str(new_image), name=name)
             assert name in write_packager.list()
+
+    def test_add_cancelled(self, write_packager, new_image, cancel_flag):
+        with write_packager:
+            cancel_flag.set()
+            with pytest.raises(CancelledError):
+                write_packager.add(str(new_image), stop_event=cancel_flag)
 
     def test_restore(self, tmpdir, write_packager, read_packager, new_image):
         name = new_image.basename
@@ -50,6 +62,19 @@ class _BaseTestBackupPackager(ABC):
             tmpdir = tmpdir.mkdir("extract")
             with pytest.raises(ImageNotFoundError):
                 read_packager.restore("test", str(tmpdir))
+
+    def test_restore_cancelled(
+        self, tmpdir, write_packager, read_packager, new_image, cancel_flag
+    ):
+        name = new_image.basename
+
+        with write_packager:
+            write_packager.add(str(new_image))
+        with read_packager:
+            tmpdir = tmpdir.mkdir("extract")
+            cancel_flag.set()
+            with pytest.raises(CancelledError):
+                read_packager.restore(name, str(tmpdir), stop_event=cancel_flag)
 
     def test_remove_package(self, write_packager):
         with write_packager:

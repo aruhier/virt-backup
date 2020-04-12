@@ -273,7 +273,7 @@ class DomBackup(_BaseDomBackup):
             definition["disks"] = {}
         definition["disks"][disk] = bak_img
 
-        packager.add(disk_properties["src"], bak_img)
+        packager.add(disk_properties["src"], bak_img, self._cancel_flag)
 
     def _disk_backup_name_format(self, snapdate, disk_name, *args, **kwargs):
         """
@@ -360,7 +360,10 @@ class DomBackup(_BaseDomBackup):
         if "name" in self.pending_info:
             packager = self._get_write_packager(self.pending_info["name"])
             try:
-                self._clean_packager(packager)
+                self._clean_packager(
+                    packager,
+                    tuple(d["target"] for d in self.pending_info["disks"].values()),
+                )
             except FileNotFoundError:
                 logger.info(
                     "%s: Packager not found, nothing to clean.", self.dom.name()
@@ -370,23 +373,6 @@ class DomBackup(_BaseDomBackup):
         except FileNotFoundError:
             # Pending info had no time to be filled, so had not be dumped.
             pass
-
-    def _clean_packager(self, packager):
-        """
-        If the package is shareable, will remove each disk backup then will
-        only remove the packager if empty.
-        """
-        if packager.is_shareable:
-            targets = (d["target"] for d in self.pending_info["disks"].values())
-            with packager:
-                for target in targets:
-                    packager.remove(target)
-                if packager.list():
-                    # Other non related backups still exists, do not delete
-                    # the package.
-                    return
-
-        packager.remove_package()
 
     def compatible_with(self, dombackup):
         """

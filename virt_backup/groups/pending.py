@@ -6,7 +6,7 @@ import os
 
 from virt_backup.backups import DomBackup, build_dom_complete_backup_from_def
 from virt_backup.domains import search_domains_regex
-from virt_backup.exceptions import BackupsFailureInGroupError
+from virt_backup.exceptions import BackupsFailureInGroupError, CancelledError
 from .pattern import matching_libvirt_domains_from_config
 
 
@@ -214,32 +214,43 @@ class BackupGroup:
 
         completed_doms = []
         futures = {}
-        with concurrent.futures.ThreadPoolExecutor(nb_threads) as executor:
-            for backups_for_domain in backups_by_domain.values():
-                backup = backups_for_domain.pop()
-                future = self._submit_backup_future(executor, backup, completed_doms)
-                futures[future] = backup.dom
+        try:
+            with concurrent.futures.ThreadPoolExecutor(nb_threads) as executor:
+                for backups_for_domain in backups_by_domain.values():
+                    backup = backups_for_domain.pop()
+                    future = self._submit_backup_future(executor, backup, completed_doms)
+                    futures[future] = backup
 
-            while len(futures) < len(self.backups):
-                next(concurrent.futures.as_completed(futures))
-                dom = completed_doms.pop()
-                if backups_by_domain.get(dom):
-                    backup = backups_by_domain[dom].pop()
-                    future = self._submit_backup_future(
-                        executor, backup, completed_doms
-                    )
-                    futures[future] = backup.dom
+                while len(futures) < len(self.backups):
+                    next(concurrent.futures.as_completed(futures))
+                    dom = completed_doms.pop().dom
+                    if backups_by_domain.get(dom):
+                        backup = backups_by_domain[dom].pop()
+                        future = self._submit_backup_future(
+                            executor, backup, completed_doms
+                        )
+                        futures[future] = backup
 
-        for f in concurrent.futures.as_completed(futures):
-            dom_name = futures[f].name()
-            try:
-                completed_backups[dom_name] = f.result()
-            except KeyboardInterrupt:
-                raise
-            except Exception as e:
-                error_backups[dom_name] = e
-                logger.error("Error with domain %s: %s", dom_name, e)
-                logger.exception(e)
+            for f in concurrent.futures.as_completed(futures):
+                dom_name = futures[f].dom.name()
+                try:
+                    completed_backups[dom_name] = f.result()
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    error_backups[dom_name] = e
+                    logger.error("Error with domain %s: %s", dom_name, e)
+                    logger.exception(e)
+        except:
+            for f in futures:
+                f.cancel()
+            for f in futures:
+                if f.running():
+                    logger.info("Cancel backup for domain %s", futures[f].dom.name())
+                    futures[f].cancel()
+
+            concurrent.futures.wait(futures)
+            raise
 
         if error_backups:
             raise BackupsFailureInGroupError(completed_backups, error_backups)

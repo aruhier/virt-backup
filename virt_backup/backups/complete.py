@@ -159,7 +159,7 @@ class DomCompleteBackup(_BaseDomBackup):
         """
         packager = self._get_packager()
         with packager:
-            return packager.restore(self.disks[disk], target)
+            return packager.restore(self.disks[disk], target, self._cancel_flag)
 
     def _get_packager(self):
         return self._get_read_packager(self.name)

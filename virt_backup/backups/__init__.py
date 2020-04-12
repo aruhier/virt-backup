@@ -26,6 +26,9 @@ class _BaseDomBackup(ABC):
     def __init__(self, *args, **kwargs):
         self._cancel_flag = threading.Event()
 
+    def cancel(self):
+        self._cancel_flag.set()
+
     def _parse_dom_xml(self):
         """
         Parse the domain's definition
@@ -90,7 +93,7 @@ class _BaseDomBackup(ABC):
                     # the package.
                     return
 
-        packager.remove_package()
+        packager.remove_package(self._clean_packager)
 
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)

@@ -12,6 +12,11 @@ from helper.virt_backup import MockSnapshot, build_dombackup
 
 
 class TestDomBackup:
+    def test_cancel(self, get_dombackup):
+        get_dombackup.cancel()
+
+        assert get_dombackup._cancel_flag.is_set()
+
     def test_get_self_domain_disks(self, get_dombackup):
         dombkup = get_dombackup
         expected_disks = {

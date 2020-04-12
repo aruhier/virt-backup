@@ -70,7 +70,7 @@ class ReadBackupPackagerDir(_AbstractReadBackupPackager, _AbstractBackupPackager
             raise ImageNotFoundError(name, self.path)
 
         self.log(logging.DEBUG, "Restore %s in %s", src, target)
-        return self._copy_file(src, target)
+        return self._copy_file(src, target, stop_event=stop_event)
 
 
 class WriteBackupPackagerDir(
@@ -82,7 +82,7 @@ class WriteBackupPackagerDir(
             name = os.path.basename(src)
         target = os.path.join(self.path, name)
         self.log(logging.DEBUG, "Copy %s as %s", src, target)
-        self._copy_file(src, target)
+        self._copy_file(src, target, stop_event=stop_event)
 
         return target
 

@@ -66,6 +66,11 @@ def test_get_complete_backup_from_def(build_bak_definition_with_compression):
 
 
 class TestDomCompleteBackup:
+    def test_cancel(self, get_dombackup):
+        get_dombackup.cancel()
+
+        assert get_dombackup._cancel_flag.is_set()
+
     def test_restore_disk_in_domain(
         self, get_uncompressed_complete_backup, build_stopped_mock_domain, tmpdir
     ):
