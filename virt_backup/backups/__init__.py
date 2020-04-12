@@ -93,7 +93,7 @@ class _BaseDomBackup(ABC):
                     # the package.
                     return
 
-        packager.remove_package(self._clean_packager)
+        packager.remove_package(self._cancel_flag)
 
     def get_complete_path_of(self, filename):
         return os.path.join(self.backup_dir, filename)
