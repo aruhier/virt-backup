@@ -48,7 +48,7 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
             for domain_name in i["domains"]:
                 if domain_name not in exclude:
                     domain = conn.lookupByName(domain_name)
-                    backup_group.add_domain(domain, matches.get("disks", ()))
+                    backup_group.add_domain(domain, i.get("disks", ()))
 
         return backup_group
 

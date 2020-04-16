@@ -289,6 +289,35 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
     assert tuple(sorted(matching_backup.disks.keys())) == ("vda", "vdb")
 
 
+def test_groups_from_dict_multiple_filters(build_mock_libvirtconn_filled):
+    """
+    Test groups_from_dict with only one group, multiple filters
+
+    Linked to issue #28
+    """
+    conn = build_mock_libvirtconn_filled
+    callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
+    groups_config = {
+        "test": {
+            "target": "/mnt/test",
+            "packager": "tar",
+            "hosts": [
+                {"host": "matching", "disks": ["vda", "vdb"]},
+                {"host": "matching2", "disks": ["vda"]},
+            ],
+        },
+    }
+
+    groups = tuple(groups_from_dict(groups_config, conn, callbacks_registrer))
+
+    dombackups = groups[0].backups
+
+    assert dombackups[0].dom.name() == "matching"
+    assert tuple(sorted(dombackups[0].disks.keys())) == ("vda", "vdb")
+    assert dombackups[1].dom.name() == "matching2"
+    assert tuple(sorted(dombackups[1].disks.keys())) == ("vda",)
+
+
 def test_groups_from_sanitize_dict_all_config_group_param(
     build_mock_libvirtconn_filled,
 ):
