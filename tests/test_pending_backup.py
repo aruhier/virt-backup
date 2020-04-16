@@ -231,6 +231,30 @@ class TestDomBackup:
         dombkup.clean_aborted()
         assert not backup_dir.listdir()
 
+    def test_clean_aborted_packager_multiple_disks(
+        self, build_mock_domain, tmpdir, mocker
+    ):
+        """
+        Test with multiple disks, but one not backup yet (no target yet defined).
+        """
+        backup_dir = tmpdir.mkdir("clean_aborted")
+        dombkup = self.prepare_clean_aborted_dombkup(
+            build_mock_domain, backup_dir, mocker
+        )
+
+        backup_dir.join("vda.qcow2").write("")
+        dombkup.pending_info["disks"] = {
+            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
+            "vdb": {"src": "vdb.qcow2", "snapshot": "vda.snap"},
+        }
+        dombkup.pending_info["packager"] = {"type": "directory", "opts": {}}
+        dombkup._dump_pending_info()
+        dombkup._dump_json_definition(dombkup.definition)
+        assert len(backup_dir.listdir()) == 3
+
+        dombkup.clean_aborted()
+        assert not backup_dir.listdir()
+
     def test_clean_aborted_test_ext_snapshot(self, build_mock_domain, tmpdir, mocker):
         """
         Ensure that the external snapshot helper is correctly declared

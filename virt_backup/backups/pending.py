@@ -369,10 +369,12 @@ class DomBackup(_BaseDomBackup):
         if "name" in self.pending_info:
             packager = self._get_write_packager(self.pending_info["name"])
             try:
-                self._clean_packager(
-                    packager,
-                    tuple(d["target"] for d in self.pending_info["disks"].values()),
-                )
+                targets = []
+                for d in self.pending_info["disks"].values():
+                    if "target" in d:
+                        targets.append(d["target"])
+
+                self._clean_packager(packager, targets)
             except FileNotFoundError:
                 logger.info(
                     "%s: Packager not found, nothing to clean.", self.dom.name()
