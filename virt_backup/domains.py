@@ -29,7 +29,7 @@ def get_domain_disks_of(dom_xml, *filter_dev):
             if elem.get("type", None) != "file":
                 logger.debug(
                     "Disk %s is not a file, which not compatible with virt-backup",
-                    elem.xpath("target")[0].get("dev")
+                    elem.xpath("target")[0].get("dev"),
                 )
                 continue
 

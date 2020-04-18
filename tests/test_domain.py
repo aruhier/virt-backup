@@ -21,7 +21,7 @@ def test_get_domain_incompatible_disks_of(build_mock_domain):
     domain = build_mock_domain
     disks = get_domain_incompatible_disks_of(domain.XMLDesc())
 
-    assert disks == ("vdz", )
+    assert disks == ("vdz",)
 
 
 def test_get_domain_disks_of_disk_not_found(build_mock_domain):
