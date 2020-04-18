@@ -61,7 +61,10 @@ class MockDomain:
         """
         for elem in self.dom_xml.xpath("devices/disk"):
             try:
-                if elem.get("device", None) == "disk":
+                if (
+                    elem.get("device", None) == "disk"
+                    and elem.get("type", None) == "file"
+                ):
                     src = elem.xpath("source")[0]
                     img = src.get("file")
                     new_path = os.path.join(basedir, os.path.basename(img))

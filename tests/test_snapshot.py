@@ -74,6 +74,7 @@ class TestDomExtSnapshot:
             "  <disks>\n"
             '    <disk name="vda" snapshot="external"/>\n'
             '    <disk name="vdb" snapshot="external"/>\n'
+            '    <disk name="vdz" snapshot="no"/>\n'
             "  </disks>\n"
             "</domainsnapshot>\n"
         )
@@ -87,6 +88,7 @@ class TestDomExtSnapshot:
             "  <disks>\n"
             '    <disk name="vda" snapshot="external"/>\n'
             '    <disk name="vdb" snapshot="no"/>\n'
+            '    <disk name="vdz" snapshot="no"/>\n'
             "  </disks>\n"
             "</domainsnapshot>\n"
         )

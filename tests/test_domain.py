@@ -3,6 +3,7 @@ import pytest
 from virt_backup.domains import (
     search_domains_regex,
     get_domain_disks_of,
+    get_domain_incompatible_disks_of,
 )
 from virt_backup.exceptions import DiskNotFoundError
 
@@ -14,6 +15,13 @@ def test_get_domain_disks_of(build_mock_domain):
     vda = get_domain_disks_of(domain.XMLDesc(), "vda", "vdb")
 
     assert "vda" in vda
+
+
+def test_get_domain_incompatible_disks_of(build_mock_domain):
+    domain = build_mock_domain
+    disks = get_domain_incompatible_disks_of(domain.XMLDesc())
+
+    assert disks == ("vdz", )
 
 
 def test_get_domain_disks_of_disk_not_found(build_mock_domain):

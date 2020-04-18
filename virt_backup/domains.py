@@ -1,7 +1,11 @@
-import defusedxml.lxml
+import logging
 import re
+import defusedxml.lxml
 
 from virt_backup.exceptions import DiskNotFoundError
+
+
+logger = logging.getLogger("virt_backup")
 
 
 def get_domain_disks_of(dom_xml, *filter_dev):
@@ -19,18 +23,27 @@ def get_domain_disks_of(dom_xml, *filter_dev):
     disks = {}
     for elem in dom_xml.xpath("devices/disk"):
         try:
-            if elem.get("device", None) == "disk":
-                dev = elem.xpath("target")[0].get("dev")
-                if filter_dev and dev not in filter_dev:
-                    continue
-                src = elem.xpath("source")[0].get("file")
-                disk_type = elem.xpath("driver")[0].get("type")
+            if elem.get("device", None) != "disk":
+                continue
 
-                disks[dev] = {"src": src, "type": disk_type}
+            if elem.get("type", None) != "file":
+                logger.debug(
+                    "Disk %s is not a file, which not compatible with virt-backup",
+                    elem.xpath("target")[0].get("dev")
+                )
+                continue
 
-                # all disks captured
-                if filter_dev in list(sorted(disks.keys())):
-                    break
+            dev = elem.xpath("target")[0].get("dev")
+            if filter_dev and dev not in filter_dev:
+                continue
+            src = elem.xpath("source")[0].get("file")
+            disk_type = elem.xpath("driver")[0].get("type")
+
+            disks[dev] = {"src": src, "type": disk_type}
+
+            # all disks captured
+            if filter_dev in list(sorted(disks.keys())):
+                break
         except IndexError:
             continue
 
@@ -39,6 +52,31 @@ def get_domain_disks_of(dom_xml, *filter_dev):
             raise DiskNotFoundError(disk)
 
     return disks
+
+
+def get_domain_incompatible_disks_of(dom_xml, *filter_dev):
+    """
+    Get incompatible (non snapshotable) disks from the domain xml
+
+    :param dom_xml: domain xml to extract the disks from
+    """
+    if isinstance(dom_xml, str):
+        dom_xml = defusedxml.lxml.fromstring(dom_xml)
+    disks = []
+    for elem in dom_xml.xpath("devices/disk"):
+        try:
+            if elem.get("device", None) != "disk":
+                continue
+
+            if elem.get("type", None) == "file":
+                continue
+
+            dev = elem.xpath("target")[0].get("dev")
+            disks.append(dev)
+        except IndexError:
+            continue
+
+    return tuple(sorted(disks))
 
 
 def get_xml_block_of_disk(dom_xml, disk):
