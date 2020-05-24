@@ -49,7 +49,7 @@ class DomExtSnapshotCallbackRegistrer:
             if status == libvirt.VIR_DOMAIN_BLOCK_JOB_FAILED:
                 logger.error("Block job failed for snapshot %s", snap)
 
-            return
+            return None
 
         if snap not in self.callbacks:
             logger.error("Callback for snapshot %s called but not existing", snap)
@@ -65,7 +65,9 @@ class DomExtSnapshot:
 
     metadatas = None
 
-    def __init__(self, dom, disks, callbacks_registrer, conn=None, timeout=None):
+    def __init__(
+        self, dom, disks, callbacks_registrer, conn=None, timeout=None, quiesce=False
+    ):
         #: domain to snapshot. Has to be a libvirt.virDomain object
         self.dom = dom
 
@@ -80,6 +82,10 @@ class DomExtSnapshot:
         #: libvirt connection to use. If not sent, will use the connection used
         #  for self.domain
         self.conn = self.dom._conn if conn is None else conn
+
+        #: enable or not quiesce. If it is not supported, the snapshot will fallback
+        #  to quiesce deactivated.
+        self.quiesce = quiesce
 
         #: used to trigger when block pivot ends, by snapshot path
         self._wait_for_pivot = defaultdict(threading.Event)
@@ -111,14 +117,39 @@ class DomExtSnapshot:
         Create an external snapshot in order to freeze the base image
         """
         snap_xml = self.gen_libvirt_snapshot_xml()
-        return self.dom.snapshotCreateXML(
-            snap_xml,
-            (
-                libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY
-                + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC
-                + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
-            ),
+        flags = self._get_snapshot_flags(quiesce=self.quiesce)
+        try:
+            return self.dom.snapshotCreateXML(snap_xml, flags)
+        except libvirt.libvirtError as e:
+            if self.quiesce:
+                # Quiesce snapshots can fail if no agent is present. Retry without it.
+                logger.debug(
+                    "%s: snapshot with Quiesce failed: %s",
+                    self.dom.name(),
+                    e.get_error_message(),
+                )
+                logger.warning(
+                    (
+                        "%s: snapshot with Quiesce required, but failed. It can be due "
+                        "to the lack of a QEMU guest agent running inside the VM. "
+                        "Retrying without Quiesce.",
+                    ),
+                    self.dom.name(),
+                )
+                flags = self._get_snapshot_flags(quiesce=False)
+                return self.dom.snapshotCreateXML(snap_xml, flags)
+            raise
+
+    def _get_snapshot_flags(self, quiesce=False):
+        flags = (
+            libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY
+            + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC
+            + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
         )
+        if quiesce:
+            flags += libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_QUIESCE
+
+        return flags
 
     def gen_libvirt_snapshot_xml(self):
         """

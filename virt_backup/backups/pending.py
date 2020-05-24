@@ -60,6 +60,7 @@ class DomBackup(_BaseDomBackup):
         disks=None,
         ext_snapshot_helper=None,
         callbacks_registrer=None,
+        quiesce=False,
     ):
         """
         :param dev_disks: list of disks dev names to backup. Disks will be
@@ -103,6 +104,11 @@ class DomBackup(_BaseDomBackup):
         #: timeout when waiting for the block pivot to end. Infinite wait if
         #  timeout is None
         self.timeout = timeout
+
+        #: quiesce enable the Livirt Quiesce options when taking the external snapshot.
+        #  It allows to freeze the filesystem before the snapshot, but requires qemu
+        #  guest agent to run inside the VM.
+        self.quiesce = quiesce
 
         #: droppable helper to take and clean external snapshots. Can be
         #  construct with an ext_snapshot_helper to clean the snapshots of an
@@ -177,9 +183,7 @@ class DomBackup(_BaseDomBackup):
 
         try:
             self._running = True
-            self._ext_snapshot_helper = DomExtSnapshot(
-                self.dom, self.disks, self._callbacks_registrer, self.conn, self.timeout
-            )
+            self._ext_snapshot_helper = self._get_ext_snapshot_helper()
 
             snapshot_date, definition = self._snapshot_and_save_date(definition)
 
@@ -207,6 +211,16 @@ class DomBackup(_BaseDomBackup):
         finally:
             self._running = False
         logger.info("%s: Backup finished", self.dom.name())
+
+    def _get_ext_snapshot_helper(self):
+        return DomExtSnapshot(
+            self.dom,
+            self.disks,
+            self._callbacks_registrer,
+            self.conn,
+            self.timeout,
+            quiesce=self.quiesce,
+        )
 
     def _get_packager(self):
         assert self._name, "_name attribute needs to be defined to get a packager"
@@ -352,9 +366,7 @@ class DomBackup(_BaseDomBackup):
             not self._ext_snapshot_helper and self.pending_info.get("disks", None)
         )
         if is_ext_snap_helper_needed:
-            self._ext_snapshot_helper = DomExtSnapshot(
-                self.dom, self.disks, self._callbacks_registrer, self.conn, self.timeout
-            )
+            self._ext_snapshot_helper = self._get_ext_snapshot_helper()
             self._ext_snapshot_helper.metadatas = {
                 "disks": {
                     disk: {"src": val["src"], "snapshot": val["snapshot"]}

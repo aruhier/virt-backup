@@ -1,6 +1,7 @@
 import json
 import os
 import arrow
+import libvirt
 import pytest
 
 from virt_backup.backups import DomBackup
@@ -66,6 +67,39 @@ class TestDomExtSnapshot:
         )
 
         return self.snapshot_helper.start()
+
+    def test_external_snapshot(self):
+        snap = self.snapshot_helper.external_snapshot()
+        assert isinstance(snap, MockSnapshot)
+
+    def test_external_snapshot_quiesce_fallback(self):
+        tried = {"quiesce": False}
+
+        def mock_quiesce_failure(_, flags):
+            if (flags & libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_QUIESCE) != 0:
+                tried["quiesce"] = True
+                raise libvirt.libvirtError("quiesce error")
+
+            return MockSnapshot("123")
+
+        self.snapshot_helper.dom.set_mock_snapshot_create(mock_quiesce_failure)
+        self.snapshot_helper.quiesce = True
+
+        snap = self.snapshot_helper.external_snapshot()
+        assert tried["quiesce"]
+        assert isinstance(snap, MockSnapshot)
+
+    def test_get_snapshot_flags(self):
+        flags = self.snapshot_helper._get_snapshot_flags()
+        assert flags == (
+            libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_DISK_ONLY
+            + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_ATOMIC
+            + libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_NO_METADATA
+        )
+
+    def test_get_snapshot_flags_quiesce(self):
+        flags = self.snapshot_helper._get_snapshot_flags(quiesce=True)
+        assert (flags & libvirt.VIR_DOMAIN_SNAPSHOT_CREATE_QUIESCE) != 0
 
     def test_gen_libvirt_snapshot_xml(self):
         expected_xml = (

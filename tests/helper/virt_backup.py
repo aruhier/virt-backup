@@ -72,6 +72,12 @@ class MockDomain:
             except IndexError:
                 continue
 
+    def snapshotCreateXML(self, xmlDesc, flags=0):
+        return self._mock_snapshot(xmlDesc, flags)
+
+    def set_mock_snapshot_create(self, mock):
+        self._mock_snapshot = mock
+
     def updateDeviceFlags(self, xml, flags):
         new_device_xml = defusedxml.lxml.fromstring(xml)
 
@@ -92,6 +98,7 @@ class MockDomain:
     def __init__(self, _conn, name="test", id=1, *args, **kwargs):
         self._conn = _conn
         self._state = [1, 1]
+        self._mock_snapshot = lambda *args: MockSnapshot(name)
 
         with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
             self.dom_xml = defusedxml.lxml.fromstring(dom_xmlfile.read())

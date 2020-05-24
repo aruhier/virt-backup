@@ -91,6 +91,16 @@ groups:
     monthly: 5
     yearly: 1
 
+    ## Enable the Libvirt Quiesce option when taking the external snapshots.
+    ##
+    ## From Libvirt documentation: libvirt will try to freeze and unfreeze the guest
+    ## virtual machine’s mounted file system(s), using the guest agent. However, if the
+    ## guest virtual machine does not have a guest agent, snapshot creation will fail.
+    ##
+    ## However, virt-backup has a fallback mechanism if the snapshot happens to fail
+    ## with Quiesce enabled, and retries without it.
+    quiesce: True
+
     ## Hosts definition ##
     hosts:
       ## This policy will match the domain "domainname" in libvirt, and will
@@ -99,6 +109,8 @@ groups:
         disks:
           - vda
           - vdb
+        ## Quiesce option can also be overriden per host definition.
+        quiesce: False
       ## Will backup all disks of "domainname2" ##
       - domainname2
       ## Regex that will match for all domains starting with "prod". The regex

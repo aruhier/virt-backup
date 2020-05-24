@@ -27,6 +27,9 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
         hosts = properties.pop("hosts")
         include, exclude = [], []
         for host in hosts:
+            # TODO: matching should not filter some options. A function should be done
+            # here like the sanitize_properties to raise an error per host if the
+            # configuration is invalid.
             matches = matching_libvirt_domains_from_config(host, conn)
             if not matches.get("domains", None):
                 continue
@@ -48,7 +51,12 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
             for domain_name in i["domains"]:
                 if domain_name not in exclude:
                     domain = conn.lookupByName(domain_name)
-                    backup_group.add_domain(domain, i.get("disks", ()))
+                    sanitize_domain_properties(i["properties"])
+                    backup_group.add_domain(
+                        domain,
+                        i["properties"].get("disks", ()),
+                        quiesce=i["properties"].get("quiesce"),
+                    )
 
         return backup_group
 
@@ -65,6 +73,12 @@ def groups_from_dict(groups_dict, conn, callbacks_registrer):
                 properties.pop(prop)
             except KeyError:
                 continue
+
+        return properties
+
+    def sanitize_domain_properties(properties):
+        if properties.get("disks"):
+            properties["disks"] = sorted(properties["disks"])
 
         return properties
 
@@ -107,7 +121,7 @@ class BackupGroup:
                     dom, disks = (bak_item, ())
                 self.add_domain(dom, disks)
 
-    def add_domain(self, dom, disks=()):
+    def add_domain(self, dom, disks=(), quiesce=None):
         """
         Add a domain and disks to backup in this group
 
@@ -124,9 +138,11 @@ class BackupGroup:
             existing_bak.add_disks(*disks)
         except StopIteration:
             # spawn a new DomBackup instance otherwise
-            self.backups.append(
-                DomBackup(dom=dom, dev_disks=disks, **self.default_bak_param)
-            )
+            kwargs = self.default_bak_param.copy()
+            if quiesce is not None:
+                kwargs["quiesce"] = quiesce
+
+            self.backups.append(DomBackup(dom=dom, dev_disks=disks, **kwargs))
 
     def add_dombackup(self, dombackup):
         """

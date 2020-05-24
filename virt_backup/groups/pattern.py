@@ -16,8 +16,8 @@ def matching_libvirt_domains_from_config(host, conn):
 
     :param host: domain name or custom regex to match on multiple domains
     :param conn: connection with libvirt
-    :returns {"domains": (domain_name, ), "exclude": bool}: exclude will
-        indicate if the domains need to be explicitly excluded of the backup
+    :returns {"domains": (domain_name, ), "exclude": bool, "properties": {}}: exclude
+        will indicate if the domains need to be explicitly excluded of the backup
         group or not (for example, if a user wants to exclude all domains
         starting by a certain pattern). Domains will not be libvirt.virDomain
         objects, but just domain names (easier to manage the include/exclude
@@ -37,10 +37,10 @@ def matching_libvirt_domains_from_config(host, conn):
     # not useful to continue if no domain matches or if the host variable
     # doesn't bring any property for our domain (like which disks to backup)
     if not isinstance(host, dict) or not matches["domains"]:
+        matches["properties"] = {}
         return matches
 
-    if host.get("disks", None):
-        matches["disks"] = sorted(host["disks"])
+    matches["properties"] = host
     return matches
 
 

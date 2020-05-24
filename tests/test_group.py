@@ -34,6 +34,67 @@ class TestBackupGroup:
         assert len(backup_group.backups) == 1
         assert backup_group.backups[0].dom == dom
 
+    def test_add_domain_quiesce(self, build_mock_domain, build_mock_libvirtconn):
+        dom = build_mock_domain
+        backup_group = build_backup_group(build_mock_libvirtconn)
+
+        backup_group.add_domain(dom, quiesce=True)
+
+        assert backup_group.backups[0].quiesce
+
+    def test_add_domain_quiesce_default(
+        self, build_mock_domain, build_mock_libvirtconn
+    ):
+        """
+        Test with Quiesce enabled for the entire group
+        """
+        dom = build_mock_domain
+        backup_group = build_backup_group(build_mock_libvirtconn)
+        backup_group.default_bak_param["quiesce"] = True
+
+        backup_group.add_domain(dom)
+
+        assert backup_group.backups[0].quiesce
+
+    def test_add_domain_quiesce_default_and_dom(
+        self, build_mock_domain, build_mock_libvirtconn
+    ):
+        """
+        Test with Quiesce enabled for the entire group
+        """
+        dom = build_mock_domain
+        backup_group = build_backup_group(build_mock_libvirtconn)
+        backup_group.default_bak_param["quiesce"] = True
+
+        backup_group.add_domain(dom, quiesce=True)
+
+        assert backup_group.backups[0].quiesce
+
+    def test_add_domain_quiesce_disabled(
+        self, build_mock_domain, build_mock_libvirtconn
+    ):
+        dom = build_mock_domain
+        backup_group = build_backup_group(build_mock_libvirtconn)
+        backup_group.default_bak_param["quiesce"] = True
+
+        backup_group.add_domain(dom, quiesce=False)
+        assert not backup_group.backups[0].quiesce
+
+    def test_add_domain_quiesce_multiple_domains(
+        self, build_mock_domain, build_mock_libvirtconn
+    ):
+        dom = build_mock_domain
+        backup_group = build_backup_group(build_mock_libvirtconn)
+        backup_group.default_bak_param["quiesce"] = True
+
+        backup_group.add_domain(dom, quiesce=False)
+
+        dom2 = MockDomain(dom._conn, "test2", id=2)
+        backup_group.add_domain(dom2, quiesce=True)
+
+        assert not backup_group.backups[0].quiesce
+        assert backup_group.backups[1].quiesce
+
     def test_dedup_add_domain(self, build_mock_domain, get_backup_group):
         """
         Test to add 2 times the same backup and check that it's not duplicated
@@ -114,7 +175,11 @@ class TestBackupGroup:
     def test_start_multithread(self, build_mock_libvirtconn, mocker):
         conn = build_mock_libvirtconn
         backup_group = build_backup_group(
-            conn, domlst=(MockDomain(_conn=conn), MockDomain(_conn=conn),)
+            conn,
+            domlst=(
+                MockDomain(_conn=conn),
+                MockDomain(_conn=conn),
+            ),
         )
         for b in backup_group.backups:
             b.start = mocker.stub()
@@ -160,7 +225,10 @@ class TestBackupGroup:
         conn = build_mock_libvirtconn
         backup_group = build_backup_group(
             conn,
-            domlst=(MockDomain(_conn=conn), MockDomain(_conn=conn),),
+            domlst=(
+                MockDomain(_conn=conn),
+                MockDomain(_conn=conn),
+            ),
             packager="tar",
             packager_opts={"compression": "xz"},
         )
@@ -215,15 +283,15 @@ def test_pattern_matching_domains_in_libvirt_exclude(build_mock_libvirtconn_fill
 
 def test_matching_libvirt_domains_from_config(build_mock_libvirtconn_filled):
     conn = build_mock_libvirtconn_filled
-    host_config = {"host": "matching", "disks": ["vda", "vdb"]}
+    host_config = {"host": "matching", "disks": ["vda", "vdb"], "quiesce": True}
 
     matches = matching_libvirt_domains_from_config(host_config, conn)
     domains = tuple(sorted(matches["domains"]))
-    exclude, disks = matches["exclude"], tuple(sorted(matches["disks"]))
 
     assert domains == ("matching",)
-    assert not exclude
-    assert disks == ("vda", "vdb")
+    assert not matches["exclude"]
+    assert tuple(sorted(matches["properties"]["disks"])) == ("vda", "vdb")
+    assert matches["properties"]["quiesce"]
 
 
 def test_matching_libvirt_domains_from_config_unexisting(build_mock_libvirtconn_filled):
@@ -246,7 +314,7 @@ def test_matching_libvirt_domains_from_config_str(build_mock_libvirtconn_filled)
     Test match_domains_from_config with a str pattern
     """
     conn = build_mock_libvirtconn_filled
-    host_config = "r:matching\d?"
+    host_config = r"r:matching\d?"
 
     matches = matching_libvirt_domains_from_config(host_config, conn)
     domains = tuple(sorted(matches["domains"]))
@@ -267,7 +335,7 @@ def test_groups_from_dict(build_mock_libvirtconn_filled):
             "target": "/mnt/test",
             "packager": "tar",
             "hosts": [
-                {"host": "r:^matching\d?$", "disks": ["vda", "vdb"]},
+                {"host": r"r:^matching\d?$", "disks": ["vda", "vdb"]},
                 "!matching2",
                 "nonexisting",
             ],
@@ -339,7 +407,7 @@ def test_groups_from_sanitize_dict_all_config_group_param(
             "monthly": 5,
             "yearly": 1,
             "hosts": [
-                {"host": "r:^matching\d?$", "disks": ["vda", "vdb"]},
+                {"host": r"r:^matching\d?$", "disks": ["vda", "vdb"]},
                 "!matching2",
                 "nonexisting",
             ],
@@ -358,8 +426,17 @@ def test_groups_from_dict_multiple_groups(build_mock_libvirtconn_filled):
     conn = build_mock_libvirtconn_filled
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     groups_config = {
-        "test0": {"target": "/mnt/test0", "packager": "tar", "hosts": ["matching2",],},
-        "test1": {"target": "/mnt/test1", "hosts": ["matching", "a"],},
+        "test0": {
+            "target": "/mnt/test0",
+            "packager": "tar",
+            "hosts": [
+                "matching2",
+            ],
+        },
+        "test1": {
+            "target": "/mnt/test1",
+            "hosts": ["matching", "a"],
+        },
     }
 
     groups = tuple(groups_from_dict(groups_config, conn, callbacks_registrer))
