@@ -169,7 +169,7 @@ class BackupGroup:
         :returns: a generator of DomBackup matching
         """
         for backup in self.backups:
-            if backup.dom == dom:
+            if backup.dom.ID() == dom.ID():
                 yield backup
 
     def propagate_default_backup_attr(self):

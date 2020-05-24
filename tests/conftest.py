@@ -24,7 +24,10 @@ def build_mock_libvirtconn():
 def build_mock_libvirtconn_filled(build_mock_libvirtconn):
     conn = build_mock_libvirtconn
     domain_names = ("a", "b", "vm-10", "matching", "matching2")
-    conn._domains = [MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names]
+    conn._domains = [
+        MockDomain(name=dom_name, _conn=conn, id=id)
+        for id, dom_name in enumerate(domain_names)
+    ]
     return conn
 
 

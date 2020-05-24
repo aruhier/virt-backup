@@ -158,7 +158,10 @@ class TestBackupGroup:
         conn = build_mock_libvirtconn
         backup_group = build_backup_group(
             conn,
-            domlst=(MockDomain(_conn=conn), MockDomain(_conn=conn, name="test_error")),
+            domlst=(
+                MockDomain(_conn=conn, id=1),
+                MockDomain(_conn=conn, name="test_error", id=2),
+            ),
         )
 
         def error_start(*args, **kwargs):
@@ -177,8 +180,8 @@ class TestBackupGroup:
         backup_group = build_backup_group(
             conn,
             domlst=(
-                MockDomain(_conn=conn),
-                MockDomain(_conn=conn),
+                MockDomain(_conn=conn, id=1),
+                MockDomain(_conn=conn, id=2),
             ),
         )
         for b in backup_group.backups:
@@ -193,7 +196,10 @@ class TestBackupGroup:
         conn = build_mock_libvirtconn
         backup_group = build_backup_group(
             conn,
-            domlst=(MockDomain(_conn=conn), MockDomain(_conn=conn, name="test_error")),
+            domlst=(
+                MockDomain(_conn=conn, id=1),
+                MockDomain(_conn=conn, name="test_error", id=2),
+            ),
         )
 
         def error_start(*args, **kwargs):
