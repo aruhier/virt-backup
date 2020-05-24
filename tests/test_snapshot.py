@@ -21,8 +21,8 @@ class TestDomExtSnapshot:
             dom=dom,
             callbacks_registrer=callbacks_registrer,
             disks={
-                "vda": {"src": "/vda.qcow2", "type": "qcow2",},
-                "vdb": {"src": "/vdb.qcow2", "type": "qcow2",},
+                "vda": {"src": "/vda.qcow2", "type": "qcow2"},
+                "vdb": {"src": "/vdb.qcow2", "type": "qcow2"},
             },
         )
 
@@ -41,7 +41,7 @@ class TestDomExtSnapshot:
 
     def test_snapshot_disks_infos(self, monkeypatch):
         """
-        Check if metadatass contains the necessary infos
+        Check if metadatas contains the necessary infos
         """
         metadatas = self.start_snapshot(monkeypatch)
 
@@ -67,7 +67,7 @@ class TestDomExtSnapshot:
 
         return self.snapshot_helper.start()
 
-    def test_get_libvirt_snapshot_xml(self):
+    def test_gen_libvirt_snapshot_xml(self):
         expected_xml = (
             "<domainsnapshot>\n"
             "  <description>Pre-backup external snapshot</description>\n"
@@ -80,7 +80,7 @@ class TestDomExtSnapshot:
         )
         assert self.snapshot_helper.gen_libvirt_snapshot_xml() == expected_xml
 
-    def test_get_libvirt_snapshot_xml_ignored_disk(self):
+    def test_gen_libvirt_snapshot_xml_ignored_disk(self):
         self.snapshot_helper.disks.pop("vdb")
         expected_xml = (
             "<domainsnapshot>\n"
@@ -138,7 +138,7 @@ class TestDomExtSnapshot:
         self.snapshot_helper.metadatas = {
             "date": arrow.now(),
             "disks": {
-                disk: {"src": prop["src"], "snapshot": snapshots[disk],}
+                disk: {"src": prop["src"], "snapshot": snapshots[disk]}
                 for disk, prop in self.snapshot_helper.disks.items()
             },
         }
