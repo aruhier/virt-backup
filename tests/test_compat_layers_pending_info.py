@@ -27,7 +27,10 @@ class TestV0_1ToV0_4:
                     "date": 1569890041,
                     "packager": {
                         "type": "tar",
-                        "opts": {"compression": "gz", "compression_lvl": 6,},
+                        "opts": {
+                            "compression": "gz",
+                            "compression_lvl": 6,
+                        },
                     },
                 },
             ),
@@ -44,7 +47,10 @@ class TestV0_1ToV0_4:
                     "domain_name": "test-domain",
                     "version": "0.4.0",
                     "date": 1569890041,
-                    "packager": {"type": "directory", "opts": {},},
+                    "packager": {
+                        "type": "directory",
+                        "opts": {},
+                    },
                 },
             ),
             (
@@ -54,7 +60,10 @@ class TestV0_1ToV0_4:
                     "domain_name": "test-domain",
                     "version": "0.4.0",
                     "date": 1569890041,
-                    "packager": {"type": "tar", "opts": {},},
+                    "packager": {
+                        "type": "tar",
+                        "opts": {},
+                    },
                 },
                 {
                     "name": "20191001-003401_3_test-domain",
@@ -62,7 +71,10 @@ class TestV0_1ToV0_4:
                     "domain_name": "test-domain",
                     "version": "0.4.0",
                     "date": 1569890041,
-                    "packager": {"type": "tar", "opts": {},},
+                    "packager": {
+                        "type": "tar",
+                        "opts": {},
+                    },
                 },
             ),
         ],
@@ -75,7 +87,12 @@ class TestV0_1ToV0_4:
         assert not diff, "diff found between converted and expected pending_info"
 
     @pytest.mark.parametrize(
-        "version,expected", [("0.1.0", True), ("0.4.0", False), ("0.5.0", False),],
+        "version,expected",
+        [
+            ("0.1.0", True),
+            ("0.4.0", False),
+            ("0.5.0", False),
+        ],
     )
     def test_is_needed(self, version, expected):
         c = ToV0_4()
@@ -119,7 +136,10 @@ class TestV0_1ToV0_4:
                 "date": 1569890041,
                 "packager": {
                     "type": "tar",
-                    "opts": {"compression": "gz", "compression_lvl": 6,},
+                    "opts": {
+                        "compression": "gz",
+                        "compression_lvl": 6,
+                    },
                 },
             },
         ),
@@ -136,7 +156,10 @@ class TestV0_1ToV0_4:
                 "domain_name": "test-domain",
                 "version": "0.4.0",
                 "date": 1569890041,
-                "packager": {"type": "directory", "opts": {},},
+                "packager": {
+                    "type": "directory",
+                    "opts": {},
+                },
             },
         ),
         (
@@ -146,7 +169,10 @@ class TestV0_1ToV0_4:
                 "domain_name": "test-domain",
                 "version": "0.4.0",
                 "date": 1569890041,
-                "packager": {"type": "tar", "opts": {},},
+                "packager": {
+                    "type": "tar",
+                    "opts": {},
+                },
             },
             {
                 "name": "20191001-003401_3_test-domain",
@@ -154,7 +180,10 @@ class TestV0_1ToV0_4:
                 "domain_name": "test-domain",
                 "version": "0.4.0",
                 "date": 1569890041,
-                "packager": {"type": "tar", "opts": {},},
+                "packager": {
+                    "type": "tar",
+                    "opts": {},
+                },
             },
         ),
     ],

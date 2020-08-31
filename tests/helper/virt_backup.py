@@ -167,7 +167,9 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
     with packager:
         for disk in dbackup.disks:
             # create empty files as our backup images
-            img_name = "{}.qcow2".format(dbackup._disk_backup_name_format(date, disk),)
+            img_name = "{}.qcow2".format(
+                dbackup._disk_backup_name_format(date, disk),
+            )
             definition["disks"][disk] = img_name
 
             img_complete_path = os.path.join(backup_dir, img_name)

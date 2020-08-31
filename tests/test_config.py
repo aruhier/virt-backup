@@ -73,7 +73,9 @@ class TestConfig:
 
         conf["default"] = {"daily": 4}
         conf["groups"] = {
-            "test_group": {"daily": 3,},
+            "test_group": {
+                "daily": 3,
+            },
         }
 
         groups = conf.get_groups()

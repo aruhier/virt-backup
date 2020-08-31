@@ -165,7 +165,13 @@ class TestListDetailed(AbstractTestList):
     default_parser_args = ("list",)
 
     def test_list_detailed(self, args_parser, mocked_config, capsys):
-        args = args_parser.parse_args(self.default_parser_args + ("-D", "matching",))
+        args = args_parser.parse_args(
+            self.default_parser_args
+            + (
+                "-D",
+                "matching",
+            )
+        )
         return self.list_and_compare(args, mocked_config, capsys)
 
     def list_and_compare(self, args, mocked_config, capsys):
@@ -301,7 +307,11 @@ class TestClean(AbstractMainTest):
 
 
 def mock_get_config(monkeypatch):
-    config = Config(defaults={"debug": False,})
+    config = Config(
+        defaults={
+            "debug": False,
+        }
+    )
     config.from_dict(get_config(TESTCONF_PATH))
 
     monkeypatch.setattr(virt_backup.__main__, "get_setup_config", lambda: config)

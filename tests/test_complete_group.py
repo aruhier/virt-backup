@@ -211,9 +211,14 @@ def test_complete_groups_from_dict_multiple_groups():
         "test0": {
             "target": "/mnt/test0",
             "compression": "tar",
-            "hosts": ["matching2",],
+            "hosts": [
+                "matching2",
+            ],
         },
-        "test1": {"target": "/mnt/test1", "hosts": ["matching", "a"],},
+        "test1": {
+            "target": "/mnt/test1",
+            "hosts": ["matching", "a"],
+        },
     }
 
     groups = tuple(complete_groups_from_dict(groups_config))

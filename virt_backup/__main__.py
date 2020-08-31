@@ -335,7 +335,11 @@ def list_detailed_backups_for_domain(group, domains_names, short=False):
 
 
 def get_setup_config():
-    config = Config(defaults={"debug": False,})
+    config = Config(
+        defaults={
+            "debug": False,
+        }
+    )
     try:
         loaded_config = get_config()
     except FileNotFoundError:
