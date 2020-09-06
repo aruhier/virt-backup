@@ -8,7 +8,11 @@ import sys
 import threading
 from collections import defaultdict
 
-from virt_backup.exceptions import BackupNotFoundError, BackupsFailureInGroupError
+from virt_backup.exceptions import (
+    BackupNotFoundError,
+    BackupsFailureInGroupError,
+    DomainNotFoundError,
+)
 from virt_backup.groups import groups_from_dict, BackupGroup, complete_groups_from_dict
 from virt_backup.backups import DomExtSnapshotCallbackRegistrer
 from virt_backup.config import get_config, Config
@@ -213,13 +217,22 @@ def restore_backup(parsed_args, *args, **kwargs):
     target_dir = parsed_args.target_dir
     target_date = arrow.get(parsed_args.date) if parsed_args.date else None
 
-    if target_date:
-        backup = group.get_backup_at_date(domain_name, target_date)
-    else:
-        try:
-            backup = group.backups[domain_name][-1]
-        except KeyError:
-            raise BackupNotFoundError
+    try:
+        if target_date:
+            backup = group.get_backup_at_date(domain_name, target_date)
+        else:
+            try:
+                backup = group.backups[domain_name][-1]
+            except KeyError:
+                raise BackupNotFoundError
+    except (DomainNotFoundError, BackupNotFoundError) as e:
+        if isinstance(e, DomainNotFoundError) or target_date is None:
+            logger.critical("Domain %s does not have any backup", domain_name)
+        else:
+            logger.critical(
+                "Backup for domain %s at date %s not found", domain_name, target_date
+            )
+        sys.exit(2)
 
     with callbacks_registrer:
         backup.restore_to(target_dir)
