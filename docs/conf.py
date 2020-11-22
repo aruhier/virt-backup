@@ -46,7 +46,6 @@ nitpicky = True
 
 # We need a recent sphinx because of the last update format.
 needs_sphinx = '1.4'
-html_last_updated_fmt = 'YYYY-MM-dd'
 templates_path = ['templates']
 
 # Keep the same ordering as in original source code.

@@ -46,6 +46,7 @@ Limitations
    quickstart
    config
    backup
+   data_map
    clean
 
 Indices and tables
