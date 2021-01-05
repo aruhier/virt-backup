@@ -10,6 +10,12 @@ VE backup system (without their vma system) to automatically backup your disks
 groups, and can be matched via regex.
 
 
+Documentation
+-------------
+
+Documentation is available [here](https://virt-backup.readthedocs.io/).
+
+
 Installation
 ------------
 
