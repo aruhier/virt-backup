@@ -238,7 +238,7 @@ class DomBackup(_BaseDomBackup):
         snapshot_metadatas = self._ext_snapshot_helper.start()
 
         # all of our disks are snapshot, so the backup date is right now
-        definition["date"] = snapshot_metadatas["date"].timestamp
+        definition["date"] = snapshot_metadatas["date"].int_timestamp
 
         self.pending_info = definition.copy()
         self.pending_info["disks"] = {
