@@ -36,7 +36,8 @@ setup(
         "packaging", "PyYAML"
     ],
     setup_requires=['pytest-runner', ],
-    tests_require=['pytest', 'pytest-cov', "pytest-mock", "deepdiff"],
+    # Deepdiff: 5.0.2 forced for Python 3.5 compatibility.
+    tests_require=['pytest', 'pytest-cov', "pytest-mock", "deepdiff==5.0.2"],
     extras_require={"zstd": ["zstandard"], },
     entry_points={
         'console_scripts': [
