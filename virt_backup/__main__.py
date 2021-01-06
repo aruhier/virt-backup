@@ -284,9 +284,24 @@ def list_groups(parsed_args, *args, **kwargs):
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
 
     complete_groups = {g.name: g for g in get_usable_complete_groups(config)}
+    if parsed_args.groups:
+        filtered_groups = {}
+        for g in parsed_args.groups:
+            try:
+                filtered_groups[g] = complete_groups[g]
+            except KeyError:
+                logger.debug(
+                    'Complete group "%s" not found. Not an error, skipping.', g
+                )
+
+        complete_groups = filtered_groups
+
     if parsed_args.list_all:
         backups_by_group = _get_all_hosts_and_bak_by_groups(
-            parsed_args.groups, config, conn, callbacks_registrer
+            config,
+            conn,
+            callbacks_registrer,
+            parsed_args.groups,
         )
     else:
         backups_by_group = {}
@@ -314,15 +329,21 @@ def list_groups(parsed_args, *args, **kwargs):
                 print("\t{}: {} backup(s)".format(dom, len(backups)))
 
 
-def _get_all_hosts_and_bak_by_groups(group_names, config, conn, callbacks_registrer):
+def _get_all_hosts_and_bak_by_groups(config, conn, callbacks_registrer, filter_names):
     complete_groups = get_usable_complete_groups(config)
     pending_groups = build_all_or_selected_groups(config, conn, callbacks_registrer)
 
     backups_by_group = {}
     for pgroup in pending_groups:
+        if filter_names and pgroup.name not in filter_names:
+            continue
+
         backups_by_group[pgroup.name] = {b.dom.name(): tuple() for b in pgroup.backups}
 
     for cgroup in complete_groups:
+        if filter_names and cgroup.name not in filter_names:
+            continue
+
         cgroup.scan_backup_dir()
         backups_by_group[cgroup.name].update(cgroup.backups)
 

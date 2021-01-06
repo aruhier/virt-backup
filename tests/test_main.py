@@ -104,6 +104,25 @@ class TestList(AbstractTestList):
             for parsed_domain, parsed_backups in parsed_values.items():
                 assert parsed_backups == len(group.backups[parsed_domain])
 
+    def test_list_group_filtered(self, args_parser, mocked_config, capsys):
+        args = args_parser.parse_args((*self.default_parser_args, "test", "empty"))
+
+        list_groups(args)
+        captured = capsys.readouterr()
+        parsed_groups = self.extract_groups(captured.out)
+        assert parsed_groups
+        self.compare_parsed_groups_with_complete(parsed_groups, mocked_config)
+        assert "empty" not in parsed_groups
+
+    def test_list_filtered_empty(self, args_parser, mocked_config, capsys):
+        args = args_parser.parse_args((*self.default_parser_args, "empty"))
+
+        list_groups(args)
+        captured = capsys.readouterr()
+        parsed_groups = self.extract_groups(captured.out)
+
+        assert not parsed_groups
+
     def test_list_one_host(self, args_parser, mocked_config, capsys):
         args = args_parser.parse_args(self.default_parser_args)
         mocked_config["groups"]["test"]["hosts"] = ["matching"]
@@ -135,7 +154,10 @@ class TestListShort(TestList):
         Extract groups from listing output
         """
         lines = list_output.splitlines()
-        lines.remove("")
+        try:
+            lines.remove("")
+        except ValueError:
+            pass
         groups = {}
 
         while lines:
