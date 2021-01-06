@@ -2,24 +2,30 @@ language: python
 
 matrix:
   include:
-    - python: 3.7-dev
+    - python: 3.9-dev
       env: TOXENV=black
-    - python: 3.7-dev
+    - python: 3.9-dev
       env: TOXENV=coveralls
     - python: 3.5-dev
-      env: TOXENV=py35
+      env: TOXENV=full
     - python: 3.5-dev
       env: TOXENV=min
     - python: 3.6-dev
-      env: TOXENV=py36
+      env: TOXENV=full
     - python: 3.6-dev
       env: TOXENV=min
     - python: 3.7-dev
-      env: TOXENV=py37
+      env: TOXENV=full
     - python: 3.7-dev
       env: TOXENV=min
-
-dist: trusty
+    - python: 3.8-dev
+      env: TOXENV=full
+    - python: 3.8-dev
+      env: TOXENV=min
+    - python: 3.9-dev
+      env: TOXENV=full
+    - python: 3.9-dev
+      env: TOXENV=min
 
 before_install:
   - sudo apt-get -qq update
