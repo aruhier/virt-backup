@@ -35,7 +35,7 @@ def test_search_domains_regex(build_mock_libvirtconn):
     domain_names = ("dom1", "dom2", "dom3", "test")
     conn._domains = [MockDomain(name=dom_name, _conn=conn) for dom_name in domain_names]
 
-    matches = list(sorted(search_domains_regex("^dom\d$", conn)))
+    matches = list(sorted(search_domains_regex(r"^dom\d$", conn)))
     expected = list(sorted(domain_names))
     expected.remove("test")
 
