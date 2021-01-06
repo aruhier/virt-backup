@@ -1,8 +1,8 @@
+import os
 import arrow
-import defusedxml.lxml
 import libvirt
 import lxml
-import os
+import lxml.etree
 
 from virt_backup.backups import (
     DomBackup,
@@ -79,7 +79,9 @@ class MockDomain:
         self._mock_snapshot = mock
 
     def updateDeviceFlags(self, xml, flags):
-        new_device_xml = defusedxml.lxml.fromstring(xml)
+        new_device_xml = lxml.etree.fromstring(
+            xml, lxml.etree.XMLParser(resolve_entities=False)
+        )
 
         address = new_device_xml.get("address")
         device_to_replace = self._find_device_with_address(address)
@@ -101,7 +103,9 @@ class MockDomain:
         self._mock_snapshot = lambda *args: MockSnapshot(name)
 
         with open(os.path.join(CUR_PATH, "testdomain.xml")) as dom_xmlfile:
-            self.dom_xml = defusedxml.lxml.fromstring(dom_xmlfile.read())
+            self.dom_xml = lxml.etree.fromstring(
+                dom_xmlfile.read(), lxml.etree.XMLParser(resolve_entities=False)
+            )
         self.set_id(id)
         self.set_name(name)
 
@@ -132,7 +136,9 @@ class MockConn:
 
     def defineXML(self, xml):
         md = MockDomain(_conn=self)
-        md.dom_xml = defusedxml.lxml.fromstring(xml)
+        md.dom_xml = lxml.etree.fromstring(
+            xml, lxml.etree.XMLParser(resolve_entities=False)
+        )
         for _, d in enumerate(self._domains):
             if d.ID() == md.ID():
                 d.dom_xml = md.dom_xml

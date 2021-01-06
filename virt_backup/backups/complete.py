@@ -1,5 +1,4 @@
 import arrow
-import defusedxml.lxml
 import logging
 import lxml.etree
 import os
@@ -95,7 +94,9 @@ class DomCompleteBackup(_BaseDomBackup):
         return lxml.etree.tostring(parsed_dxml, pretty_print=True).decode()
 
     def _parse_dom_xml(self):
-        return defusedxml.lxml.fromstring(self.dom_xml)
+        return lxml.etree.fromstring(
+            self.dom_xml, lxml.etree.XMLParser(resolve_entities=False)
+        )
 
     def restore_and_replace_disk_of(self, disk, domain, disk_to_replace):
         """
@@ -122,7 +123,9 @@ class DomCompleteBackup(_BaseDomBackup):
 
     def _copy_disk_driver_with_domain(self, disk, domain, domain_disk):
         disk_xml = self._get_elemxml_of_domain_disk(self._parse_dom_xml(), disk)
-        domain_xml = defusedxml.lxml.fromstring(domain.XMLDesc())
+        domain_xml = lxml.etree.fromstring(
+            domain.XMLDesc(), lxml.etree.XMLParser(resolve_entities=False)
+        )
         domain_disk_xml = self._get_elemxml_of_domain_disk(domain_xml, domain_disk)
 
         domain_disk_xml.replace(
@@ -150,7 +153,7 @@ class DomCompleteBackup(_BaseDomBackup):
             self.restore_disk_to(d, os.path.join(target, original_img_name))
         xml_path = "{}.xml".format(os.path.join(target, self.dom_name))
         with open(xml_path, "w") as xml_file:
-            xml_file.write(self.dom_xml)
+            xml_file.write(self.dom_xml or "")
 
     def restore_disk_to(self, disk, target):
         """

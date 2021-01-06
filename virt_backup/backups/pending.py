@@ -1,5 +1,4 @@
 import arrow
-import defusedxml.lxml
 import json
 import libvirt
 import logging
@@ -313,7 +312,9 @@ class DomBackup(_BaseDomBackup):
         """
         Parse the domain's definition
         """
-        return defusedxml.lxml.fromstring(self.dom.XMLDesc())
+        return lxml.etree.fromstring(
+            self.dom.XMLDesc(), lxml.etree.XMLParser(resolve_entities=False)
+        )
 
     def _dump_json_definition(self, definition):
         """

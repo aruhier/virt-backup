@@ -1,6 +1,6 @@
 import logging
 import re
-import defusedxml.lxml
+import lxml.etree
 
 from virt_backup.exceptions import DiskNotFoundError
 
@@ -18,7 +18,9 @@ def get_domain_disks_of(dom_xml, *filter_dev):
                        every disks.
     """
     if isinstance(dom_xml, str):
-        dom_xml = defusedxml.lxml.fromstring(dom_xml)
+        dom_xml = lxml.etree.fromstring(
+            dom_xml, lxml.etree.XMLParser(resolve_entities=False)
+        )
     filter_dev = sorted(list(filter_dev))
     disks = {}
     for elem in dom_xml.xpath("devices/disk"):
@@ -61,7 +63,9 @@ def get_domain_incompatible_disks_of(dom_xml, *filter_dev):
     :param dom_xml: domain xml to extract the disks from
     """
     if isinstance(dom_xml, str):
-        dom_xml = defusedxml.lxml.fromstring(dom_xml)
+        dom_xml = lxml.etree.fromstring(
+            dom_xml, lxml.etree.XMLParser(resolve_entities=False)
+        )
     disks = []
     for elem in dom_xml.xpath("devices/disk"):
         try:
@@ -81,7 +85,9 @@ def get_domain_incompatible_disks_of(dom_xml, *filter_dev):
 
 def get_xml_block_of_disk(dom_xml, disk):
     if isinstance(dom_xml, str):
-        dom_xml = defusedxml.lxml.fromstring(dom_xml)
+        dom_xml = lxml.etree.fromstring(
+            dom_xml, lxml.etree.XMLParser(resolve_entities=False)
+        )
     for elem in dom_xml.xpath("devices/disk"):
         try:
             if elem.get("device", None) == "disk":

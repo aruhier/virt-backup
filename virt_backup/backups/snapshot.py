@@ -4,7 +4,6 @@ import os
 import subprocess
 import threading
 import arrow
-import defusedxml.lxml
 import libvirt
 import lxml.etree
 
@@ -166,7 +165,9 @@ class DomExtSnapshot:
         root_el.append(disks_el)
 
         all_domain_disks = get_domain_disks_of(
-            defusedxml.lxml.fromstring(self.dom.XMLDesc())
+            lxml.etree.fromstring(
+                self.dom.XMLDesc(), lxml.etree.XMLParser(resolve_entities=False)
+            )
         )
         for d in sorted(all_domain_disks.keys()):
             disk_el = lxml.etree.Element("disk")
@@ -178,7 +179,9 @@ class DomExtSnapshot:
             disks_el.append(disk_el)
 
         non_snapshotable_disks = get_domain_incompatible_disks_of(
-            defusedxml.lxml.fromstring(self.dom.XMLDesc())
+            lxml.etree.fromstring(
+                self.dom.XMLDesc(), lxml.etree.XMLParser(resolve_entities=False)
+            )
         )
         for d in non_snapshotable_disks:
             disk_el = lxml.etree.Element("disk")
@@ -311,7 +314,9 @@ class DomExtSnapshot:
         :param disk: disk name
         :param src: new disk path
         """
-        dom_xml = defusedxml.lxml.fromstring(self.dom.XMLDesc())
+        dom_xml = lxml.etree.fromstring(
+            self.dom.XMLDesc(), lxml.etree.XMLParser(resolve_entities=False)
+        )
 
         disk_xml = get_xml_block_of_disk(dom_xml, disk)
         disk_xml.xpath("source")[0].set("file", src)
@@ -319,8 +324,8 @@ class DomExtSnapshot:
         if self.conn.getLibVersion() >= 3000000:
             # update a disk is broken in libvirt < 3.0
             return self.dom.updateDeviceFlags(
-                defusedxml.lxml.tostring(disk_xml).decode(),
+                lxml.etree.tostring(disk_xml).decode(),
                 libvirt.VIR_DOMAIN_AFFECT_CONFIG,
             )
         else:
-            return self.conn.defineXML(defusedxml.lxml.tostring(dom_xml).decode())
+            return self.conn.defineXML(lxml.etree.tostring(dom_xml).decode())
