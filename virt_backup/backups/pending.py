@@ -6,6 +6,7 @@ import lxml.etree
 import os
 import subprocess
 import tarfile
+import hashlib
 
 import virt_backup
 from virt_backup.backups.packagers import ReadBackupPackagers, WriteBackupPackagers
@@ -200,7 +201,7 @@ class DomBackup(_BaseDomBackup):
 
                     self._backup_disk(disk, prop, packager, definition)
                     self._ext_snapshot_helper.clean_for_disk(disk)
-
+            definition = self._update_file_with_hash(definition)
             self._dump_json_definition(definition)
             self.post_backup()
             self._clean_pending_info()
@@ -210,6 +211,33 @@ class DomBackup(_BaseDomBackup):
         finally:
             self._running = False
         logger.info("%s: Backup finished", self.dom.name())
+
+    def _update_file_with_hash(self, definition):
+        backup_date = arrow.get(definition["date"]).to("local")
+        main_file = self._get_json_definition_path(backup_date)
+
+        file_name = definition['name']
+        file_name = f'{self.backup_dir}/{file_name}.{definition["packager"]["type"]}'
+        hash_data = {
+            file_name: self._get_file_hash(file_name)
+        }
+        if 'hash' not in definition:
+            definition['hash'] = {}
+        definition['hash'].update(hash_data)
+
+        return definition
+
+    @staticmethod
+    def _get_file_hash(file):
+        sha1 = hashlib.sha1()
+        with open(file, 'rb') as f:
+            chunk = 0
+            while chunk != b'':
+                # read only 1024 bytes at a time
+                chunk = f.read(1024)
+                sha1.update(chunk)
+
+        return sha1.hexdigest()
 
     def _get_ext_snapshot_helper(self):
         return DomExtSnapshot(
