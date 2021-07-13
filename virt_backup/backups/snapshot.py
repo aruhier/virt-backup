@@ -103,6 +103,7 @@ class DomExtSnapshot:
             "disks": {
                 disk: {
                     "src": prop["src"],
+                    "type": prop["type"],
                     "snapshot": self._get_snapshot_path(prop["src"], snapshot),
                 }
                 for disk, prop in self.disks.items()
@@ -225,6 +226,7 @@ class DomExtSnapshot:
 
         snapshot_path = os.path.abspath(self.metadatas["disks"][disk]["snapshot"])
         disk_path = os.path.abspath(self.metadatas["disks"][disk]["src"])
+        disk_type = self.metadatas["disks"][disk]["type"]
 
         # Do not commit and pivot if our snapshot is not the current top disk
         current_disk_path = (
@@ -249,7 +251,7 @@ class DomExtSnapshot:
             self.blockcommit_disk(disk)
         else:
             self._qemu_img_commit(disk_path, snapshot_path)
-            self._manually_pivot_disk(disk, disk_path)
+            self._manually_pivot_disk(disk, disk_path, disk_type)
             os.remove(snapshot_path)
 
         self.metadatas["disks"].pop(disk)
@@ -307,7 +309,7 @@ class DomExtSnapshot:
             ("qemu-img", "commit", "-b", parent_disk_path, snapshot_path)
         )
 
-    def _manually_pivot_disk(self, disk, src):
+    def _manually_pivot_disk(self, disk, src, disk_type):
         """
         Replace the disk src
 
@@ -320,6 +322,7 @@ class DomExtSnapshot:
 
         disk_xml = get_xml_block_of_disk(dom_xml, disk)
         disk_xml.xpath("source")[0].set("file", src)
+        disk_xml.xpath("driver")[0].set("type", disk_type)
 
         if self.conn.getLibVersion() >= 3000000:
             # update a disk is broken in libvirt < 3.0
