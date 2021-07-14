@@ -292,7 +292,7 @@ class DomExtSnapshot:
         If the received domain matches with the one associated to this backup,
         abort the blockjob, pivot it and delete the snapshot.
         """
-        domain_matches = dom.ID() == self.dom.ID()
+        domain_matches = dom.UUID() == self.dom.UUID()
         if status == libvirt.VIR_DOMAIN_BLOCK_JOB_READY and domain_matches:
             dom.blockJobAbort(snap, libvirt.VIR_DOMAIN_BLOCK_JOB_ABORT_PIVOT)
             os.remove(snap)
