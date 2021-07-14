@@ -409,7 +409,7 @@ class DomBackup(_BaseDomBackup):
         packager and packager_opts, self and dombackup are considered
         compatibles.
         """
-        same_domain = dombackup.dom.ID() == self.dom.ID()
+        same_domain = dombackup.dom.UUID() == self.dom.UUID()
         if not same_domain:
             return False
 
