@@ -1,4 +1,5 @@
 import os
+import uuid
 import arrow
 import libvirt
 import lxml
@@ -30,6 +31,9 @@ class MockDomain:
     def ID(self):
         return self.dom_xml.get("id")
 
+    def UUID(self):
+        return self.dom_xml.get("uuid")
+
     def name(self):
         return self.dom_xml.xpath("name")[0].text
 
@@ -49,6 +53,9 @@ class MockDomain:
 
     def set_id(self, id):
         self.dom_xml.set("id", str(id))
+
+    def set_uuid(self, uuid):
+        self.dom_xml.set("uuid", uuid)
 
     def set_state(self, state_id, reason_id):
         self._state = [state_id, reason_id]
@@ -108,6 +115,7 @@ class MockDomain:
             )
         self.set_id(id)
         self.set_name(name)
+        self.set_uuid(kwargs.get("uuid", str(uuid.uuid4())))
 
 
 class MockSnapshot:

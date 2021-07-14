@@ -48,7 +48,7 @@ class TestDomExtSnapshot:
 
         assert len(self.snapshot_helper.disks) == len(metadatas["disks"])
         for disk in self.snapshot_helper.disks:
-            assert sorted(("snapshot", "src")) == sorted(
+            assert sorted(("snapshot", "src", "type")) == sorted(
                 metadatas["disks"][disk].keys()
             )
 
@@ -130,7 +130,7 @@ class TestDomExtSnapshot:
 
     def test_manually_pivot_disk(self, build_mock_libvirtconn):
         self.snapshot_helper.conn = build_mock_libvirtconn
-        self.snapshot_helper._manually_pivot_disk("vda", "/testvda")
+        self.snapshot_helper._manually_pivot_disk("vda", "/testvda", "qcow2")
         dom_xml = self.snapshot_helper.dom.XMLDesc()
         assert self.get_src_for_disk(dom_xml, "vda") == "/testvda"
 
@@ -150,7 +150,7 @@ class TestDomExtSnapshot:
 
     def test_manually_pivot_unexistant_disk(self):
         with pytest.raises(DiskNotFoundError):
-            self.snapshot_helper._manually_pivot_disk("sda", "/testvda")
+            self.snapshot_helper._manually_pivot_disk("sda", "/testvda", "qcow2")
 
     def test_clean_no_metadata(self):
         with pytest.raises(SnapshotNotStarted):
@@ -172,7 +172,7 @@ class TestDomExtSnapshot:
         self.snapshot_helper.metadatas = {
             "date": arrow.now(),
             "disks": {
-                disk: {"src": prop["src"], "snapshot": snapshots[disk]}
+                disk: {"src": prop["src"], "snapshot": snapshots[disk], "type": "qcow2"}
                 for disk, prop in self.snapshot_helper.disks.items()
             },
         }
