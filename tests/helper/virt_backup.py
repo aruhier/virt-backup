@@ -159,7 +159,7 @@ def build_complete_backup_files_from_domainbackup(dbackup, date):
     :returns definition: updated definition from backuped files
     """
     definition = dbackup.get_definition()
-    definition["date"] = date.int_timestamp
+    definition["date"] = int(date.timestamp)
     definition["disks"] = {}
 
     backup_dir = dbackup.backup_dir
