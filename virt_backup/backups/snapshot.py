@@ -103,7 +103,7 @@ class DomExtSnapshot:
             "disks": {
                 disk: {
                     "src": prop["src"],
-                    "type": prop["type"],
+                    "type": self._get_disk_type(disk),
                     "snapshot": self._get_snapshot_path(prop["src"], snapshot),
                 }
                 for disk, prop in self.disks.items()
@@ -194,6 +194,13 @@ class DomExtSnapshot:
 
     def _get_snapshot_path(self, parent_disk_path, snapshot):
         return "{}.{}".format(os.path.splitext(parent_disk_path)[0], snapshot.getName())
+
+    def _get_disk_type(self, disk):
+        dom_xml = lxml.etree.fromstring(
+            self.dom.XMLDesc(), lxml.etree.XMLParser(resolve_entities=False)
+        )
+        disk_xml = get_xml_block_of_disk(dom_xml, disk)
+        return disk_xml.xpath("driver")[0].get("type", "raw")
 
     def clean(self):
         if not self.metadatas:

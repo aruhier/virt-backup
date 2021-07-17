@@ -245,6 +245,7 @@ class DomBackup(_BaseDomBackup):
             disk: {
                 "src": prop["src"],
                 "snapshot": snapshot_metadatas["disks"][disk]["snapshot"],
+                "type": snapshot_metadatas["disks"][disk]["type"],
             }
             for disk, prop in self.disks.items()
         }
@@ -370,7 +371,11 @@ class DomBackup(_BaseDomBackup):
             self._ext_snapshot_helper = self._get_ext_snapshot_helper()
             self._ext_snapshot_helper.metadatas = {
                 "disks": {
-                    disk: {"src": val["src"], "snapshot": val["snapshot"]}
+                    disk: {
+                        "src": val["src"],
+                        "snapshot": val["snapshot"],
+                        "type": val["type"],
+                    }
                     for disk, val in self.pending_info["disks"].items()
                 }
             }

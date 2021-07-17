@@ -106,6 +106,7 @@ class TestDomBackup:
         assert definition.items() <= pending_info.items()
         assert "snapshot" in pending_info["disks"]["vda"]
         assert "src" in pending_info["disks"]["vda"]
+        assert "type" in pending_info["disks"]["vda"]
 
     def take_snapshot_and_return_date(self, mock_domain, backup_dir, monkeypatch):
         dombkup = build_dombackup(
@@ -221,7 +222,12 @@ class TestDomBackup:
 
         backup_dir.join("vda.qcow2").write("")
         dombkup.pending_info["disks"] = {
-            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
+            "vda": {
+                "src": "vda.qcow2",
+                "target": "vda.qcow2",
+                "snapshot": "vda.snap",
+                "type": "qcow2",
+            },
         }
         dombkup.pending_info["packager"] = {"type": "directory", "opts": {}}
         dombkup._dump_pending_info()
@@ -244,8 +250,13 @@ class TestDomBackup:
 
         backup_dir.join("vda.qcow2").write("")
         dombkup.pending_info["disks"] = {
-            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
-            "vdb": {"src": "vdb.qcow2", "snapshot": "vda.snap"},
+            "vda": {
+                "src": "vda.qcow2",
+                "target": "vda.qcow2",
+                "snapshot": "vda.snap",
+                "type": "qcow2",
+            },
+            "vdb": {"src": "vdb.qcow2", "snapshot": "vda.snap", "type": "qcow2"},
         }
         dombkup.pending_info["packager"] = {"type": "directory", "opts": {}}
         dombkup._dump_pending_info()
@@ -268,7 +279,12 @@ class TestDomBackup:
 
         backup_dir.join("vda.qcow2").write("")
         disk_infos = {
-            "vda": {"src": "vda.qcow2", "target": "vda.qcow2", "snapshot": "vda.snap"},
+            "vda": {
+                "src": "vda.qcow2",
+                "target": "vda.qcow2",
+                "snapshot": "vda.snap",
+                "type": "qcow2",
+            },
         }
         dombkup.pending_info["disks"] = disk_infos.copy()
         dombkup._dump_pending_info()
@@ -280,6 +296,7 @@ class TestDomBackup:
             "vda": {
                 "src": disk_infos["vda"]["src"],
                 "snapshot": disk_infos["vda"]["snapshot"],
+                "type": "qcow2",
             }
         }
 

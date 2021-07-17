@@ -11,9 +11,9 @@ logger = logging.getLogger("virt_backup")
 
 
 def convert(definition):
-    def_version = version_parser(definition["version"])
     converters = (ToV0_4(),)
     for c in converters:
+        def_version = version_parser(definition["version"])
         if c.is_needed(def_version):
             logger.debug(
                 "definition %s needs convertion update to v%s",
