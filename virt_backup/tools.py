@@ -1,9 +1,6 @@
 import logging
 import os
-import re
 import shutil
-import sys
-import tarfile
 
 
 def copy_file(src, dst, buffersize=None):
