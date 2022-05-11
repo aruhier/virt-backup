@@ -32,7 +32,7 @@ setup(
     keywords="libvirt",
     packages=find_packages(exclude=["example", "tests"]),
     install_requires=[
-        "appdirs", "argparse", "arrow", "libvirt-python", "lxml", "packaging", "PyYAML"
+        "appdirs", "arrow", "libvirt-python", "lxml", "packaging", "PyYAML"
     ],
     setup_requires=['pytest-runner', ],
     # Deepdiff: 5.0.2 forced for Python 3.5 compatibility.
