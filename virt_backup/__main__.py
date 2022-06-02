@@ -73,7 +73,7 @@ def build_parser():
 
     sp_list = sp_action.add_parser("list", aliases=["ls"], help=("list groups"))
     sp_list.add_argument(
-        "groups", metavar="group", type=str, nargs="*", help="domain group to clean"
+        "groups", metavar="group", type=str, nargs="*", help="domain group to list"
     )
     sp_list.add_argument(
         "-D",
