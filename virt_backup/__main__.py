@@ -47,7 +47,7 @@ def build_parser():
     sp_restore.add_argument(
         "--date", metavar="date", help="backup date (default: last backup)"
     )
-    sp_restore.add_argument("target_dir", metavar="target_dir", help="backup date")
+    sp_restore.add_argument("target_dir", metavar="target_dir", help="destination path")
     sp_restore.set_defaults(func=restore_backup)
 
     sp_clean = sp_action.add_parser("clean", aliases=["cl"], help=("clean groups"))

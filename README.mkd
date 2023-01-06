@@ -108,7 +108,7 @@ $ virt-backup list -h
 usage: virt-backup list [-h] [-D domain_name] [-s] [group [group ...]]
 
 positional arguments:
-  group                 domain group to clean
+  group                 domain group to list
 
 optional arguments:
   -D domain_name, --domain domain_name
@@ -133,7 +133,7 @@ usage: virt-backup restore [-h] [--date date] group domain target_dir
 positional arguments:
   group        domain group
   domain       domain name
-  target_dir   backup date
+  target_dir   destination path
 
 optional arguments:
   --date date  backup date (default: last backup)
