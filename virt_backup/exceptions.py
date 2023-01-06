@@ -43,6 +43,11 @@ class ImageNotFoundError(Exception):
         super().__init__("Image {} not found in {}".format(image, target))
 
 
+class ImageFoundError(Exception):
+    def __init__(self, image):
+        super().__init__("Image {} found".format(image))
+
+
 class DomainRunningError(Exception):
     """
     Domain is running when a task would need it to be shutdown

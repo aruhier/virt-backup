@@ -5,7 +5,7 @@ import re
 import shutil
 import zstandard as zstd
 
-from virt_backup.exceptions import CancelledError, ImageNotFoundError
+from virt_backup.exceptions import CancelledError, ImageNotFoundError, ImageFoundError
 from . import (
     _AbstractBackupPackager,
     _AbstractReadBackupPackager,
@@ -82,6 +82,8 @@ class ReadBackupPackagerZSTD(_AbstractReadBackupPackager, _AbstractBackupPackage
             os.makedirs(target)
         if os.path.isdir(target):
             target = os.path.join(target, name)
+        if os.path.isfile(target):
+            raise ImageFoundError(target)
 
         buffersize = 2 ** 20
         dctx = zstd.ZstdDecompressor()
