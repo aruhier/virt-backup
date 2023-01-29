@@ -43,12 +43,16 @@ def _list_json_following_pattern_by_domain(directory, glob_pattern):
     backups = {}
     for json_file in glob.glob(os.path.join(directory, glob_pattern)):
         logger.debug("{} detected".format(json_file))
-        with open(json_file, "r") as definition_file:
-            try:
-                metadata = json.load(definition_file)
-            except Exception as e:
-                logger.debug("Error for file {}: {}".format(json_file, e))
-                continue
+        try:
+            with open(json_file, "r") as definition_file:
+                try:
+                    metadata = json.load(definition_file)
+                except Exception as e:
+                    logger.debug("Error for file {}: {}".format(json_file, e))
+                    continue
+        except FileNotFoundError as e:
+            logger.warning(f"File vanished: {e}")
+            continue
         domain_name = metadata["domain_name"]
         if domain_name not in backups:
             backups[domain_name] = []
