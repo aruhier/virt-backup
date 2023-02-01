@@ -51,7 +51,7 @@ def _list_json_following_pattern_by_domain(directory, glob_pattern):
                     logger.debug("Error for file {}: {}".format(json_file, e))
                     continue
         except FileNotFoundError as e:
-            logger.warning(f"File vanished: {e}")
+            logger.warning(f"File not found or already removed: {e}")
             continue
         domain_name = metadata["domain_name"]
         if domain_name not in backups:
