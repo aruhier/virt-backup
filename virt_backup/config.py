@@ -23,6 +23,7 @@ def get_config(custom_path=None):
 
     :returns: loaded config in yaml, as a dict object
     """
+    config_path = ""
     if custom_path:
         config_path = custom_path
     else:

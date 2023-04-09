@@ -109,6 +109,14 @@ def build_parser():
         action="store_true",
     )
     parser.add_argument(
+        "-c",
+        "--config",
+        dest="config_path",
+        help="config path",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
         "--version", action="version", version="{} {}".format(APP_NAME, VERSION)
     )
 
@@ -149,7 +157,7 @@ def parse_args_and_run(parser):
 def start_backups(parsed_args, *args, **kwargs):
     vir_event_loop_native_start()
 
-    config = get_setup_config()
+    config = get_setup_config(parsed_args.config_path)
     conn = get_setup_conn(config)
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
 
@@ -199,7 +207,7 @@ def build_main_backup_group(groups):
 def restore_backup(parsed_args, *args, **kwargs):
     vir_event_loop_native_start()
 
-    config = get_setup_config()
+    config = get_setup_config(parsed_args.config_path)
     conn = get_setup_conn(config)
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     try:
@@ -241,7 +249,7 @@ def restore_backup(parsed_args, *args, **kwargs):
 def clean_backups(parsed_args, *args, **kwargs):
     vir_event_loop_native_start()
 
-    config = get_setup_config()
+    config = get_setup_config(parsed_args.config_path)
     conn = get_setup_conn(config)
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
     groups = get_usable_complete_groups(
@@ -279,7 +287,7 @@ def clean_backups(parsed_args, *args, **kwargs):
 
 def list_groups(parsed_args, *args, **kwargs):
     vir_event_loop_native_start()
-    config = get_setup_config()
+    config = get_setup_config(parsed_args.config_path)
     conn = get_setup_conn(config)
     callbacks_registrer = DomExtSnapshotCallbackRegistrer(conn)
 
@@ -368,14 +376,14 @@ def list_detailed_backups_for_domain(group, domains_names, short=False):
                 )
 
 
-def get_setup_config():
+def get_setup_config(custom_path=None):
     config = Config(
         defaults={
             "debug": False,
         }
     )
     try:
-        loaded_config = get_config()
+        loaded_config = get_config(custom_path)
     except FileNotFoundError:
         sys.exit(1)
 
