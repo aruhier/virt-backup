@@ -336,7 +336,7 @@ def mock_get_config(monkeypatch):
     )
     config.from_dict(get_config(TESTCONF_PATH))
 
-    monkeypatch.setattr(virt_backup.__main__, "get_setup_config", lambda: config)
+    monkeypatch.setattr(virt_backup.__main__, "get_setup_config", lambda _: config)
 
     return config
 
