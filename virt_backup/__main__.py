@@ -185,9 +185,10 @@ def start_backups(parsed_args, *args, **kwargs):
 def vir_event_loop_native_start():
     libvirt.virEventRegisterDefaultImpl()
     eventLoopThread = threading.Thread(
-        target=vir_event_loop_native_run, name="libvirtEventLoop"
+        target=vir_event_loop_native_run,
+        name="libvirtEventLoop",
+        daemon=True,
     )
-    eventLoopThread.setDaemon(True)
     eventLoopThread.start()
 
 
