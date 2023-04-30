@@ -107,7 +107,7 @@ class ReadBackupPackagerTar(_AbstractReadBackupPackager, _AbstractBackupPackager
         if os.path.isfile(target):
             raise ImageFoundError(target)
 
-        buffersize = 2 ** 20
+        buffersize = 2**20
         self._tarfile.fileobj.flush()
         try:
             with self._tarfile.extractfile(disk_tarinfo) as fsrc:
@@ -154,7 +154,7 @@ class WriteBackupPackagerTar(_AbstractWriteBackupPackager, _AbstractBackupPackag
         )
         self._tarfile.fileobj.write(buf)
         self._tarfile.offset += len(buf)
-        buffersize = 2 ** 20
+        buffersize = 2**20
 
         with open(src, "rb") as fsrc:
             while True:

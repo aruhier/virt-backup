@@ -40,7 +40,7 @@ class _AbstractBackupPackagerDir(_AbstractBackupPackager):
     def list(self):
         return os.listdir(self.path)
 
-    def _copy_file(self, src, dst, stop_event=None, buffersize=2 ** 20):
+    def _copy_file(self, src, dst, stop_event=None, buffersize=2**20):
         if not os.path.exists(dst) and dst.endswith("/"):
             os.makedirs(dst)
         if os.path.isdir(dst):

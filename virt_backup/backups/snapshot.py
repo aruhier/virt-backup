@@ -19,7 +19,6 @@ logger = logging.getLogger("virt_backup")
 
 
 class DomExtSnapshotCallbackRegistrer:
-
     _callback_id = None
 
     def __init__(self, conn):

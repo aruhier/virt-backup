@@ -85,7 +85,7 @@ class ReadBackupPackagerZSTD(_AbstractReadBackupPackager, _AbstractBackupPackage
         if os.path.isfile(target):
             raise ImageFoundError(target)
 
-        buffersize = 2 ** 20
+        buffersize = 2**20
         dctx = zstd.ZstdDecompressor()
         try:
             with open(self.archive_path(name), "rb") as ifh, open(target, "xb") as ofh:

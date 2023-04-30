@@ -13,7 +13,7 @@ def new_image(tmpdir, name="test", content=None):
     image = tmpdir.join(name)
     if content is None:
         # Generate a content of around 5MB.
-        content = "{:016d}".format(random.randrange(16)) * int(5 * 2 ** 20 / 16)
+        content = "{:016d}".format(random.randrange(16)) * int(5 * 2**20 / 16)
     image.write(content)
     return image
 
