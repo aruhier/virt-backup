@@ -17,7 +17,7 @@ class _AbstractBackupPackagerDir(_AbstractBackupPackager):
     Images are just copied in a directory
     """
 
-    def __init__(self, name, path):
+    def __init__(self, name, path, *args, **kwargs):
         super().__init__(name)
         self.path = path
 

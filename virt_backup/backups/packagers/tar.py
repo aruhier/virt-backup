@@ -20,7 +20,14 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
     _mode = ""
 
     def __init__(
-        self, name, path, archive_name, compression=None, compression_lvl=None
+        self,
+        name,
+        path,
+        archive_name,
+        compression=None,
+        compression_lvl=None,
+        *args,
+        **kwargs
     ):
         super().__init__(name)
 

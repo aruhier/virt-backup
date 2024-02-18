@@ -33,7 +33,7 @@ class _AbstractBackupPackager(ABC):
     #: backups.
     is_shareable = False
 
-    def __init__(self, name=None):
+    def __init__(self, name=None, *args, **kwargs):
         #: Used for logging
         self.name = name
 

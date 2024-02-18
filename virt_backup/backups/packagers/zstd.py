@@ -18,7 +18,9 @@ from . import (
 class _AbstractBackupPackagerZSTD(_AbstractBackupPackager):
     _mode = ""
 
-    def __init__(self, name, path, name_prefix, compression_lvl=0, threads=0):
+    def __init__(
+        self, name, path, name_prefix, compression_lvl=0, threads=0, *args, **kwargs
+    ):
         super().__init__(name)
 
         #: Directory path to store the archives in.
