@@ -14,7 +14,6 @@ from virt_backup.domains import (
 )
 from virt_backup.exceptions import DiskNotSnapshot, SnapshotNotStarted
 
-
 logger = logging.getLogger("virt_backup")
 
 

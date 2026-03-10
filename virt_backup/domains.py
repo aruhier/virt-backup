@@ -4,7 +4,6 @@ import lxml.etree
 
 from virt_backup.exceptions import DiskNotFoundError
 
-
 logger = logging.getLogger("virt_backup")
 
 

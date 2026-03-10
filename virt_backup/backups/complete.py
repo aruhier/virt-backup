@@ -12,7 +12,6 @@ from virt_backup.exceptions import DomainRunningError
 from virt_backup.tools import copy_file
 from . import _BaseDomBackup
 
-
 logger = logging.getLogger("virt_backup")
 
 

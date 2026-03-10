@@ -6,7 +6,6 @@ import arrow
 from packaging.version import parse as version_parser
 import yaml
 
-
 logger = logging.getLogger("virt_backup")
 
 

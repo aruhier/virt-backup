@@ -6,7 +6,6 @@ from packaging.version import parse as version_parser
 from virt_backup.domains import get_xml_block_of_disk
 from . import definition as definition_compat
 
-
 logger = logging.getLogger("virt_backup")
 
 

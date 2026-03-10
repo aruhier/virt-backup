@@ -18,7 +18,6 @@ from virt_backup.tools import copy_file
 from . import _BaseDomBackup
 from .snapshot import DomExtSnapshot
 
-
 logger = logging.getLogger("virt_backup")
 
 

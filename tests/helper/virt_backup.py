@@ -13,7 +13,6 @@ from virt_backup.backups import (
 )
 from virt_backup.groups import BackupGroup
 
-
 CUR_PATH = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -235,7 +234,7 @@ def build_dombackup(dom, *dombackup_args, **dombackup_kwargs):
         dom,
         *dombackup_args,
         callbacks_registrer=callbacks_registrer,
-        **dombackup_kwargs
+        **dombackup_kwargs,
     )
 
 

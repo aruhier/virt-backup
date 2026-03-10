@@ -19,7 +19,6 @@ from virt_backup.config import get_config, Config
 from virt_backup.tools import InfoFilter
 from virt_backup import APP_NAME, VERSION, compat_layers
 
-
 logger = logging.getLogger("virt_backup")
 
 

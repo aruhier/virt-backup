@@ -11,7 +11,6 @@ from virt_backup.backups import (
 from virt_backup.exceptions import BackupNotFoundError, DomainNotFoundError
 from .pattern import domains_matching_with_patterns
 
-
 logger = logging.getLogger("virt_backup")
 
 

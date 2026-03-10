@@ -6,7 +6,6 @@ import yaml
 
 from virt_backup import APP_NAME
 
-
 logger = logging.getLogger("virt_backup")
 
 os.environ["XDG_CONFIG_DIRS"] = "/etc"

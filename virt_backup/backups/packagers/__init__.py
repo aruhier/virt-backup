@@ -7,7 +7,6 @@ from virt_backup.exceptions import (
     BackupPackagerOpenedError,
 )
 
-
 logger = logging.getLogger("virt_backup")
 
 

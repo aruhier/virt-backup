@@ -9,7 +9,6 @@ from virt_backup.domains import search_domains_regex
 from virt_backup.exceptions import BackupsFailureInGroupError, CancelledError
 from .pattern import matching_libvirt_domains_from_config
 
-
 logger = logging.getLogger("virt_backup")
 
 

@@ -4,7 +4,6 @@ import os
 import threading
 from virt_backup.domains import get_domain_disks_of
 
-
 __all__ = [
     "DomBackup",
     "DomCompleteBackup",

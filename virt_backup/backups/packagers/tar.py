@@ -27,7 +27,7 @@ class _AbstractBackupPackagerTar(_AbstractBackupPackager):
         compression=None,
         compression_lvl=None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(name)
 

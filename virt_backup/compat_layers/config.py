@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import logging
 import yaml
 
-
 logger = logging.getLogger("virt_backup")
 
 

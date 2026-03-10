@@ -4,7 +4,6 @@ import re
 
 from virt_backup.domains import search_domains_regex
 
-
 logger = logging.getLogger("virt_backup")
 
 
