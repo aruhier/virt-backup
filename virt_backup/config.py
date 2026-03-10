@@ -1,7 +1,7 @@
 import errno
 import logging
 import os
-import appdirs
+import platformdirs
 import yaml
 
 from virt_backup import APP_NAME
@@ -11,8 +11,8 @@ logger = logging.getLogger("virt_backup")
 
 os.environ["XDG_CONFIG_DIRS"] = "/etc"
 CONFIG_DIRS = (
-    appdirs.user_config_dir(APP_NAME),
-    appdirs.site_config_dir(APP_NAME),
+    platformdirs.user_config_dir(APP_NAME),
+    platformdirs.site_config_dir(APP_NAME),
 )
 CONFIG_FILENAME = "config.yml"
 

@@ -27,11 +27,11 @@ setup(
     keywords="libvirt",
     packages=find_packages(exclude=["example", "tests"]),
     install_requires=[
-        "appdirs",
         "arrow",
         "libvirt-python",
         "lxml",
         "packaging",
+        "platformdirs",
         "PyYAML",
     ],
     setup_requires=[
