@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "virt-backup"
+version = "0.5.6"
+description = "Automatic backups for libvirt"
+readme = "README.md"
+license = {text = "BSD-2-Clause"}
+authors = [{name = "Anthony Ruhier", email = "anthony.ruhier@gmail.com"}]
+requires-python = ">=3.12"
+classifiers = [
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: BSD License",
+]
+dependencies = [
+    "appdirs",
+    "arrow",
+    "libvirt-python",
+    "lxml",
+    "packaging",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+zstd = ["zstandard"]
+test = ["pytest", "pytest-cov", "pytest-mock", "deepdiff", "apipkg"]
+
+[project.scripts]
+virt-backup = "virt_backup.__main__:cli_run"
+
+[project.urls]
+Homepage = "https://github.com/Anthony25/virt-backup"
+Repository = "https://github.com/Anthony25/virt-backup"
+
+[tool.setuptools.packages.find]
+exclude = ["example", "tests"]
+
+[tool.bumpversion]
+current_version = "0.5.6"
+commit = true
+tag = true
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "virt_backup/__init__.py"
+search = 'VERSION = "{current_version}"'
+replace = 'VERSION = "{new_version}"'
