@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "virt-backup"
-version = "0.5.6"
+version = "0.5.7"
 description = "Automatic backups for libvirt"
 readme = "README.md"
 license = {text = "BSD-2-Clause"}
@@ -39,7 +39,7 @@ Repository = "https://github.com/Anthony25/virt-backup"
 exclude = ["example", "tests"]
 
 [tool.bumpversion]
-current_version = "0.5.6"
+current_version = "0.5.7"
 commit = true
 tag = true
 
