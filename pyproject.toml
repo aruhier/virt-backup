@@ -16,11 +16,11 @@ classifiers = [
     "License :: OSI Approved :: BSD License",
 ]
 dependencies = [
-    "appdirs",
     "arrow",
     "libvirt-python",
     "lxml",
     "packaging",
+    "platformdirs",
     "PyYAML",
 ]
 
