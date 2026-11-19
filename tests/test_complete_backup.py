@@ -5,7 +5,11 @@ import tarfile
 import arrow
 import pytest
 
-from virt_backup.backups import build_dom_complete_backup_from_def
+from virt_backup.backups import (
+    DomBackup,
+    DomExtSnapshotCallbackRegistrer,
+    build_dom_complete_backup_from_def,
+)
 from virt_backup.domains import get_domain_disks_of
 from virt_backup.exceptions import DomainRunningError
 
@@ -115,6 +119,34 @@ class TestDomCompleteBackup:
         target_dir = tmpdir.mkdir("extract")
 
         return self.restore_to(backup, target_dir)
+
+    def test_restore_to_same_image_names(
+        self, build_mock_domain, build_mock_libvirtconn, tmpdir
+    ):
+        """
+        Test with 2 disks having the same image name in different directories
+        """
+        callbacks_registrer = DomExtSnapshotCallbackRegistrer(build_mock_libvirtconn)
+        dombkup = DomBackup(
+            dom=build_mock_domain,
+            dev_disks=("vda", "vdb"),
+            packager="directory",
+            callbacks_registrer=callbacks_registrer,
+        )
+        dombkup.backup_dir = str(tmpdir.mkdir("backup"))
+        backup = transform_dombackup_to_dom_complete_backup(dombkup)
+        backup.dom_xml = backup.dom_xml.replace(
+            "/var/lib/libvirt/images/test-disk-2.qcow2",
+            "/var/lib/libvirt/images2/test-disk-1.qcow2",
+        )
+        target_dir = tmpdir.mkdir("extract")
+
+        self.restore_to(backup, target_dir)
+        for disk in ("vda", "vdb"):
+            assert filecmp.cmp(
+                backup.get_complete_path_of(backup.disks[disk]),
+                str(target_dir.join("{}_test-disk-1.qcow2".format(disk))),
+            )
 
     def restore_to(self, complete_backup, target):
         complete_backup.restore_to(str(target))
