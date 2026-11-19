@@ -1,4 +1,5 @@
 import arrow
+import collections
 import logging
 import lxml.etree
 import os
@@ -147,9 +148,15 @@ class DomCompleteBackup(_BaseDomBackup):
 
         # TODO: store the original images names in the definition file
         disks_src = get_domain_disks_of(self.dom_xml)
-        for d in self.disks:
-            original_img_name = os.path.basename(disks_src[d]["src"])
-            self.restore_disk_to(d, os.path.join(target, original_img_name))
+        img_names = {d: os.path.basename(disks_src[d]["src"]) for d in self.disks}
+        # Disks can have the same image name in different directories. Prefix
+        # those with the disk name, otherwise they would be restored to the
+        # same path.
+        names_count = collections.Counter(img_names.values())
+        for d, img_name in img_names.items():
+            if names_count[img_name] > 1:
+                img_name = "{}_{}".format(d, img_name)
+            self.restore_disk_to(d, os.path.join(target, img_name))
         xml_path = "{}.xml".format(os.path.join(target, self.dom_name))
         with open(xml_path, "w") as xml_file:
             xml_file.write(self.dom_xml or "")
